@@ -1,0 +1,579 @@
+import { useState } from 'react'
+import { adminDb, systemSettingsDb, institutionDb, userDb, useLocalState, addLog, InstLoginConfig, STUDENT_COLUMNS } from '../../db'
+import { AppDialog, useDialog } from '../../components/AppDialog'
+import { PERM_GROUPS, ALL_PERMS } from '../../permissions'
+
+const EyeIcon = ({ off }: { off: boolean }) => off
+  ? <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+  : <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+
+const ROLES: Record<string, string> = {
+  superadmin: 'Baş Admin',
+  admin:      'Admin',
+  moderator:  'Moderator',
+  operator:   'Operator',
+}
+
+const ROLE_BADGE: Record<string, string> = {
+  superadmin: 'badge-purple',
+  admin:      'badge-blue',
+  moderator:  'badge-orange',
+  operator:   'badge-green',
+}
+
+const EMPTY_FORM = { name: '', email: '', role: 'admin', username: '', password: '', permissions: [] as string[] }
+
+// ── İcazə seçimi (checkbox qrupları) ──
+function PermSelector({ value, onChange }: { value: string[]; onChange: (v: string[]) => void }) {
+  const toggle = (code: string) =>
+    onChange(value.includes(code) ? value.filter(c => c !== code) : [...value, code])
+  const toggleGroup = (codes: string[]) => {
+    const allOn = codes.every(c => value.includes(c))
+    onChange(allOn ? value.filter(c => !codes.includes(c)) : [...new Set([...value, ...codes])])
+  }
+  return (
+    <div style={{ border: '1.5px solid #e8eaf5', borderRadius: 12, overflow: 'hidden' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '9px 14px', background: '#f8f9fd', borderBottom: '1.5px solid #eef0f8' }}>
+        <span style={{ fontSize: 11, fontWeight: 800, color: '#9a7b1e', textTransform: 'uppercase', letterSpacing: .5 }}>🛡️ İcazələr ({value.length}/{ALL_PERMS.length})</span>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button type="button" onClick={() => onChange([...ALL_PERMS])} style={{ fontSize: 11, fontWeight: 700, color: '#c9962a', background: 'none', border: 'none', cursor: 'pointer' }}>Hamısı</button>
+          <button type="button" onClick={() => onChange([])} style={{ fontSize: 11, fontWeight: 700, color: '#999', background: 'none', border: 'none', cursor: 'pointer' }}>Heç biri</button>
+        </div>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '14px 20px', padding: '12px 16px' }}>
+        {PERM_GROUPS.map(g => {
+          const codes = g.perms.map(p => p.code)
+          const allOn = codes.every(c => value.includes(c))
+          return (
+            <div key={g.group} style={{ background: '#fafbff', border: '1px solid #eef0f8', borderRadius: 10, padding: '10px 12px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 7, cursor: 'pointer', marginBottom: 7 }}>
+                <input type="checkbox" checked={allOn} onChange={() => toggleGroup(codes)} style={{ accentColor: '#c9962a' }} />
+                <span style={{ fontSize: 12.5, fontWeight: 800, color: '#5a4a12' }}>{g.icon} {g.group}</span>
+              </label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, paddingLeft: 22 }}>
+                {g.perms.map(p => (
+                  <label key={p.code} style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12, color: value.includes(p.code) ? '#3a4cad' : '#888', whiteSpace: 'nowrap' }}>
+                    <input type="checkbox" checked={value.includes(p.code)} onChange={() => toggle(p.code)} style={{ accentColor: '#c9962a' }} />
+                    {p.label}
+                  </label>
+                ))}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+export default function Admins() {
+  const [admins, refresh] = useLocalState(adminDb.getAll)
+  const [modal,  setModal]  = useState(false)
+  const [form,   setForm]   = useState({ ...EMPTY_FORM })
+  const [showPw, setShowPw] = useState(false)
+  const { dialog, showConfirm, showInfo, closeDialog } = useDialog()
+
+  // Şifrə dəyişmə state
+  const [pwModal,   setPwModal]   = useState(false)
+  const [pwTarget,  setPwTarget]  = useState<any>(null)
+  const [pwCurrent, setPwCurrent] = useState('')
+  const [pwNew,     setPwNew]     = useState('')
+  const [pwNew2,    setPwNew2]    = useState('')
+  const [pwShowC,   setPwShowC]   = useState(false)
+  const [pwShowN,   setPwShowN]   = useState(false)
+  const [pwError,   setPwError]   = useState('')
+
+  const session = (() => { try { return JSON.parse(sessionStorage.getItem('admin_session') || 'null') } catch { return null } })()
+  const isSuperAdmin = session?.role === 'superadmin'
+
+  const institutions = institutionDb.getAll() as any[]
+  const [selInst, setSelInst] = useState<string>(institutions[0]?.id || '')
+  const [instCfg, setInstCfg] = useState<InstLoginConfig>(() =>
+    systemSettingsDb.getInstConfig(institutions[0]?.id || '')
+  )
+  const [settingsSaved, setSettingsSaved] = useState(false)
+
+  function handleInstChange(id: string) {
+    setSelInst(id)
+    setInstCfg(systemSettingsDb.getInstConfig(id))
+  }
+
+  function handleSaveSettings() {
+    systemSettingsDb.setInstConfig(selInst, instCfg)
+    setSettingsSaved(true)
+    setTimeout(() => setSettingsSaved(false), 2000)
+    addLog('admin', 'success', 'Giriş parametrləri yeniləndi', `Müəssisə: ${selInst}`, session?.name)
+  }
+
+  // ── Yalnız bu müəssisənin kursant datasında mövcud olan sütunlar ──
+  const instCadets = (userDb.getAll() as any[]).filter((u: any) => u.institution === selInst)
+  const availColumns0 = STUDENT_COLUMNS.filter(c => instCadets.some((u: any) => u[c.key] != null && String(u[c.key]).trim() !== ''))
+  const availColumns = availColumns0.length ? availColumns0 : STUDENT_COLUMNS  // kursant yoxdursa hamısını göstər
+  const colOptions = (selectedKey: string) =>
+    availColumns.some(c => c.key === selectedKey)
+      ? availColumns
+      : [STUDENT_COLUMNS.find(c => c.key === selectedKey)!, ...availColumns].filter(Boolean)
+
+  function setF1(k: keyof InstLoginConfig['field1'], v: any) {
+    setInstCfg(c => ({ ...c, field1: { ...c.field1, [k]: v } }))
+  }
+  function setF2(k: keyof InstLoginConfig['field2'], v: any) {
+    setInstCfg(c => ({ ...c, field2: { ...c.field2, [k]: v } }))
+  }
+
+  function openPwModal(a: any) {
+    setPwTarget(a); setPwCurrent(''); setPwNew(''); setPwNew2(''); setPwError(''); setPwModal(true)
+  }
+
+  function handleChangePw() {
+    if (!pwNew || !pwNew2) { setPwError('Bütün sahələri doldurun'); return }
+    // Superadmin öz şifrəsini dəyişəndə cari şifrə yoxlanır
+    if (pwTarget?.id === session?.id) {
+      if (!pwCurrent) { setPwError('Cari şifrəni daxil edin'); return }
+      if (pwTarget.password !== pwCurrent) { setPwError('Cari şifrə yanlışdır'); return }
+    }
+    if (pwNew.length < 6) { setPwError('Yeni şifrə ən azı 6 simvol olmalıdır'); return }
+    if (pwNew !== pwNew2) { setPwError('Yeni şifrələr uyğun gəlmir'); return }
+    adminDb.update(pwTarget.id, { password: pwNew })
+    // Öz şifrəsini dəyişirsə sessionı yenilə
+    if (pwTarget?.id === session?.id) {
+      sessionStorage.setItem('admin_session', JSON.stringify({ ...session }))
+    }
+    refresh(); setPwModal(false)
+    addLog('admin', 'success', `Şifrə dəyişdirildi: ${pwTarget.name}`, '', session?.name)
+    showInfo({ icon:'✅', iconBg:'#f0fff4', iconColor:'#52c41a', title:'Şifrə dəyişdirildi', message:'Yeni şifrə uğurla yadda saxlanıldı.', confirmLabel:'Bağla' })
+  }
+
+  const isOperator = form.role === 'operator'
+  const needsPerms = form.role === 'admin' || form.role === 'moderator' || form.role === 'operator'
+
+  function handleAdd() {
+    if (!form.name || !form.username || !form.password) return
+    adminDb.create({
+      name:        form.name,
+      email:       isOperator ? '' : form.email,
+      role:        form.role,
+      username:    form.username.trim(),
+      password:    form.password,
+      permissions: needsPerms ? form.permissions : undefined,
+    })
+    addLog('admin', 'success', `Yeni hesab yaradıldı: "${form.name}" (${ROLES[form.role] || form.role})`,
+      `@${form.username.trim()}${needsPerms ? ` · ${form.permissions.length} icazə` : ''}`)
+    refresh()
+    setModal(false)
+    setForm({ ...EMPTY_FORM })
+  }
+
+  // ── İcazə redaktə modalı ──
+  const [permTarget, setPermTarget] = useState<any>(null)
+  const [permSel,    setPermSel]    = useState<string[]>([])
+  function openPerms(a: any) { setPermTarget(a); setPermSel(a.permissions || []) }
+  function savePerms() {
+    adminDb.update(permTarget.id, { permissions: permSel })
+    addLog('admin', 'info', `İcazələr yeniləndi: "${permTarget.name}"`, `${permSel.length} icazə`, session?.name)
+    refresh(); setPermTarget(null)
+  }
+
+  function handleDelete(a: any) {
+    showConfirm({
+      icon: '🗑️', iconBg: '#fff0f0', iconColor: '#ff4d4f',
+      title: 'Hesabı sil',
+      message: `"${a.name}" hesabı silinəcək. Bu əməliyyat geri alına bilməz.`,
+      confirmLabel: 'Sil', confirmColor: '#ff4d4f',
+      onConfirm: () => { adminDb.delete(a.id); refresh(); addLog('admin', 'warning', `Hesab silindi: "${a.name}" (${ROLES[a.role] || a.role})`, `id: ${a.id}`) },
+    })
+  }
+
+  return (
+    <>
+      {dialog && <AppDialog cfg={dialog} onClose={closeDialog} />}
+
+      {/* ── Şifrə dəyişmə modalı ── */}
+      {pwModal && pwTarget && (
+        <div className="modal-overlay open" onClick={() => setPwModal(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 420 }}>
+            <div className="modal-head">
+              <span className="modal-title">🔑 Şifrəni Dəyiş — {pwTarget.name}</span>
+              <button className="modal-close" onClick={() => setPwModal(false)}>✕</button>
+            </div>
+            <div className="modal-body">
+              {/* Cari şifrə — yalnız öz hesabı üçün */}
+              {pwTarget.id === session?.id && (
+                <div className="form-group">
+                  <label className="form-label">Cari şifrə *</label>
+                  <div style={{ position: 'relative' }}>
+                    <input className="form-input" type={pwShowC ? 'text' : 'password'}
+                      placeholder="Mövcud şifrəni daxil edin"
+                      value={pwCurrent} onChange={e => { setPwCurrent(e.target.value); setPwError('') }}
+                      style={{ paddingRight: 44 }} />
+                    <button type="button" onClick={() => setPwShowC(v => !v)} title={pwShowC ? 'Gizlət' : 'Göstər'}
+                      style={{ position:'absolute', right:12, top:'50%', transform:'translateY(-50%)', background:'none', border:'none', cursor:'pointer', color:'var(--muted)', padding:4, lineHeight:0, display:'flex', alignItems:'center' }}>
+                      <EyeIcon off={pwShowC} />
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Yeni şifrə */}
+              <div className="form-group">
+                <label className="form-label">Yeni şifrə *</label>
+                <div style={{ position: 'relative' }}>
+                  <input className="form-input" type={pwShowN ? 'text' : 'password'}
+                    placeholder="Ən azı 6 simvol"
+                    value={pwNew} onChange={e => { setPwNew(e.target.value); setPwError('') }}
+                    style={{ paddingRight: 44 }} />
+                  <button type="button" onClick={() => setPwShowN(v => !v)} title={pwShowN ? 'Gizlət' : 'Göstər'}
+                    style={{ position:'absolute', right:12, top:'50%', transform:'translateY(-50%)', background:'none', border:'none', cursor:'pointer', color:'var(--muted)', padding:4, lineHeight:0, display:'flex', alignItems:'center' }}>
+                    <EyeIcon off={pwShowN} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Təkrar */}
+              <div className="form-group">
+                <label className="form-label">Yeni şifrəni təkrarla *</label>
+                <input className="form-input" type="password"
+                  placeholder="Yeni şifrəni yenidən daxil edin"
+                  value={pwNew2} onChange={e => { setPwNew2(e.target.value); setPwError('') }} />
+              </div>
+
+              {pwError && (
+                <div style={{ padding:'10px 14px', borderRadius:10, background:'#fff0f0', border:'1px solid #ffccc7', color:'#cf1322', fontSize:12, fontWeight:600 }}>
+                  ⚠ {pwError}
+                </div>
+              )}
+            </div>
+            <div className="modal-foot">
+              <button className="btn btn-outline" onClick={() => setPwModal(false)}>Ləğv et</button>
+              <button className="btn btn-primary" onClick={handleChangePw}>🔑 Şifrəni yenilə</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── İcazə redaktə modalı ── */}
+      {permTarget && (
+        <div className="modal-overlay open" onClick={() => setPermTarget(null)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 780, width: '94vw' }}>
+            <div className="modal-head">
+              <span className="modal-title">🛡️ İcazələr — {permTarget.name}</span>
+              <button className="modal-close" onClick={() => setPermTarget(null)}>✕</button>
+            </div>
+            <div className="modal-body" style={{ maxHeight: '82vh' }}>
+              <PermSelector value={permSel} onChange={setPermSel} />
+            </div>
+            <div className="modal-foot">
+              <button className="btn btn-outline" onClick={() => setPermTarget(null)}>Ləğv et</button>
+              <button className="btn btn-primary" onClick={savePerms}>✓ Yadda saxla</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Yeni hesab modalı ── */}
+      {modal && (
+        <div className="modal-overlay open" onClick={() => setModal(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: needsPerms ? 1020 : 480, width: '94vw', transition: 'max-width .2s' }}>
+            <div className="modal-head">
+              <span className="modal-title">➕ Yeni Hesab</span>
+              <button className="modal-close" onClick={() => setModal(false)}>✕</button>
+            </div>
+            <div className="modal-body" style={{ maxHeight: '85vh' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: needsPerms ? '300px 1fr' : '1fr', gap: needsPerms ? 22 : 0, alignItems: 'start' }}>
+              <div>
+              {/* Rol */}
+              <div className="form-group">
+                <label className="form-label">Rol *</label>
+                <select className="form-select" value={form.role}
+                  onChange={e => setForm(f => ({ ...f, role: e.target.value }))}>
+                  <option value="admin">Admin</option>
+                  <option value="moderator">Moderator</option>
+                  <option value="operator">Operator</option>
+                </select>
+              </div>
+
+              {/* Ad Soyad */}
+              <div className="form-group">
+                <label className="form-label">Ad Soyad *</label>
+                <input className="form-input" placeholder="Məs: Əli Məmmədov"
+                  value={form.name}
+                  onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
+              </div>
+
+              {/* İstifadəçi adı + şifrə (bütün rollar üçün) */}
+              <div className="form-group">
+                <label className="form-label">İstifadəçi adı *</label>
+                <input className="form-input" placeholder={isOperator ? 'Məs: operator1' : 'Məs: admin2'}
+                  value={form.username}
+                  onChange={e => setForm(f => ({ ...f, username: e.target.value }))} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Şifrə *</label>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    className="form-input"
+                    type={showPw ? 'text' : 'password'}
+                    placeholder="Güclü şifrə daxil edin"
+                    value={form.password}
+                    style={{ paddingRight: 44 }}
+                    onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPw(p => !p)}
+                    title={showPw ? 'Gizlət' : 'Göstər'}
+                    style={{
+                      position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
+                      background: 'none', border: 'none', cursor: 'pointer',
+                      color: 'var(--muted)', padding: 4, lineHeight: 0, display:'flex', alignItems:'center',
+                    }}
+                  ><EyeIcon off={showPw} /></button>
+                </div>
+              </div>
+
+              {!isOperator && (
+                <div className="form-group">
+                  <label className="form-label">Email</label>
+                  <input className="form-input" type="email" placeholder="Məs: admin@mmu.az"
+                    value={form.email}
+                    onChange={e => setForm(f => ({ ...f, email: e.target.value }))} />
+                </div>
+              )}
+
+              </div>
+
+              {/* Sağ sütun: icazə seçimi — admin / moderator / operator üçün */}
+              {needsPerms && (
+                <PermSelector value={form.permissions} onChange={v => setForm(f => ({ ...f, permissions: v }))} />
+              )}
+              </div>
+            </div>
+            <div className="modal-foot">
+              <button className="btn btn-outline" onClick={() => setModal(false)}>Ləğv et</button>
+              <button
+                className="btn btn-primary"
+                onClick={handleAdd}
+                disabled={!form.name || !form.username || !form.password}
+                style={{ opacity: (!form.name || !form.username || !form.password) ? 0.5 : 1 }}
+              >
+                ✓ Əlavə et
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Cədvəl ── */}
+      <div className="card">
+        <div className="card-head">
+          <div>
+            <div className="card-title">Sistem İstifadəçiləri</div>
+            <div className="card-sub">Admin və operator hesabları</div>
+          </div>
+          <button className="btn btn-primary btn-sm" onClick={() => { setForm({ ...EMPTY_FORM }); setModal(true) }}>
+            + Hesab Yarat
+          </button>
+        </div>
+        <div className="card-body">
+          <table>
+            <thead>
+              <tr>
+                <th>Ad Soyad</th>
+                <th>Giriş məlumatı</th>
+                <th>Rol</th>
+                <th>Status</th>
+                <th>Son Giriş</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {(admins as any[]).map((a: any) => (
+                <tr key={a.id}>
+                  <td>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div style={{
+                        width: 34, height: 34, borderRadius: 10, flexShrink: 0,
+                        background: a.role === 'operator' ? 'linear-gradient(135deg,#00b96b,#007a47)' : 'linear-gradient(135deg,#c9962a,#b8860b)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: 15, color: '#fff', fontWeight: 800,
+                      }}>
+                        {a.role === 'operator' ? '🛠️' : a.name[0]}
+                      </div>
+                      <span style={{ fontWeight: 700 }}>{a.name}</span>
+                    </div>
+                  </td>
+                  <td style={{ color: 'var(--muted)', fontSize: 12 }}>
+                    {a.role === 'operator'
+                      ? <span style={{ fontFamily: 'monospace' }}>@{a.username}</span>
+                      : a.email
+                    }
+                  </td>
+                  <td>
+                    <span className={`badge ${ROLE_BADGE[a.role] || 'badge-gray'}`}>
+                      {ROLES[a.role] || a.role}
+                    </span>
+                  </td>
+                  <td>
+                    <span className={`badge ${a.status === 'active' ? 'badge-green' : 'badge-red'}`}>
+                      {a.status === 'active' ? 'Aktiv' : 'Deaktiv'}
+                    </span>
+                  </td>
+                  <td style={{ color: 'var(--muted)', fontSize: 11 }}>{a.lastLogin || '—'}</td>
+                  <td>
+                    <div style={{ display:'flex', gap:6, alignItems:'center' }}>
+                      {a.username && (
+                        <button className="btn-ghost" title="Şifrəni dəyiş" onClick={() => openPwModal(a)}
+                          style={{ color:'#c9962a', border:'1.5px solid #c5d0ff', borderRadius:8, padding:'4px 10px', background:'#f4f7ff', fontSize:13 }}>
+                          🔑
+                        </button>
+                      )}
+                      {isSuperAdmin && (a.role === 'admin' || a.role === 'moderator' || a.role === 'operator') && (
+                        <button className="btn-ghost" title="İcazələr" onClick={() => openPerms(a)}
+                          style={{ color:'#b8860b', border:'1.5px solid #d5c5ff', borderRadius:8, padding:'4px 10px', background:'#f8f4ff', fontSize:13 }}>
+                          🛡️ {(a.permissions || []).length}
+                        </button>
+                      )}
+                      <button className="btn-ghost" onClick={() => handleDelete(a)}>🗑</button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {(admins as any[]).length === 0 && (
+                <tr><td colSpan={6} style={{ textAlign: 'center', color: 'var(--muted)', padding: 40 }}>Hesab yoxdur</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {/* ── Giriş Parametrləri (yalnız superadmin) ── */}
+      {isSuperAdmin && (
+        <div className="card" style={{ marginTop: 20, overflow:'hidden' }}>
+
+          {/* Başlıq */}
+          <div style={{ background:'linear-gradient(135deg,#b8860b,#e0a92e)', padding:'20px 28px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+            <div>
+              <div style={{ fontSize:15, fontWeight:800, color:'#fff', marginBottom:3 }}>⚙️ Kursant Giriş Parametrləri</div>
+              <div style={{ fontSize:12, color:'#ffffffcc' }}>Müəssisəyə görə giriş sahələrini təyin edin</div>
+            </div>
+            <div style={{ display:'flex', gap:10, alignItems:'center' }}>
+              {settingsSaved && (
+                <span style={{ padding:'6px 14px', borderRadius:8, background:'#f0fff4', color:'#237804', fontSize:12, fontWeight:700, border:'1px solid #b7eb8f' }}>
+                  ✅ Yadda saxlanıldı
+                </span>
+              )}
+              <button onClick={handleSaveSettings}
+                style={{ padding:'9px 20px', borderRadius:10, border:'none', background:'linear-gradient(135deg,#c9962a,#b8860b)', color:'#fff', fontWeight:700, fontSize:13, cursor:'pointer', boxShadow:'0 4px 14px #c9962a44' }}>
+                💾 Yadda Saxla
+              </button>
+            </div>
+          </div>
+
+          {/* Müəssisə tab sətri */}
+          <div style={{ background:'#f4f6ff', borderBottom:'2px solid #e8ecff', padding:'0 28px', display:'flex', gap:2 }}>
+            {institutions.map((inst: any) => (
+              <button key={inst.id} onClick={() => handleInstChange(inst.id)}
+                style={{
+                  padding:'13px 20px', border:'none', cursor:'pointer', fontWeight:700, fontSize:13,
+                  background:'transparent', transition:'all .15s',
+                  color: selInst===inst.id ? '#c9962a' : '#8892b0',
+                  borderBottom: selInst===inst.id ? '2px solid #c9962a' : '2px solid transparent',
+                  marginBottom: -2,
+                }}>
+                {inst.icon} {inst.label}
+              </button>
+            ))}
+            {institutions.length === 0 && (
+              <span style={{ padding:'13px 0', fontSize:13, color:'var(--muted)' }}>Müəssisə tapılmadı</span>
+            )}
+          </div>
+
+          {/* Sahə konfiqurasiyası */}
+          {selInst && (
+            <div style={{ padding:'28px', display:'grid', gridTemplateColumns:'1fr 1fr', gap:24 }}>
+              {([
+                { title:'İstifadəçi adı', icon:'🪪', accent:'#c9962a', accentBg:'#fbf1d6', field: instCfg.field1, setF: setF1 },
+                { title:'Parol',          icon:'🔑', accent:'#b8860b', accentBg:'#fbf1d6', field: instCfg.field2, setF: setF2 },
+              ] as const).map(({ title, icon, accent, accentBg, field, setF }) => (
+                <div key={title} style={{ border:`1.5px solid ${accent}33`, borderRadius:14, overflow:'hidden' }}>
+                  {/* Kart başlığı */}
+                  <div style={{ background: accentBg, padding:'14px 20px', borderBottom:`1px solid ${accent}22`, display:'flex', alignItems:'center', gap:10 }}>
+                    <div style={{ width:34, height:34, borderRadius:10, background: accent, display:'flex', alignItems:'center', justifyContent:'center', fontSize:16, flexShrink:0 }}>
+                      {icon}
+                    </div>
+                    <div>
+                      <div style={{ fontSize:13, fontWeight:800, color: accent }}>{title}</div>
+                      <div style={{ fontSize:11, color:`${accent}99` }}>Giriş formasındakı {title.toLowerCase()} sahəsi</div>
+                    </div>
+                  </div>
+
+                  {/* Kart gövdəsi */}
+                  <div style={{ padding:'18px 20px', display:'flex', flexDirection:'column', gap:14, background:'#fff' }}>
+
+                    {/* Sütun seçici */}
+                    <div>
+                      <label style={{ display:'block', fontSize:11, fontWeight:700, color:'#9a7b1e', textTransform:'uppercase', letterSpacing:.5, marginBottom:6 }}>
+                        Kursant cədvəlindəki sütun
+                      </label>
+                      <select className="form-select" value={field.column} onChange={e => setF('column', e.target.value)}
+                        style={{ borderColor:`${accent}44`, background: accentBg }}>
+                        {colOptions(field.column).map(c => (
+                          <option key={c.key} value={c.key}>{c.label}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Etiket */}
+                    <div>
+                      <label style={{ display:'block', fontSize:11, fontWeight:700, color:'#9a7b1e', textTransform:'uppercase', letterSpacing:.5, marginBottom:6 }}>
+                        Ekran adı (etiket)
+                      </label>
+                      <input className="form-input" value={field.label}
+                        onChange={e => setF('label', e.target.value)}
+                        placeholder="Məs: FİN Kodu"
+                        style={{ borderColor:`${accent}33` }} />
+                    </div>
+
+                    {/* Min / Maks */}
+                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+                      {[
+                        { lbl:'Min uzunluq', key:'min' as const, val: field.min, fn: (v:number)=>setF('min', Math.max(0,v)) },
+                        { lbl:'Maks uzunluq', key:'max' as const, val: field.max, fn: (v:number)=>setF('max', Math.max(1,v)) },
+                      ].map(f => (
+                        <div key={f.key}>
+                          <label style={{ display:'block', fontSize:11, fontWeight:700, color:'#9a7b1e', textTransform:'uppercase', letterSpacing:.5, marginBottom:6 }}>{f.lbl}</label>
+                          <input className="form-input" type="number" min={0} max={50}
+                            value={f.val} onChange={e => f.fn(Number(e.target.value))}
+                            style={{ textAlign:'center', borderColor:`${accent}33` }} />
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Məcburi toggle */}
+                    <label style={{ display:'flex', alignItems:'center', gap:10, cursor:'pointer', padding:'10px 14px', borderRadius:10, background: field.required ? accentBg : '#f8f9fd', border:`1.5px solid ${field.required ? accent+'44' : '#efe1bd'}`, transition:'all .15s' }}>
+                      <input type="checkbox" checked={field.required} style={{ width:16, height:16, accentColor: accent }}
+                        onChange={e => setF('required', e.target.checked)} />
+                      <div>
+                        <div style={{ fontSize:13, fontWeight:700, color: field.required ? accent : '#9a7b1e' }}>Məcburi sahədir</div>
+                        <div style={{ fontSize:11, color:'#8892b0' }}>{field.required ? 'Boş buraxıla bilməz' : 'İstəyə bağlıdır'}</div>
+                      </div>
+                    </label>
+
+                    {/* Xülasə */}
+                    <div style={{ padding:'8px 14px', borderRadius:9, background:'#f4f6ff', fontSize:11, color:'#9a7b1e', display:'flex', alignItems:'center', gap:6 }}>
+                      <span>📋</span>
+                      <span>
+                        <b>{STUDENT_COLUMNS.find(c=>c.key===field.column)?.label}</b> sütunu ·{' '}
+                        {field.min}–{field.max} simvol ·{' '}
+                        {field.required ? 'Məcburi' : 'İstəyə bağlı'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </>
+  )
+}

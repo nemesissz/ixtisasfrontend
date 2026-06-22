@@ -1,0 +1,401 @@
+import { useState, useRef } from 'react'
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+export interface SpecEntry  { specId: string; specName: string; quota: number }
+export interface SubEntry   { subId: string; subName: string; specialties: SpecEntry[] }
+export interface GroupEntry { groupId: string; groupName: string; subgroups: SubEntry[] }
+export interface FlatRow    {
+  groupId: string; groupName: string
+  subId: string;   subName: string
+  specId: string;  specName: string; quota: number
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+// Rekursiv ağacdan yarpaqları topla (hər yarpaq üçün əcdad zənciri)
+function collectLeaves(nodes: any[], ancestors: any[]): Array<{ leaf: any; anc: any[] }> {
+  const result: Array<{ leaf: any; anc: any[] }> = []
+  for (const n of nodes) {
+    if (!n.children?.length) result.push({ leaf: n, anc: ancestors })
+    else result.push(...collectLeaves(n.children, [...ancestors, n]))
+  }
+  return result
+}
+
+export function treeToNested(tree: any): GroupEntry[] {
+  // Köhnə format (groups/subgroups/specialties) — geriyə uyğunluq
+  if (tree?.groups && !tree?.nodes) {
+    return (tree.groups || []).map((g: any) => ({
+      groupId: g.id, groupName: g.name,
+      subgroups: (g.subgroups || []).map((sg: any) => ({
+        subId: sg.id, subName: sg.name,
+        specialties: (sg.specialties || []).map((sp: any) => ({
+          specId: sp.id, specName: sp.name, quota: sp.quota || 0,
+        })),
+      })),
+    }))
+  }
+
+  // Yeni dinamik format (nodes rekursiv)
+  const rootNodes: any[] = tree?.nodes || []
+  const allLeaves = collectLeaves(rootNodes, [])
+  if (!allLeaves.length) return []
+
+  const gOrder: string[] = []
+  const gMap = new Map<string, { name: string; sOrder: string[]; sMap: Map<string, { name: string; specs: SpecEntry[] }> }>()
+
+  for (const { leaf, anc } of allLeaves) {
+    // 1-ci əcdad → qrup, 2-ci əcdad → alt qrup
+    const gNode = anc[0] || { id: '__root__', name: 'Ümumi' }
+    const sNode = anc[1] || { id: `__sub_${gNode.id}`, name: gNode.id === '__root__' ? 'Ümumi' : gNode.name }
+
+    if (!gMap.has(gNode.id)) { gOrder.push(gNode.id); gMap.set(gNode.id, { name: gNode.name, sOrder: [], sMap: new Map() }) }
+    const gm = gMap.get(gNode.id)!
+    if (!gm.sMap.has(sNode.id)) { gm.sOrder.push(sNode.id); gm.sMap.set(sNode.id, { name: sNode.name, specs: [] }) }
+    gm.sMap.get(sNode.id)!.specs.push({ specId: leaf.id, specName: leaf.name, quota: leaf.quota || 0 })
+  }
+
+  return gOrder.map(gid => {
+    const gm = gMap.get(gid)!
+    return {
+      groupId: gid, groupName: gm.name,
+      subgroups: gm.sOrder.map(sid => { const sm = gm.sMap.get(sid)!; return { subId: sid, subName: sm.name, specialties: sm.specs } }),
+    }
+  })
+}
+
+export function nestedToFlat(groups: GroupEntry[]): FlatRow[] {
+  const rows: FlatRow[] = []
+  for (const g of groups)
+    for (const s of g.subgroups)
+      for (const sp of s.specialties)
+        rows.push({ groupId: g.groupId, groupName: g.groupName, subId: s.subId, subName: s.subName, specId: sp.specId, specName: sp.specName, quota: sp.quota })
+  return rows
+}
+
+export function flatToNested(flat: FlatRow[]): GroupEntry[] {
+  const gOrder: string[] = []
+  const gMap = new Map<string, { name: string; sOrder: string[]; sMap: Map<string, { name: string; specs: SpecEntry[] }> }>()
+  for (const r of flat) {
+    if (!gMap.has(r.groupId)) { gOrder.push(r.groupId); gMap.set(r.groupId, { name: r.groupName, sOrder: [], sMap: new Map() }) }
+    const gm = gMap.get(r.groupId)!
+    if (!gm.sMap.has(r.subId)) { gm.sOrder.push(r.subId); gm.sMap.set(r.subId, { name: r.subName, specs: [] }) }
+    gm.sMap.get(r.subId)!.specs.push({ specId: r.specId, specName: r.specName, quota: r.quota })
+  }
+  return gOrder.map(gid => {
+    const gm = gMap.get(gid)!
+    return { groupId: gid, groupName: gm.name, subgroups: gm.sOrder.map(sid => { const sm = gm.sMap.get(sid)!; return { subId: sid, subName: sm.name, specialties: sm.specs } }) }
+  })
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// 📋  Siyahı Görünüşü
+// ══════════════════════════════════════════════════════════════════════════════
+export function FlatView({ flat, onChange, submitted = false, levelNames }: {
+  flat: FlatRow[]
+  onChange?: (f: FlatRow[]) => void
+  submitted?: boolean
+  levelNames?: string[]
+}) {
+  const lv = levelNames && levelNames.length ? levelNames : ['Ana Qrup', 'Alt Qrup', 'İxtisas']
+  const dragIdx  = useRef<number | null>(null)
+  const movedId  = useRef<string | null>(null)
+  const [dragging,    setDragging]    = useState<number | null>(null)
+  const [overIdx,     setOverIdx]     = useState<number | null>(null)
+  const [flashedId,   setFlashedId]   = useState<string | null>(null)
+
+  const interactive = !submitted && !!onChange
+
+  function onDragStart(i: number) { if (!interactive) return; dragIdx.current = i; setDragging(i) }
+  function onDragOver(e: React.DragEvent, i: number) {
+    if (!interactive) return
+    e.preventDefault()
+    if (dragIdx.current === null || dragIdx.current === i) return
+    setOverIdx(i)
+    const next = [...flat]; const [m] = next.splice(dragIdx.current, 1); next.splice(i, 0, m)
+    movedId.current = m.specId
+    dragIdx.current = i; onChange!(next)
+  }
+  function onDragEnd() {
+    setDragging(null); setOverIdx(null); dragIdx.current = null
+    if (movedId.current) {
+      setFlashedId(movedId.current)
+      movedId.current = null
+      setTimeout(() => setFlashedId(null), 2000)
+    }
+  }
+
+  return (
+    <>
+      {/* Başlıq sətiri */}
+      <div style={{
+        display: 'grid', gridTemplateColumns: '40px 1fr 1fr 1fr 44px',
+        background: '#f3e3b8', border: '2px solid #ecd9a0',
+        borderRadius: '12px 12px 0 0', overflow: 'hidden',
+      }}>
+        {[['#','center'],[lv[0] || 'Ana Qrup','left'],[lv[1] || 'Alt Qrup','left'],[lv[2] || 'İxtisas','left'],['','center']].map(([h, align], i) => (
+          <div key={i} style={{
+            padding: '10px 14px', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5,
+            borderRight: i < 4 ? '2px solid #ecd9a0' : 'none', textAlign: align as any,
+            background: i === 2 ? '#f7eccf' : i === 3 ? '#fff4ef' : '#f3e3b8',
+            color:      i === 2 ? '#6a4a12' : i === 3 ? '#8c3a1f' : '#5a4a12',
+          }}>{h}</div>
+        ))}
+      </div>
+
+      {/* Sətirler */}
+      <div style={{ border: '2px solid #ecd9a0', borderTop: 'none', borderRadius: '0 0 12px 12px', overflow: 'hidden', marginBottom: 10 }}>
+        {flat.map((row, i) => {
+          const sameG   = i > 0 && flat[i].groupId === flat[i - 1].groupId
+          const sameS   = sameG && flat[i].subId === flat[i - 1].subId
+          const isDrag  = dragging === i
+          const isOver  = overIdx === i
+          const isFlash = flashedId === row.specId
+
+          return (
+            <div
+              key={row.specId}
+              draggable={interactive}
+              onDragStart={() => onDragStart(i)}
+              onDragOver={e => onDragOver(e, i)}
+              onDragEnd={onDragEnd}
+              style={{
+                display: 'grid', gridTemplateColumns: '40px 1fr 1fr 1fr 44px',
+                alignItems: 'stretch',
+                borderBottom: i < flat.length - 1 ? '1.5px solid #eef0f8' : 'none',
+                background: isFlash ? '#fffbe6' : isDrag ? 'rgba(79,124,255,.05)' : '#fff',
+                opacity: isDrag ? 0.35 : 1,
+                boxShadow: isFlash
+                  ? 'inset 0 0 0 2px #f5a623'
+                  : isOver ? 'inset 0 2px 0 #c9962a, inset 0 -2px 0 #c9962a' : 'none',
+                cursor: interactive ? 'grab' : 'default',
+                userSelect: 'none',
+                transition: isFlash ? 'background 1.8s ease, box-shadow 1.8s ease' : 'background .1s',
+              }}
+            >
+              {/* Sıra # */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#c9962a', color: '#fff', fontWeight: 800, fontSize: 12, borderRight: '2px solid #ecd9a0' }}>
+                {i + 1}
+              </div>
+              {/* Ana Qrup */}
+              <div style={{ padding: '9px 12px', display: 'flex', alignItems: 'center', fontSize: 12, fontWeight: sameG ? 400 : 700, color: sameG ? '#9aa0ac' : '#5a4a12', background: sameG ? '#fafbff' : '#f8f9ff', borderRight: '2px solid #dde2f5' }}>
+                {row.groupName}
+              </div>
+              {/* Alt Qrup */}
+              <div style={{ padding: '9px 12px', display: 'flex', alignItems: 'center', fontSize: 12, fontWeight: sameS ? 400 : 600, color: sameS ? '#b39a6a' : '#6a4a12', background: sameS ? '#fdfaff' : '#faf8ff', borderRight: '1.5px solid #ece8ff' }}>
+                {row.subName}
+              </div>
+              {/* İxtisas */}
+              <div style={{ padding: '9px 12px', display: 'flex', alignItems: 'center', fontSize: 12, fontWeight: 500, color: '#7a2a10' }}>
+                {row.specName}
+              </div>
+              {/* Sürükləmə tutacağı */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', borderLeft: '1.5px solid #eef0f8' }}>
+                {interactive && <span style={{ color: '#ccc', fontSize: 13 }}>⠿</span>}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </>
+  )
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ⠿  Qrup Görünüşü
+// ══════════════════════════════════════════════════════════════════════════════
+export function NestedView({ nested, onChange, submitted = false }: {
+  nested: GroupEntry[]
+  onChange?: (g: GroupEntry[]) => void
+  submitted?: boolean
+}) {
+  const gDrag = useRef<number | null>(null)
+  const sDrag = useRef<{ gi: number; si: number } | null>(null)
+  const pDrag = useRef<{ gi: number; si: number; pi: number } | null>(null)
+
+  const [gDragging, setGDragging] = useState<number | null>(null)
+  const [sDragging, setSDragging] = useState<string | null>(null)
+  const [pDragging, setPDragging] = useState<string | null>(null)
+  const [gOverIdx,  setGOverIdx]  = useState<number | null>(null)
+  const [sOverKey,  setSOverKey]  = useState<string | null>(null)
+  const [pOverKey,  setPOverKey]  = useState<string | null>(null)
+  const [flashKey,  setFlashKey]  = useState<string | null>(null)
+
+  const interactive = !submitted && !!onChange
+  const clone = () => JSON.parse(JSON.stringify(nested)) as GroupEntry[]
+
+  function flash(key: string) {
+    setFlashKey(key)
+    setTimeout(() => setFlashKey(null), 2000)
+  }
+
+  // ── Group ──
+  function gStart(gi: number) { if (!interactive) return; gDrag.current = gi; setGDragging(gi) }
+  function gDragOver(e: React.DragEvent, gi: number) {
+    e.preventDefault(); e.stopPropagation()
+    if (!interactive || gDrag.current === null) return
+    if (gOverIdx !== gi) setGOverIdx(gi)
+  }
+  function gDrop(gi: number) {
+    const src = gDrag.current; if (!interactive || src === null || src === gi) return
+    const next = clone(); const [m] = next.splice(src, 1); next.splice(gi, 0, m)
+    onChange!(next); gDrag.current = null; setGDragging(null); setGOverIdx(null)
+    flash(`g-${next[gi].groupId}`)
+  }
+  function gEnd() { setGDragging(null); setGOverIdx(null); gDrag.current = null }
+
+  // ── Subgroup ──
+  function sStart(e: React.DragEvent, gi: number, si: number) {
+    e.stopPropagation(); if (!interactive) return; sDrag.current = { gi, si }; setSDragging(`${gi}-${si}`)
+  }
+  function sDragOver(e: React.DragEvent, gi: number, si: number) {
+    e.preventDefault(); e.stopPropagation()
+    const src = sDrag.current; if (!interactive || !src || src.gi !== gi) return
+    const k = `${gi}-${si}`; if (sOverKey !== k) setSOverKey(k)
+  }
+  function sDrop(e: React.DragEvent, gi: number, si: number) {
+    e.stopPropagation()
+    const src = sDrag.current; if (!interactive || !src || src.gi !== gi || src.si === si) return
+    const next = clone(); const subs = next[gi].subgroups
+    const [m] = subs.splice(src.si, 1); subs.splice(si, 0, m)
+    onChange!(next); sDrag.current = null; setSDragging(null); setSOverKey(null)
+    flash(`s-${next[gi].groupId}-${m.subId}`)
+  }
+  function sEnd() { setSDragging(null); setSOverKey(null); sDrag.current = null }
+
+  // ── Specialty ──
+  function pStart(e: React.DragEvent, gi: number, si: number, pi: number) {
+    e.stopPropagation(); if (!interactive) return; pDrag.current = { gi, si, pi }; setPDragging(`${gi}-${si}-${pi}`)
+  }
+  function pDragOver(e: React.DragEvent, gi: number, si: number, pi: number) {
+    e.preventDefault(); e.stopPropagation()
+    const src = pDrag.current; if (!interactive || !src || src.gi !== gi || src.si !== si) return
+    const k = `${gi}-${si}-${pi}`; if (pOverKey !== k) setPOverKey(k)
+  }
+  function pDrop(e: React.DragEvent, gi: number, si: number, pi: number) {
+    e.stopPropagation()
+    const src = pDrag.current; if (!interactive || !src || src.gi !== gi || src.si !== si || src.pi === pi) return
+    const next = clone(); const specs = next[gi].subgroups[si].specialties
+    const [m] = specs.splice(src.pi, 1); specs.splice(pi, 0, m)
+    onChange!(next); pDrag.current = null; setPDragging(null); setPOverKey(null)
+    flash(`p-${m.specId}`)
+  }
+  function pEnd() { setPDragging(null); setPOverKey(null); pDrag.current = null }
+
+  let gr = 0, sr = 0, pr = 0
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 10 }}>
+      {nested.map((group, gi) => {
+        gr++; const gn = gr
+        const isDG  = gDragging === gi
+        const isOG  = gOverIdx === gi && gDragging !== null && gDragging !== gi
+        const isFG  = flashKey === `g-${group.groupId}`
+
+        return (
+          <div key={group.groupId} style={{ display: 'flex', alignItems: 'stretch', gap: 8 }}>
+            {/* Ana Qrup */}
+            <div
+              draggable={interactive}
+              onDragStart={() => gStart(gi)}
+              onDragOver={e => gDragOver(e, gi)}
+              onDrop={() => gDrop(gi)}
+              onDragEnd={gEnd}
+              style={{
+                width: 180, flexShrink: 0, display: 'flex', alignItems: 'stretch',
+                background: isFG ? '#fffbe6' : isOG ? '#e8eeff' : '#eef1ff',
+                border: `2px solid ${isFG ? '#f5a623' : isOG ? '#c9962a' : '#ecd9a0'}`,
+                borderRadius: 12, overflow: 'hidden',
+                cursor: interactive ? 'grab' : 'default',
+                opacity: isDG ? 0.3 : 1,
+                boxShadow: isFG ? '0 0 0 3px #f5a62330' : isOG ? '0 0 0 3px #c9962a28' : 'none',
+                userSelect: 'none',
+                transition: isFG ? 'background 1.8s ease, border-color 1.8s ease' : 'border-color .1s',
+              }}
+            >
+              <div style={{ minWidth: 38, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#c9962a', fontSize: 14, fontWeight: 800, color: '#fff' }}>{gn}</div>
+              <div style={{ flex: 1, padding: '14px 10px', fontSize: 12, fontWeight: 700, color: '#5a4a12', lineHeight: 1.4 }}>{group.groupName}</div>
+              {interactive && <div style={{ display: 'flex', alignItems: 'center', padding: '0 8px', color: '#bbc', fontSize: 15 }}>⠿</div>}
+            </div>
+
+            {/* Alt qruplar */}
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6, background: '#fff', border: '2px solid #e0e4f5', borderRadius: 12, padding: 8 }}>
+              {group.subgroups.map((sub, si) => {
+                sr++; const sn = sr
+                const sk = `${gi}-${si}`
+                const isDS = sDragging === sk
+                const isOS = sOverKey === sk && sDragging !== null && sDragging !== sk
+                const isFS = flashKey === `s-${group.groupId}-${sub.subId}`
+
+                return (
+                  <div key={sub.subId} style={{ display: 'flex', alignItems: 'stretch', gap: 6 }}>
+                    {/* Alt Qrup */}
+                    <div
+                      draggable={interactive}
+                      onDragStart={e => sStart(e, gi, si)}
+                      onDragOver={e => sDragOver(e, gi, si)}
+                      onDrop={e => sDrop(e, gi, si)}
+                      onDragEnd={sEnd}
+                      style={{
+                        width: 160, flexShrink: 0, display: 'flex', alignItems: 'stretch',
+                        background: isFS ? '#fffbe6' : isOS ? '#e8d8ff' : '#f4f0ff',
+                        border: `2px solid ${isFS ? '#f5a623' : isOS ? '#b8860b' : '#f3e9cf'}`,
+                        borderRadius: 8, overflow: 'hidden',
+                        cursor: interactive ? 'grab' : 'default',
+                        opacity: isDS ? 0.3 : 1,
+                        boxShadow: isFS ? '0 0 0 2px #f5a62330' : isOS ? '0 0 0 2px #b8860b28' : 'none',
+                        userSelect: 'none',
+                        transition: isFS ? 'background 1.8s ease, border-color 1.8s ease' : 'border-color .1s',
+                      }}
+                    >
+                      <div style={{ minWidth: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#b8860b', fontSize: 11, fontWeight: 700, color: '#fff' }}>{sn}</div>
+                      <div style={{ flex: 1, padding: 9, fontSize: 11, fontWeight: 600, color: '#6a4a12', lineHeight: 1.3 }}>{sub.subName}</div>
+                      {interactive && <div style={{ display: 'flex', alignItems: 'center', padding: '0 6px', color: '#ccc', fontSize: 13 }}>⠿</div>}
+                    </div>
+
+                    {/* İxtisaslar */}
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4, background: '#fff9f6', border: '1.5px solid #fde8dc', borderRadius: 8, padding: 6 }}>
+                      {sub.specialties.map((spec, pi) => {
+                        pr++; const pn = pr
+                        const pk = `${gi}-${si}-${pi}`
+                        const isDP = pDragging === pk
+                        const isOP = pOverKey === pk && pDragging !== null && pDragging !== pk
+                        const isFP = flashKey === `p-${spec.specId}`
+
+                        return (
+                          <div
+                            key={spec.specId}
+                            draggable={interactive}
+                            onDragStart={e => pStart(e, gi, si, pi)}
+                            onDragOver={e => pDragOver(e, gi, si, pi)}
+                            onDrop={e => pDrop(e, gi, si, pi)}
+                            onDragEnd={pEnd}
+                            style={{
+                              display: 'flex', alignItems: 'stretch',
+                              background: isFP ? '#fffbe6' : isOP ? '#ffe8d8' : '#fff4ef',
+                              border: `1.5px solid ${isFP ? '#f5a623' : isOP ? '#ff7c4f' : '#ffd5c2'}`,
+                              borderRadius: 6, overflow: 'hidden',
+                              cursor: interactive ? 'grab' : 'default',
+                              opacity: isDP ? 0.3 : 1,
+                              boxShadow: isFP ? '0 0 0 2px #f5a62330' : isOP ? '0 0 0 2px #ff7c4f28' : 'none',
+                              userSelect: 'none',
+                              transition: isFP ? 'background 1.8s ease, border-color 1.8s ease' : 'border-color .1s',
+                            }}
+                          >
+                            <div style={{ minWidth: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#ff7c4f', fontSize: 10, fontWeight: 700, color: '#fff' }}>{pn}</div>
+                            <div style={{ flex: 1, padding: '7px 8px', fontSize: 11, fontWeight: 500, color: '#7a2a10', lineHeight: 1.3 }}>{spec.specName}</div>
+                            {interactive && <div style={{ display: 'flex', alignItems: 'center', padding: '0 5px', color: '#ddd', fontSize: 11 }}>⠿</div>}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
