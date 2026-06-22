@@ -128,41 +128,29 @@ export default function Logs() {
 
       {/* ── Başlıq ── */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
-        <div>
-          <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--text)', lineHeight: 1.2, display: 'flex', alignItems: 'center', gap: 10 }}>
-            Audit jurnalı
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 700, color: '#237804', background: '#f6ffed', border: '1px solid #b7eb8f', padding: '2px 10px', borderRadius: 20 }}>
-              <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#52c41a', boxShadow: '0 0 0 3px #52c41a33' }} /> Canlı
-            </span>
-          </div>
-          <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 4 }}>
-            Platformadakı bütün dəyişikliklər, əməliyyatlar və sistem hadisələri xronoloji qeydə alınır
-          </div>
-        </div>
+        <div />
         <div style={{ display: 'flex', gap: 8 }}>
           <button onClick={handleRefresh} style={btnStyle('#fff', 'var(--text)', 'var(--border)')}>🔄 Yenilə</button>
           <button onClick={() => exportCsv(filtered)} disabled={!filtered.length} style={{ ...btnStyle('#f6ffed', '#237804', '#b7eb8f'), opacity: filtered.length ? 1 : .5, cursor: filtered.length ? 'pointer' : 'not-allowed' }}>⬇️ İxrac (CSV)</button>
         </div>
       </div>
 
-      {/* ── Stat kartlar ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
+      {/* ── Stat zolağı (bir sətir, kompakt) ── */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, background: '#fff', border: '1.5px solid var(--border)', borderRadius: 14, padding: '8px 10px' }}>
         {STAT_CARDS.map(s => {
           const active = s.key === 'all' ? typeFlt === 'all' : typeFlt === s.key
           return (
             <button key={s.key}
               onClick={() => setTypeFlt(s.key === 'all' ? 'all' : (typeFlt === s.key ? 'all' : s.key))}
               style={{
-                textAlign: 'left', cursor: 'pointer', background: '#fff', borderRadius: 14, padding: '14px 16px',
-                border: `1.5px solid ${active ? s.accent : 'var(--border)'}`,
-                boxShadow: active ? `0 4px 14px ${s.accent}33` : '0 1px 4px #0000000a',
-                display: 'flex', alignItems: 'center', gap: 12, transition: 'all .15s',
+                cursor: 'pointer', borderRadius: 10, padding: '6px 12px',
+                border: `1.5px solid ${active ? s.accent : 'transparent'}`,
+                background: active ? `${s.accent}14` : 'transparent',
+                display: 'flex', alignItems: 'center', gap: 8, transition: 'all .15s',
               }}>
-              <div style={{ width: 42, height: 42, borderRadius: 12, background: `${s.accent}14`, color: s.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 19, flexShrink: 0 }}>{s.icon}</div>
-              <div>
-                <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--text)', lineHeight: 1 }}>{s.value}</div>
-                <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 3 }}>{s.label}</div>
-              </div>
+              <span style={{ fontSize: 15, color: s.accent }}>{s.icon}</span>
+              <span style={{ fontSize: 18, fontWeight: 800, color: 'var(--text)', lineHeight: 1 }}>{s.value}</span>
+              <span style={{ fontSize: 12, color: 'var(--muted)' }}>{s.label}</span>
             </button>
           )
         })}

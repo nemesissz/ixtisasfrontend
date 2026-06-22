@@ -92,6 +92,7 @@ export default function Admins() {
     systemSettingsDb.getInstConfig(institutions[0]?.id || '')
   )
   const [settingsSaved, setSettingsSaved] = useState(false)
+  const [redirectDelay, setRedirectDelay] = useState<number>(() => systemSettingsDb.getRedirectDelay())
 
   function handleInstChange(id: string) {
     setSelInst(id)
@@ -100,9 +101,10 @@ export default function Admins() {
 
   function handleSaveSettings() {
     systemSettingsDb.setInstConfig(selInst, instCfg)
+    systemSettingsDb.setRedirectDelay(redirectDelay)
     setSettingsSaved(true)
     setTimeout(() => setSettingsSaved(false), 2000)
-    addLog('admin', 'success', 'Giriş parametrləri yeniləndi', `Müəssisə: ${selInst}`, session?.name)
+    addLog('admin', 'success', 'Giriş parametrləri yeniləndi', `Müəssisə: ${selInst} · Yönləndirmə: ${redirectDelay}s`, session?.name)
   }
 
   // ── Yalnız bu müəssisənin kursant datasında mövcud olan sütunlar ──
@@ -572,6 +574,28 @@ export default function Admins() {
               ))}
             </div>
           )}
+
+          {/* Qlobal: seçimdən sonra login-ə qayıtma vaxtı */}
+          <div style={{ padding:'0 28px 28px' }}>
+            <div style={{ border:'1.5px solid #e0a92e33', borderRadius:14, overflow:'hidden' }}>
+              <div style={{ background:'#fbf1d6', padding:'14px 20px', borderBottom:'1px solid #e0a92e22', display:'flex', alignItems:'center', gap:10 }}>
+                <div style={{ width:34, height:34, borderRadius:10, background:'#c9962a', display:'flex', alignItems:'center', justifyContent:'center', fontSize:16, flexShrink:0 }}>⏱️</div>
+                <div>
+                  <div style={{ fontSize:14, fontWeight:800, color:'#2b2f3a' }}>Seçimdən sonra login-ə qayıtma</div>
+                  <div style={{ fontSize:11.5, color:'#8892b0' }}>Kursant seçimini tamamlayandan sonra bu müddət keçəndə avtomatik login səhifəsinə qayıdır</div>
+                </div>
+              </div>
+              <div style={{ padding:'18px 20px', display:'flex', alignItems:'center', gap:14, flexWrap:'wrap' }}>
+                <label style={{ fontSize:13, fontWeight:700, color:'#9a7b1e' }}>Vaxt (saniyə):</label>
+                <input className="form-input" type="number" min={0} max={3600}
+                  value={redirectDelay} onChange={e => setRedirectDelay(Math.max(0, Math.round(Number(e.target.value))))}
+                  style={{ width:120, textAlign:'center', borderColor:'#e0a92e33' }} />
+                <span style={{ fontSize:12, color:'#8892b0' }}>
+                  {redirectDelay === 0 ? 'Dərhal qayıdır' : `${redirectDelay} saniyə gözləyir`}
+                </span>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </>

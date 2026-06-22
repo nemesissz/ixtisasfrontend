@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { selectionDb, treeDb, userDb, submissionDb, addLog } from '../../db'
+import { selectionDb, treeDb, userDb, submissionDb, systemSettingsDb, addLog } from '../../db'
 import {
   FlatView, NestedView,
   treeToNested, nestedToFlat, flatToNested,
@@ -85,8 +85,8 @@ export default function SelectionPage() {
   const [saving,      setSaving]      = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
   const [justSubmitted, setJustSubmitted] = useState(false)  // təzəcə göndərdi → təsdiq səhifəsi
-  const [redirectIn,    setRedirectIn]    = useState(20)      // geri sayım (saniyə)
-  const REDIRECT_SECONDS = 20
+  const REDIRECT_SECONDS = systemSettingsDb.getRedirectDelay()  // super admin paneldən
+  const [redirectIn,    setRedirectIn]    = useState(REDIRECT_SECONDS)  // geri sayım (saniyə)
 
   useEffect(() => {
     if (!tree) return
@@ -131,7 +131,12 @@ export default function SelectionPage() {
       setSubmitted(true)
       setIsDirty(false)
       setJustSubmitted(true)
-      // Geri sayım → bitəndə login səhifəsinə qaytar
+      // Geri sayım → bitəndə login səhifəsinə qaytar (vaxt super admin paneldən)
+      if (REDIRECT_SECONDS <= 0) {
+        sessionStorage.removeItem('mmu_student')
+        navigate('/student', { replace: true })
+        return
+      }
       let n = REDIRECT_SECONDS
       setRedirectIn(n)
       const iv = setInterval(() => {
@@ -172,7 +177,7 @@ export default function SelectionPage() {
   // ── Mərhələ 3/3: təsdiq səhifəsi ──
   if (justSubmitted) {
     const GOLD = '#e0a92e'
-    const pct = Math.min(100, Math.round((REDIRECT_SECONDS - redirectIn) / REDIRECT_SECONDS * 100))
+    const pct = REDIRECT_SECONDS > 0 ? Math.min(100, Math.round((REDIRECT_SECONDS - redirectIn) / REDIRECT_SECONDS * 100)) : 100
     return (
       <div style={{
         position: 'fixed', inset: 0, overflowY: 'auto', background: '#eef1f5',

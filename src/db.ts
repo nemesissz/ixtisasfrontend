@@ -717,6 +717,7 @@ export interface InstLoginConfig {
 
 export interface SystemSettings {
   instLogin: Record<string, InstLoginConfig>  // instId → config
+  redirectDelaySec?: number                    // seçimdən sonra login-ə qayıtma vaxtı (saniyə)
 }
 
 export const DEFAULT_FIELD1: LoginFieldConfig = { column: 'fin',        label: 'FİN Kodu',    min: 1, max: 20, required: true }
@@ -724,7 +725,7 @@ export const DEFAULT_FIELD2: LoginFieldConfig = { column: 'workNumber', label: '
 
 export const DEFAULT_INST_CONFIG: InstLoginConfig = { field1: DEFAULT_FIELD1, field2: DEFAULT_FIELD2 }
 
-const DEFAULT_SETTINGS: SystemSettings = { instLogin: {} }
+const DEFAULT_SETTINGS: SystemSettings = { instLogin: {}, redirectDelaySec: 10 }
 
 export const systemSettingsDb = {
   get: (): SystemSettings => {
@@ -745,6 +746,15 @@ export const systemSettingsDb = {
   setInstConfig: (instId: string, cfg: InstLoginConfig) => {
     const s = systemSettingsDb.get()
     s.instLogin = { ...(s.instLogin || {}), [instId]: cfg }
+    localStorage.setItem(KEYS.settings, JSON.stringify(s))
+  },
+  getRedirectDelay: (): number => {
+    const v = systemSettingsDb.get().redirectDelaySec
+    return (typeof v === 'number' && v >= 0) ? v : 10
+  },
+  setRedirectDelay: (sec: number) => {
+    const s = systemSettingsDb.get()
+    s.redirectDelaySec = Math.max(0, Math.round(sec))
     localStorage.setItem(KEYS.settings, JSON.stringify(s))
   },
   reset: () => {

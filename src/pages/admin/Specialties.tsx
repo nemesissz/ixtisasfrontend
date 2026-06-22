@@ -1337,12 +1337,7 @@ export default function Specialties() {
 
       {/* ── Başlıq ── */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-        <div>
-          <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--text)' }}>İxtisas Strukturları</div>
-          <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
-            {(trees as any[]).length} struktur · açmaq üçün üzərinə klikləyin
-          </div>
-        </div>
+        <div />
         {can('tree.edit') && (
         <button className="btn btn-primary" onClick={() => {
           const activeId = tab || (insts as any[])[0]?.id || ''
