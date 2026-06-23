@@ -138,11 +138,16 @@ function AdminLayoutInner() {
             </div>
           </div>
           <button onClick={handleLogout} title="Çıxış"
-            style={{ width:'100%', marginTop: 10, padding:'8px', borderRadius: 10, border:'1.5px solid #2a2f50', background:'transparent', color:'#5a6080', fontWeight:700, fontSize:12, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:6, transition:'all .15s' }}
+            style={{ width:'100%', marginTop: 10, padding:'8px', borderRadius: 10, border:'1.5px solid #e7eaf0', background:'transparent', color:'#5a6080', fontWeight:700, fontSize:12, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:7, transition:'all .15s' }}
             onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background='#ff4d4f18'; (e.currentTarget as HTMLElement).style.color='#ff4d4f'; (e.currentTarget as HTMLElement).style.borderColor='#ff4d4f44' }}
-            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background='transparent'; (e.currentTarget as HTMLElement).style.color='#5a6080'; (e.currentTarget as HTMLElement).style.borderColor='#2a2f50' }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background='transparent'; (e.currentTarget as HTMLElement).style.color='#5a6080'; (e.currentTarget as HTMLElement).style.borderColor='#e7eaf0' }}
           >
-            🚪 <span className="logout-label">Çıxış</span>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink:0 }}>
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+              <polyline points="16 17 21 12 16 7"/>
+              <line x1="21" y1="12" x2="9" y2="12"/>
+            </svg>
+            <span className="logout-label">Çıxış</span>
           </button>
         </div>
       </aside>

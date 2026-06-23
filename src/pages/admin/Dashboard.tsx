@@ -173,44 +173,12 @@ export default function Dashboard() {
     const mostCompetitive = [...ranked].sort((a, b) => b.comp - a.comp).slice(0, 5)
     const leastDemanded = [...ranked].sort((a, b) => a.comp - b.comp).slice(0, 5)
 
-    // top 10% kursantların qoşun növü üzrə bölgüsü (istedadın paylanması)
-    const sortedByScore = [...placedUsers].sort((a, b) => (b.score || 0) - (a.score || 0))
-    const topN = Math.max(1, Math.ceil(sortedByScore.length * 0.1))
-    const topPerformers = sortedByScore.slice(0, topN)
-    let topBranchNote = ''
-    if (topPerformers.length && tree) {
-      const branchOf: Record<string, string> = {}
-      for (const top of tree.nodes || []) for (const { leaf } of getLeaves([top])) branchOf[leaf.id] = top.name
-      const cnt: Record<string, number> = {}
-      for (const u of topPerformers) { const b = branchOf[u.placedSpecialtyId]; if (b) cnt[b] = (cnt[b] || 0) + 1 }
-      const top = Object.entries(cnt).sort((a, b) => b[1] - a[1])[0]
-      if (top) topBranchNote = `Ən yüksək ballı 10% (${topPerformers.length} kursant) əsasən "${top[0]}" qoşun növünə düşüb (${top[1]} nəfər).`
-    }
-
-    // avtomatik tövsiyələr / risklər
-    const insights: { sev: 'warn' | 'info' | 'ok'; text: string }[] = []
-    const over = byLeaf.filter(l => l.quota > 0 && l.demand / l.quota >= 1.5)
-    if (over.length) insights.push({ sev: 'warn', text: `${over.length} ixtisasda tələb kvotadan 1.5× çoxdur (${over.slice(0, 3).map(l => l.name).join(', ')}${over.length > 3 ? '…' : ''}) — kvota artırılması nəzərdən keçirilə bilər.` })
-    const hasPlacement = placedUsers.length > 0
-    const under = hasPlacement
-      ? byLeaf.filter(l => l.quota > 0 && (l.placed / l.quota) < 0.5)
-      : byLeaf.filter(l => l.quota > 0 && (l.demand / l.quota) < 0.5)
-    if (under.length) insights.push({ sev: 'info', text: `${under.length} ixtisas ${hasPlacement ? 'yarıdan az dolub' : 'aşağı tələblidir'} (${under.slice(0, 3).map(l => l.name).join(', ')}${under.length > 3 ? '…' : ''}) — təşviq və ya kvota yenidən baxılması tövsiyə olunur.` })
-    if (unplacedSubmitted > 0) insights.push({ sev: 'warn', text: `${unplacedSubmitted} kursant seçim edib, lakin heç bir ixtisasa yerləşməyib — əl ilə baxılması lazımdır.` })
-    if (pendingCount > 0) insights.push({ sev: 'info', text: `${pendingCount} kursant hələ seçim etməyib (${pct(pendingCount, instUsers.length)}%).` })
-    if (hasGender) {
-      const noFemale = leaves.filter(({ leaf }) => leaf.allowFemale === false).length
-      if (noFemale > 0) insights.push({ sev: 'info', text: `${noFemale} ixtisas qadınlara qapalıdır (cins məhdudiyyəti tətbiq olunub).` })
-    }
-    if (topBranchNote) insights.push({ sev: 'ok', text: topBranchNote })
-    if (hasPlacement && (choiceDist[1] || 0) / placedUsers.length >= 0.7) insights.push({ sev: 'ok', text: `Yerləşənlərin ${pct(choiceDist[1] || 0, placedUsers.length)}%-i 1-ci seçiminə düşüb — yüksək məmnuniyyət.` })
-
     return {
       sel, tree, instUsers, leaves, byLeaf, choiceDist, hist, totalQuota, avgScore,
       placed: placedUsers.length, submittedCount, pendingCount, unplacedSubmitted,
       fem, mal, hasGender, mulki, lisey, hasSource,
       minScore, maxScore, branchStats, subjectAvg, mostCompetitive, leastDemanded, levelStats,
-      insights, satisfaction: pct(choiceDist[1] || 0, placedUsers.length),
+      satisfaction: pct(choiceDist[1] || 0, placedUsers.length),
     }
   }, [instId, allUsers, allTrees, allSels])
 
@@ -269,25 +237,6 @@ export default function Dashboard() {
               </div>
             ))}
           </div>
-
-          {/* Rəhbərlik üçün avtomatik tövsiyələr / risklər */}
-          {A.insights.length > 0 && (
-            <Card title="Tövsiyələr və diqqət tələb edənlər" icon="🧭">
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
-                {A.insights.map((ins, i) => {
-                  const c = ins.sev === 'warn' ? { bg: '#fff7e6', bd: '#ffd591', tx: '#d46b08', ic: '⚠️' }
-                    : ins.sev === 'ok' ? { bg: '#f6ffed', bd: '#b7eb8f', tx: '#237804', ic: '✅' }
-                    : { bg: '#f0f5ff', bd: '#adc6ff', tx: '#2f54eb', ic: 'ℹ️' }
-                  return (
-                    <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: '10px 14px', background: c.bg, border: `1px solid ${c.bd}`, borderRadius: 10, fontSize: 12.5, color: c.tx, lineHeight: 1.5 }}>
-                      <span style={{ flexShrink: 0 }}>{c.ic}</span>
-                      <span style={{ fontWeight: 600 }}>{ins.text}</span>
-                    </div>
-                  )
-                })}
-              </div>
-            </Card>
-          )}
 
           {/* Sıra 1: status donut + bal paylanması */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 14 }}>

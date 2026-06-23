@@ -1906,66 +1906,50 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
       )}
 
       <div className="card" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', marginBottom: 0 }}>
-        <div className="card-head" style={{ flexShrink: 0 }}>
-          <div>
-            <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              {instIcon && <InstIcon icon={instIcon} size={18} />}
-              {instLabel} — Tələbə Siyahısı
-            </div>
-            <div className="card-sub">
-              {instUsers.length} qeydiyyatlı ·
-              <span style={{ color: '#237804', fontWeight: 700 }}> {totalSub} göndərdi</span> ·
-              <span style={{ color: 'var(--muted)' }}> {totalPend} gözləyir</span>
+        <div className="card-head" style={{ flexShrink: 0, padding: '10px 16px', gap: 10 }}>
+          <div style={{ minWidth: 0 }}>
+            <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 14 }}>
+              {instIcon && <InstIcon icon={instIcon} size={16} />}
+              {instLabel}
+              <span style={{ fontSize: 11.5, fontWeight: 500, color: 'var(--muted)' }}>
+                · {instUsers.length} <span style={{ color: '#237804', fontWeight: 700 }}>· {totalSub} göndərdi</span> · {totalPend} gözləyir
+              </span>
             </div>
           </div>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-            {/* ── Arxivlə düyməsi ── */}
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
             {can('users.delete') && (
-            <button
-              onClick={() => handleArchiveUsers(instUsers)}
-              disabled={instUsers.length === 0}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 7,
-                padding: '9px 16px', borderRadius: 10, cursor: instUsers.length ? 'pointer' : 'not-allowed',
-                border: archiveDone ? '1.5px solid #52c41a' : '1.5px solid #b0bae8',
-                background: archiveDone ? '#f0fff4' : '#f4f6ff',
-                color: archiveDone ? '#237804' : '#9a7b1e',
-                fontWeight: 700, fontSize: 13,
-                opacity: instUsers.length === 0 ? 0.4 : 1,
-                transition: 'all .2s',
-              }}
-            >
-              <span style={{ fontSize: 15 }}>{archiveDone ? '✅' : '🗄️'}</span>
-              {archiveDone ? 'Arxivləndi!' : 'Arxivlə'}
+            <button onClick={() => handleArchiveUsers(instUsers)} disabled={instUsers.length === 0}
+              title="Arxivlə"
+              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 10px', borderRadius: 8, cursor: instUsers.length ? 'pointer' : 'not-allowed',
+                border: archiveDone ? '1.5px solid #52c41a' : '1.5px solid #ecd9a0', background: archiveDone ? '#f0fff4' : '#fffdf5',
+                color: archiveDone ? '#237804' : '#9a7b1e', fontWeight: 700, fontSize: 12, opacity: instUsers.length === 0 ? 0.4 : 1 }}>
+              {archiveDone ? '✅' : '🗄️'} {archiveDone ? 'Arxivləndi' : 'Arxivlə'}
             </button>
             )}
             {can('users.import') && (
-            <button onClick={() => setShowImport(true)} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 16px', borderRadius: 10, border: '1.5px solid var(--blue)', background: '#fff', color: 'var(--blue)', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
-              <span style={{ fontSize: 15 }}>📤</span> Excel İdxal
+            <button onClick={() => setShowImport(true)} title="Excel İdxal"
+              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 10px', borderRadius: 8, border: '1.5px solid var(--blue)', background: '#fff', color: 'var(--blue)', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>
+              📤 İdxal
             </button>
             )}
             {can('users.export') && (
-            <button onClick={() => setShowExport(true)} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 16px', borderRadius: 10, border: 'none', cursor: 'pointer', background: '#1d6f42', color: '#fff', fontWeight: 700, fontSize: 13, boxShadow: '0 2px 8px #1d6f4233' }}>
-              <span style={{ fontSize: 15 }}>📥</span> Excel Export
-              <span style={{ fontSize: 11, fontWeight: 400, opacity: 0.85 }}>({sorted.length})</span>
+            <button onClick={() => setShowExport(true)} title="Excel Export"
+              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 10px', borderRadius: 8, border: 'none', cursor: 'pointer', background: '#1d6f42', color: '#fff', fontWeight: 700, fontSize: 12 }}>
+              📥 Export <span style={{ fontWeight: 400, opacity: 0.85 }}>({sorted.length})</span>
             </button>
             )}
             {can('users.delete') && (
-            <button onClick={onReset} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 14px', borderRadius: 10, border: '1.5px solid #ffd591', background: '#fffbe6', color: '#d46b08', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}
-              title="Kursant siyahısını sıfırla">
-              🔄 Sıfırla
-            </button>
+            <button onClick={onReset} title="Kursant siyahısını sıfırla"
+              style={{ padding: '6px 9px', borderRadius: 8, border: '1.5px solid #ffd591', background: '#fffbe6', color: '#d46b08', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>🔄</button>
             )}
             {can('inst.delete') && (
-            <button onClick={onDelete} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 14px', borderRadius: 10, border: '1.5px solid #ffccc7', background: '#fff5f5', color: '#cf1322', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}
-              title="Müəssisəni sil">
-              🗑 Sil
-            </button>
+            <button onClick={onDelete} title="Müəssisəni sil"
+              style={{ padding: '6px 9px', borderRadius: 8, border: '1.5px solid #ffccc7', background: '#fff5f5', color: '#cf1322', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>🗑</button>
             )}
           </div>
         </div>
 
-        <div className="search-row" style={{ flexShrink: 0 }}>
+        <div className="search-row" style={{ flexShrink: 0, padding: '10px 16px' }}>
           <input className="search-input" placeholder="🔍  Ad, FİN və ya iş nömrəsi..."
             value={search} onChange={e => setSearch(e.target.value)} />
           <select className="filter-select" value={filter} onChange={e => setFilter(e.target.value)}>

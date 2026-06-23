@@ -115,51 +115,14 @@ export default function Logs() {
   const handleRefresh = () => setLogs(logDb.getAll())
   const hasFilter = catFlt !== 'all' || typeFlt !== 'all' || !!search || !!dateFrom || !!dateTo
 
-  const STAT_CARDS = [
-    { key: 'all',     label: 'Ümumi qeyd',  value: stats.all,     accent: '#c9962a', icon: '📋' },
-    { key: 'success', label: 'Uğurlu',       value: stats.success, accent: '#52c41a', icon: '✅' },
-    { key: 'info',    label: 'Məlumat',      value: stats.info,    accent: '#1677ff', icon: 'ℹ️' },
-    { key: 'warning', label: 'Xəbərdarlıq', value: stats.warning, accent: '#faad14', icon: '⚠️' },
-    { key: 'error',   label: 'Xəta',         value: stats.error,   accent: '#ff4d4f', icon: '❌' },
-  ] as const
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
 
-      {/* ── Başlıq ── */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
-        <div />
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button onClick={handleRefresh} style={btnStyle('#fff', 'var(--text)', 'var(--border)')}>🔄 Yenilə</button>
-          <button onClick={() => exportCsv(filtered)} disabled={!filtered.length} style={{ ...btnStyle('#f6ffed', '#237804', '#b7eb8f'), opacity: filtered.length ? 1 : .5, cursor: filtered.length ? 'pointer' : 'not-allowed' }}>⬇️ İxrac (CSV)</button>
-        </div>
-      </div>
-
-      {/* ── Stat zolağı (bir sətir, kompakt) ── */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, background: '#fff', border: '1.5px solid var(--border)', borderRadius: 14, padding: '8px 10px' }}>
-        {STAT_CARDS.map(s => {
-          const active = s.key === 'all' ? typeFlt === 'all' : typeFlt === s.key
-          return (
-            <button key={s.key}
-              onClick={() => setTypeFlt(s.key === 'all' ? 'all' : (typeFlt === s.key ? 'all' : s.key))}
-              style={{
-                cursor: 'pointer', borderRadius: 10, padding: '6px 12px',
-                border: `1.5px solid ${active ? s.accent : 'transparent'}`,
-                background: active ? `${s.accent}14` : 'transparent',
-                display: 'flex', alignItems: 'center', gap: 8, transition: 'all .15s',
-              }}>
-              <span style={{ fontSize: 15, color: s.accent }}>{s.icon}</span>
-              <span style={{ fontSize: 18, fontWeight: 800, color: 'var(--text)', lineHeight: 1 }}>{s.value}</span>
-              <span style={{ fontSize: 12, color: 'var(--muted)' }}>{s.label}</span>
-            </button>
-          )
-        })}
-      </div>
-
-      {/* ── Filtr paneli ── */}
-      <div style={{ background: '#fff', border: '1.5px solid var(--border)', borderRadius: 14, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {/* Kateqoriya çipləri */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
+      {/* ── Birləşmiş idarə paneli ── */}
+      <div style={{ background: '#fff', border: '1.5px solid var(--border)', borderRadius: 14, padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {/* Sıra 1: kateqoriya çipləri + əməliyyatlar (bir sətir) */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 7 }}>
           <button onClick={() => setCatFlt('all')} style={chip(catFlt === 'all', '#c9962a', '#fbf1d6')}>Hamısı ({stats.all})</button>
           {(Object.keys(CAT_LABEL) as LogCategory[]).map(cat => (
             <button key={cat} onClick={() => setCatFlt(catFlt === cat ? 'all' : cat)}
@@ -167,6 +130,10 @@ export default function Logs() {
               {CAT_ICON[cat]} {CAT_LABEL[cat]} ({stats.byCat[cat] || 0})
             </button>
           ))}
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+            <button onClick={handleRefresh} style={btnStyle('#fff', 'var(--text)', 'var(--border)')}>🔄 Yenilə</button>
+            <button onClick={() => exportCsv(filtered)} disabled={!filtered.length} style={{ ...btnStyle('#f6ffed', '#237804', '#b7eb8f'), opacity: filtered.length ? 1 : .5, cursor: filtered.length ? 'pointer' : 'not-allowed' }}>⬇️ İxrac (CSV)</button>
+          </div>
         </div>
         {/* Axtarış + tip + tarix */}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
