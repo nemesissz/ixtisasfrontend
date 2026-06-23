@@ -47,6 +47,67 @@ function compareStudents(a: any, b: any, tb: string[]): number {
   return 0
 }
 
+// ── Balı qoruyan max-flow yenidən-tarazlama (qismən bölgü üçün) ──
+// Greedy nəticəsi (res) başlanğıc axın kimi saxlanılır; boş yer + yerləşməyən
+// qaldıqda cins-qapılı max-flow ilə kvotanı aşmadan maksimum yerləşmə tapılır.
+function maxflowRebalancePartial(opts: {
+  pool: any[]; subs: any[]; quotas: Record<string, number>;
+  leafById: Record<string, any>;
+  res: Record<string, { specId: string; choiceNum: number }>;
+}) {
+  const { pool, subs, quotas, leafById, res } = opts
+  const specs = Object.keys(quotas)
+  const placed: Record<string, number> = {}
+  for (const uid in res) { const s = res[uid].specId; if (quotas[s] !== undefined) placed[s] = (placed[s] || 0) + 1 }
+  const hasEmpty = specs.some(s => (quotas[s] || 0) - (placed[s] || 0) > 0)
+  const hasUnplaced = pool.some(u => !res[u.id])
+  if (!hasEmpty || !hasUnplaced) return
+  const rankingOf = (uid: string): string[] => subs.find((s: any) => s.userId === uid)?.ranking || []
+
+  let n = 2; const S = 0, T = 1
+  const uN: Record<string, number> = {}, fg: Record<string, number> = {}, mg: Record<string, number> = {}, sp: Record<string, number> = {}
+  for (const u of pool) uN[u.id] = n++
+  for (const s of specs) { fg[s] = n++; mg[s] = n++; sp[s] = n++ }
+  const cap: Array<Record<number, number>> = Array.from({ length: n }, () => ({}))
+  const adj: number[][] = Array.from({ length: n }, () => [])
+  const add = (a: number, b: number, c: number) => {
+    if (cap[a][b] === undefined) { adj[a].push(b); cap[a][b] = 0 }
+    if (cap[b][a] === undefined) { adj[b].push(a); cap[b][a] = 0 }
+    cap[a][b] += c
+  }
+  for (const u of pool) add(S, uN[u.id], 1)
+  for (const s of specs) {
+    const l = leafById[s], q = quotas[s] || 0
+    const maxF = (l?.allowFemale === false) ? 0 : (l?.maxFemale != null ? Math.min(l.maxFemale, q) : q)
+    const maxM = (l?.allowMale === false) ? 0 : (l?.maxMale != null ? Math.min(l.maxMale, q) : q)
+    add(fg[s], sp[s], maxF); add(mg[s], sp[s], maxM); add(sp[s], T, q)
+  }
+  const gate = (g: any, s: string) => g === 'qadın' ? fg[s] : g === 'kişi' ? mg[s] : sp[s]
+  for (const u of pool) for (const s of rankingOf(u.id)) { if (quotas[s] === undefined) continue; add(uN[u.id], gate(u.gender, s), 1) }
+  const push = (a: number, b: number) => { cap[a][b] -= 1; cap[b][a] += 1 }
+  for (const u of pool) {
+    const a = res[u.id]; if (!a) continue
+    const s = a.specId; if (quotas[s] === undefined) continue
+    const gt = gate(u.gender, s); push(S, uN[u.id]); push(uN[u.id], gt); push(gt, sp[s]); push(sp[s], T)
+  }
+  const bfs = (): number[] | null => {
+    const par = new Array(n).fill(-1); par[S] = S; const q = [S]
+    while (q.length) { const v = q.shift()!; for (const w of adj[v]) if (par[w] < 0 && cap[v][w] > 0) { par[w] = v; if (w === T) return par; q.push(w) } }
+    return null
+  }
+  let par: number[] | null
+  while ((par = bfs())) { for (let v = T; v !== S; v = par[v]) { cap[par[v]][v] -= 1; cap[v][par[v]] += 1 } }
+  for (const k in res) delete res[k]
+  for (const u of pool) {
+    const g = u.gender
+    for (const s of rankingOf(u.id)) {
+      if (quotas[s] === undefined) continue
+      const gt = gate(g, s)
+      if (cap[gt][uN[u.id]] > 0) { const i = rankingOf(u.id).indexOf(s); res[u.id] = { specId: s, choiceNum: i >= 0 ? i + 1 : 0 }; break }
+    }
+  }
+}
+
 export default function Redistribute() {
   const [users, refreshUsers] = useLocalState(userDb.getAll)
   const institutions = institutionDb.getAll() as any[]
@@ -129,6 +190,14 @@ export default function Redistribute() {
         }
       }
     }
+    // Balı qoruyan max-flow tarazlama: boş yer + yerləşməyən eyni anda qalmasın
+    const quotas: Record<string, number> = {}
+    const leafById: Record<string, any> = {}
+    leafStats.filter(s => selected.has(s.id)).forEach(s => {
+      quotas[s.id] = s.quota
+      const p = pathMap[s.id]; leafById[s.id] = p ? p[p.length - 1] : null
+    })
+    maxflowRebalancePartial({ pool, subs, quotas, leafById, res })
     return res
   }
 
@@ -155,7 +224,12 @@ export default function Redistribute() {
           const snap = { id: Date.now().toString(), ts: new Date().toISOString(), selName: `${sel.name} (qismən)`, algorithm: 'partial', method: 'partial', placedCount: pool.length, userStates, treeId: tree?.id, quotas: oldQuotas }
           localStorage.setItem('dist_snapshots', JSON.stringify([snap, ...snaps].slice(0, 8)))
         } catch {}
-        // Yaz
+        // Yaz: əvvəlcə hovuzdakı köhnə yerləşməni təmizlə, sonra yenisini yaz
+        pool.forEach((u: any) => {
+          if (!preview[u.id]) {
+            userDb.update(u.id, { placedSpecialty: null, choiceNum: null, placedSpecialtyId: null, placedSelectionId: null })
+          }
+        })
         Object.entries(preview).forEach(([uid, a]) => {
           const path = pathMap[a.specId] || []
           userDb.update(uid, {
