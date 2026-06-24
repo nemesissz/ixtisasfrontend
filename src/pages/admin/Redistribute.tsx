@@ -263,7 +263,6 @@ export default function Redistribute() {
 
       {/* Müəssisə seçimi */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
-        <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)' }}>Müəssisə:</span>
         {institutions.map((inst: any) => (
           <button key={inst.id} onClick={() => changeInst(inst.id)}
             style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 16px', borderRadius: 10, cursor: 'pointer', fontWeight: 700, fontSize: 13,

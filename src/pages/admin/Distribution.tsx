@@ -607,7 +607,7 @@ function StorySim({ students, packets, subs, tree, onClose }: { students?: any[]
   const Seat = ({ on, color }: { on: boolean; color: string }) => <span style={{ width: 8, height: 8, borderRadius: '50%', background: on ? color : 'transparent', border: on ? 'none' : '1px solid #d6dae3', flexShrink: 0 }} />
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 600, background: '#eef1f5', backgroundImage: 'repeating-linear-gradient(135deg,#ffffff 0px,#ffffff 1px,transparent 1px,transparent 26px)', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ position: 'fixed', inset: 0, zIndex: 600, background: "#eef1f5 url('/background.jpeg') center center / cover no-repeat fixed", display: 'flex', flexDirection: 'column' }}>
       {/* Üst: idarə paneli (tam eni tutur) */}
       <div style={{ padding: '12px 20px', background: '#fff', borderBottom: '1px solid #e7eaf0', boxShadow: '0 2px 10px #1a1f3c0a', display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
         {data.multiPacket && (
@@ -1753,7 +1753,6 @@ export default function Distribution() {
         </div>
       )}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
-        <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', marginRight: 4 }}>Müəssisə:</span>
         {institutions.map((inst: any) => (
           <button key={inst.id} onClick={() => changeInst(inst.id)}
             style={{

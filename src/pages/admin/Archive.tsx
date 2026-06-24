@@ -134,19 +134,9 @@ export default function Archive() {
   useEffect(() => {
     const token = setSlot(
       insts.length === 0
-        ? (
-          <div>
-            <div className="topbar-title">Arxiv</div>
-            <div className="topbar-sub">Arxivlənmiş seçimlər və nəticələr</div>
-          </div>
-        )
+        ? <></>
         : (
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-            <div>
-              <div className="topbar-title">Arxiv</div>
-              <div className="topbar-sub">Arxivlənmiş seçimlər</div>
-            </div>
-            <div style={{ width: 1, height: 32, background: 'var(--border)', margin: '0 4px' }} />
             {insts.map((inst: any) => (
               <button
                 key={inst.id}

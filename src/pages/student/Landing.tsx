@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { selectionDb, userDb, systemSettingsDb, institutionDb, addLog } from '../../db'
+import { selectionDb, userDb, systemSettingsDb, institutionDb, addLog, studentColValue } from '../../db'
 
 export default function Landing() {
   const navigate     = useNavigate()
@@ -59,8 +59,8 @@ export default function Landing() {
         const c2 = ic.field2.column
         const match = users.find((u: any) => {
           if (u.institution !== inst.id) return false
-          const v1 = norm(String(u[c1] ?? ''))
-          const v2 = norm(String(u[c2] ?? ''))
+          const v1 = norm(studentColValue(u, c1))
+          const v2 = norm(studentColValue(u, c2))
           return (v1 === norm(finT) && v2 === norm(wT)) ||
                  (v1 === norm(wT)   && v2 === norm(finT))
         })
@@ -111,8 +111,7 @@ export default function Landing() {
   return (
     <div style={{
       position: 'fixed', inset: 0, overflowY: 'auto',
-      background: '#eef1f5',
-      backgroundImage: 'repeating-linear-gradient(135deg,#ffffff 0px,#ffffff 1px,transparent 1px,transparent 26px)',
+      background: 'url(/background.jpeg) center center / cover no-repeat fixed',
       display: 'flex', flexDirection: 'column', alignItems: 'center',
       padding: '40px 20px',
     }}>

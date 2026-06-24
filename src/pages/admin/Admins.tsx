@@ -8,6 +8,7 @@ import {
   addLog,
   InstLoginConfig,
   STUDENT_COLUMNS,
+  studentColValue,
 } from "../../db";
 import { AppDialog, useDialog } from "../../components/AppDialog";
 import { PERM_GROUPS, ALL_PERMS } from "../../permissions";
@@ -288,7 +289,7 @@ export default function Admins() {
   );
   const availColumns0 = STUDENT_COLUMNS.filter((c) =>
     instCadets.some(
-      (u: any) => u[c.key] != null && String(u[c.key]).trim() !== "",
+      (u: any) => studentColValue(u, c.key).trim() !== "",
     ),
   );
   const availColumns = availColumns0.length ? availColumns0 : STUDENT_COLUMNS; // təhsil alan yoxdursa hamısını göstər

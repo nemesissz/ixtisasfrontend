@@ -51,6 +51,8 @@ function AdminLayoutInner() {
   }
 
   const meta = PAGE_META[pathname] ?? { title: 'Seçim Detalı', sub: 'Seçimi idarə et' }
+  // Bu səhifələrdə yuxarı başlıq gizlədilir (məzmun yuxarı qalxsın)
+  const hideHeaderText = pathname === '/admin/users' || pathname === '/admin/specialties' || pathname === '/admin/distribution' || pathname === '/admin/redistribute' || pathname === '/admin/results'
 
   // ── İcazəyə görə nav filtri (boş qalan bölmə başlıqları da gizlədilir) ──
   const visibleNav = (() => {
@@ -154,7 +156,7 @@ function AdminLayoutInner() {
 
       {/* ── Main ── */}
       <div className="admin-content">
-        <header className="topbar">
+        <header className={`topbar${hideHeaderText ? ' topbar--bare' : ''}`}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
             {/* Hamburger (yalnız mobil) */}
             <button
@@ -164,18 +166,16 @@ function AdminLayoutInner() {
             >
               <span /><span /><span />
             </button>
-            {/* Breadcrumb xətti */}
-            <div className="topbar-accent-line" />
-            {slot ?? (
+            {slot ?? (!hideHeaderText && (
               <div>
                 <div className="topbar-title">{meta.title}</div>
                 <div className="topbar-sub">{meta.sub}</div>
               </div>
-            )}
+            ))}
           </div>
         </header>
 
-        <div className="page-body">
+        <div className={`page-body${hideHeaderText ? ' page-body--white' : ''}`}>
           {allowed ? <Outlet /> : (
             <div style={{ background: '#fff', border: '1.5px dashed #ffccc7', borderRadius: 16, padding: '56px 32px', textAlign: 'center', marginTop: 24 }}>
               <div style={{ fontSize: 44, marginBottom: 12 }}>🔒</div>

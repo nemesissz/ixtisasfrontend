@@ -536,10 +536,11 @@ function ImportModal({ instId, instLabel, onClose, onImported }: {
   const [errors,     setErrors]     = useState<string[]>([])
   const [loading,    setLoading]    = useState(false)
   const [done,       setDone]       = useState(false)
-  const [mode,       setMode]       = useState<'add' | 'replace'>('add')
+  const [mode]                      = useState<'add' | 'replace'>('add')
   const [year,       setYear]       = useState<string>(YEAR_OPTIONS[1])
   const [customYear, setCustomYear] = useState('')
   const [useCustom,  setUseCustom]  = useState(false)
+  const [hint, setHint] = useState<{ text: string; x: number; y: number } | null>(null)
   // ── Şablon konfiqurasiyasını localStorage-dan yüklə ──
   const TMPL_KEY = `mmu_import_tmpl_${instId}`
   function loadTmpl() {
@@ -610,6 +611,14 @@ function ImportModal({ instId, instLabel, onClose, onImported }: {
 
   return (
     <div className="modal-overlay open" onClick={onClose}>
+      {hint && (
+        <div style={{
+          position: 'fixed', left: hint.x + 14, top: hint.y + 16, zIndex: 9999,
+          background: '#2b2f3a', color: '#fff', fontSize: 12, fontWeight: 600,
+          padding: '6px 10px', borderRadius: 8, pointerEvents: 'none',
+          boxShadow: '0 4px 14px rgba(0,0,0,.25)', whiteSpace: 'nowrap',
+        }}>{hint.text}</div>
+      )}
       <div className="modal" style={{ maxWidth: 600 }} onClick={e => e.stopPropagation()}>
         <div className="modal-head">
           <span className="modal-title">📤 Excel İdxal — {instLabel}</span>
@@ -686,12 +695,17 @@ function ImportModal({ instId, instLabel, onClose, onImported }: {
                               const accent    = isBase ? '#c9962a' : isAlways ? '#f5a623' : isSubj ? subjClr : isCustom ? '#c41d7f' : '#52c41a'
                               const bgHead    = isBase ? '#eef1ff' : isAlways ? '#fff8e6' : isSubj ? `${subjClr}14` : isCustom ? '#fff0f6' : '#f0fff4'
                               return (
-                                <th key={col} style={{
+                                <th key={col}
+                                  onMouseEnter={col === 'Mənbə' ? (ev) => setHint({ text: 'Bitirdiyi təhsil müəssisəsi', x: ev.clientX, y: ev.clientY }) : undefined}
+                                  onMouseMove={col === 'Mənbə' ? (ev) => setHint({ text: 'Bitirdiyi təhsil müəssisəsi', x: ev.clientX, y: ev.clientY }) : undefined}
+                                  onMouseLeave={col === 'Mənbə' ? () => setHint(null) : undefined}
+                                  style={{
                                   padding: '7px 12px', fontWeight: 800, color: accent,
                                   background: bgHead, whiteSpace: 'nowrap',
                                   borderRight: i < allTemplateCols.length - 1 ? '1px solid #e4e8f8' : 'none',
                                   borderBottom: `2.5px solid ${accent}`,
                                   textAlign: 'left', letterSpacing: 0.2,
+                                  cursor: col === 'Mənbə' ? 'help' : 'default',
                                 }}>
                                   <span style={{ marginRight: 4, fontSize: 10 }}>
                                     {isBase ? '🔒' : isAlways ? '★' : isSubj ? '🎯' : isCustom ? '✦' : '✓'}
@@ -752,6 +766,9 @@ function ImportModal({ instId, instLabel, onClose, onImported }: {
                         return (
                           <button key={col}
                             onClick={() => setExtraCols(p => active ? p.filter(c => c !== col) : [...p, col])}
+                            onMouseEnter={col === 'Mənbə' ? (ev) => setHint({ text: 'Bitirdiyi təhsil müəssisəsi', x: ev.clientX, y: ev.clientY }) : undefined}
+                            onMouseMove={col === 'Mənbə' ? (ev) => setHint({ text: 'Bitirdiyi təhsil müəssisəsi', x: ev.clientX, y: ev.clientY }) : undefined}
+                            onMouseLeave={col === 'Mənbə' ? () => setHint(null) : undefined}
                             style={{
                               display: 'inline-flex', alignItems: 'center', gap: 5,
                               padding: '5px 13px', borderRadius: 20, fontSize: 11, fontWeight: 700,
@@ -801,6 +818,9 @@ function ImportModal({ instId, instLabel, onClose, onImported }: {
                       {/* Prioritet düyməsi */}
                       <button
                         onClick={() => setShowSubjModal(true)}
+                        onMouseEnter={(ev) => setHint({ text: 'İmtahan verdiyi fənlər', x: ev.clientX, y: ev.clientY })}
+                        onMouseMove={(ev) => setHint({ text: 'İmtahan verdiyi fənlər', x: ev.clientX, y: ev.clientY })}
+                        onMouseLeave={() => setHint(null)}
                         style={{
                           display: 'inline-flex', alignItems: 'center', gap: 5,
                           padding: '5px 13px', borderRadius: 20, fontSize: 11, fontWeight: 700,
@@ -948,13 +968,6 @@ function ImportModal({ instId, instLabel, onClose, onImported }: {
                   <span style={{ color: '#b8860b', fontWeight: 700 }}>
                     📅 {selectedYear || '—'}
                   </span>
-                </div>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  {(['add', 'replace'] as const).map(m => (
-                    <button key={m} onClick={() => setMode(m)} style={{ padding: '4px 12px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer', border: '1.5px solid ' + (mode === m ? 'var(--blue)' : '#dde'), background: mode === m ? 'var(--blue)' : '#fff', color: mode === m ? '#fff' : 'var(--muted)' }}>
-                      {m === 'add' ? 'Əlavə et / yenilə' : 'Hamısını əvəz et'}
-                    </button>
-                  ))}
                 </div>
               </div>
               <div style={{ maxHeight: 160, overflowY: 'auto', border: '1px solid #eef0fa', borderRadius: 8, marginBottom: 14 }}>
@@ -1902,13 +1915,7 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
 
       <div className="card" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', marginBottom: 0 }}>
         <div className="card-head" style={{ flexShrink: 0, padding: '10px 16px', gap: 10 }}>
-          <div style={{ minWidth: 0 }}>
-            <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 14 }}>
-              {instIcon && <InstIcon icon={instIcon} size={16} />}
-              {instLabel}
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end', flex: 1 }}>
             {can('users.delete') && (
             <button onClick={() => handleArchiveUsers(instUsers)} disabled={instUsers.length === 0}
               title="Arxivlə"
@@ -1971,9 +1978,9 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
           <table className="adaptive-table">
             <thead>
               <tr>
-                <th className="sticky-col sticky-col-1" style={{ textAlign: 'center' }}>#</th>
+                <th className="sticky-col sticky-col-1" style={{ textAlign: 'center' }}>№</th>
                 <th className="sticky-col sticky-col-2"></th>
-                <th className="sticky-col sticky-col-3">İstifadəçi</th>
+                <th className="sticky-col sticky-col-3">Təhsil alan</th>
                 <th>İş Nömrəsi</th>
                 <th>FİN</th>
                 <th style={{ textAlign: 'center' }}>Tədris İli</th>

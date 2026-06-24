@@ -1335,21 +1335,7 @@ export default function Specialties() {
         </InlineModal>
       )}
 
-      {/* ── Başlıq ── */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-        <div />
-        {can('tree.edit') && (
-        <button className="btn btn-primary" onClick={() => {
-          const activeId = tab || (insts as any[])[0]?.id || ''
-          const activeInst = (insts as any[]).find((i: any) => i.id === activeId)
-          setModal({ type: 'createTree', name: '', instId: activeInst?.id || '', instLabel: activeInst?.label || '', year: getInstYear(activeId), icon: '' })
-        }}>
-          + Yeni İxtisas Strukturu
-        </button>
-        )}
-      </div>
-
-      {/* ── Müəssisə tabları ── */}
+      {/* ── Müəssisə tabları + Yeni struktur düyməsi ── */}
       {(insts as any[]).length > 0 && (
         <div style={{ display: 'flex', gap: 6, marginBottom: 16, alignItems: 'center', flexWrap: 'wrap' }}>
           {(insts as any[]).map((inst: any) => {
@@ -1373,6 +1359,24 @@ export default function Specialties() {
               </button>
             )
           })}
+          {can('tree.edit') && (
+          <button
+            onClick={() => {
+              const activeId = tab || (insts as any[])[0]?.id || ''
+              const activeInst = (insts as any[]).find((i: any) => i.id === activeId)
+              setModal({ type: 'createTree', name: '', instId: activeInst?.id || '', instLabel: activeInst?.label || '', year: getInstYear(activeId), icon: '' })
+            }}
+            style={{
+              padding: '10px 18px', borderRadius: 10, border: '1.5px dashed #c5d0ff',
+              background: '#f8f9ff', color: 'var(--blue)', fontWeight: 700, fontSize: 13,
+              cursor: 'pointer', transition: 'all .15s',
+            }}
+            onMouseEnter={e => { (e.currentTarget.style.background = '#eef1ff'); (e.currentTarget.style.borderColor = 'var(--blue)') }}
+            onMouseLeave={e => { (e.currentTarget.style.background = '#f8f9ff'); (e.currentTarget.style.borderColor = '#c5d0ff') }}
+          >
+            + Yeni İxtisas Strukturu
+          </button>
+          )}
         </div>
       )}
 

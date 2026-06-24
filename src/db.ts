@@ -285,7 +285,7 @@ export const userDb = {
     localStorage.setItem('mmu_institutions', JSON.stringify(instList))
   }
   let users = JSON.parse(localStorage.getItem('mmu_users') || '[]')
-  if (users.filter((u) => u.institution === 'gtest').length < 50) {
+  if (!users.some((u) => u.institution === 'gtest')) {
     const fF = ['Aysu','Nigar','Leyla','Günay','Səbinə','Ülviyyə','Fatimə','Zəhra','Nərmin','Aytac','Mələk','Türkan','Şəbnəm','Gülnar','Aynur']
     const fM = ['Elçin','Murad','Rəşad','Kənan','Orxan','Tural','Nicat','Anar','Fərid','Ramin','Vüsal','Emin','Cavid','Samir','Rauf','Elvin','Toğrul','Ayxan','Kamran','İlkin']
     const sur = ['Əliyev','Hüseynov','Məmmədov','Quliyev','Həsənov','İsmayılov','Cəfərov','Rəhimov','Kərimov','Abbasov']
@@ -371,7 +371,7 @@ export const userDb = {
     localStorage.setItem('mmu_institutions', JSON.stringify(instList))
   }
   let users = JSON.parse(localStorage.getItem('mmu_users') || '[]')
-  if (users.filter((u) => u.institution === 'hehi').length < 100) {
+  if (!users.some((u) => u.institution === 'hehi')) {
     const first = ['Elçin','Murad','Rəşad','Kənan','Orxan','Tural','Nicat','Anar','Fərid','Ramin','Vüsal','Emin','Cavid','Samir','Rauf','Elvin','Toğrul','Ayxan','Kamran','İlkin','Aysu','Nigar','Leyla','Günay','Səbinə','Ülviyyə','Fatimə','Zəhra','Nərmin','Aytac']
     const sur = ['Əliyev','Hüseynov','Məmmədov','Quliyev','Həsənov','İsmayılov','Cəfərov','Rəhimov','Kərimov','Abbasov']
     const fat = ['Elşən','Rauf','Kamil','Vüqar','Natiq','Bəhruz','Şahin','Rövşən','İlqar','Zaur']
@@ -766,10 +766,18 @@ export const systemSettingsDb = {
 export const STUDENT_COLUMNS = [
   { key: 'fin',        label: 'FİN Kodu' },
   { key: 'workNumber', label: 'İş Nömrəsi' },
-  { key: 'name',       label: 'Ad Soyad' },
+  { key: 'firstName',  label: 'Ad' },
+  { key: 'lastName',   label: 'Soyad' },
   { key: 'parentName', label: 'Ata adı' },
   { key: 'group',      label: 'Qrup' },
 ]
+
+// Təhsil alan sütununun dəyərini al — Ad/Soyad `name`-dən ayrılır (qeyddə yalnız tam ad saxlanılır)
+export function studentColValue(u: any, key: string): string {
+  if (key === 'firstName') return String(u?.name ?? '').trim().split(/\s+/)[0] || ''
+  if (key === 'lastName')  return String(u?.name ?? '').trim().split(/\s+/).slice(1).join(' ')
+  return String(u?.[key] ?? '')
+}
 
 // ── Packet calculator ─────────────────────────────────────────────────────────
 export function calcPackets(total: number, packetCount: number) {

@@ -39,19 +39,9 @@ export default function Selections() {
   useEffect(() => {
     const token = setSlot(
       insts.length === 0
-        ? (
-          <div>
-            <div className="topbar-title">Seçimlər</div>
-            <div className="topbar-sub">Seçim sessiyaları</div>
-          </div>
-        )
+        ? <></>
         : (
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-            <div>
-              <div className="topbar-title">Seçimlər</div>
-              <div className="topbar-sub">Seçim sessiyaları</div>
-            </div>
-            <div style={{ width: 1, height: 32, background: 'var(--border)', margin: '0 4px' }} />
             {insts.map((inst: any) => (
               <button
                 key={inst.id}
