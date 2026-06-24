@@ -13,7 +13,7 @@ export const PERM_GROUPS: PermGroup[] = [
   {
     group: 'Təhsil Alanlar', icon: '👥', perms: [
       { code: 'users.view',   label: 'Siyahıya baxış' },
-      { code: 'users.edit',   label: 'Kursant redaktəsi' },
+      { code: 'users.edit',   label: 'Təhsil alan redaktəsi' },
       { code: 'users.import', label: 'Excel idxal' },
       { code: 'users.export', label: 'Excel export' },
       { code: 'users.print',  label: 'Çap əməliyyatı' },
@@ -40,11 +40,11 @@ export const PERM_GROUPS: PermGroup[] = [
     ],
   },
   {
-    group: 'Bölüşdürmə', icon: '⚖️', perms: [
+    group: 'Yerləşdirmə', icon: '⚖️', perms: [
       { code: 'dist.view',     label: 'Baxış / simulyasiya' },
       { code: 'dist.run',      label: 'Bazaya yazma' },
       { code: 'dist.rollback', label: 'Rollback (geri qaytarma)' },
-      { code: 'dist.partial',  label: 'Qismən yenidən bölgü' },
+      { code: 'dist.partial',  label: 'Qismən yenidən yerləşdirmə' },
     ],
   },
   {

@@ -109,18 +109,18 @@ function generatePrintHTML(user: any, sel: any, nameMap: Record<string, string>,
   @page{margin:12mm;size:A4 portrait} @media print{body{padding:0}}
 </style></head>
 <body>
-  <div class="doc-title">KURSANTIN İXTİSAS SEÇİM VƏRƏQİ</div>
+  <div class="doc-title">TƏHSİL ALANIN İXTİSAS SEÇİM VƏRƏQİ</div>
   <div class="info">
     <div class="info-left">
-      <div class="name">Kursant: ${esc(user.name)}</div>
+      <div class="name">Təhsil alan: ${esc(user.name)}</div>
       <div class="sub">FİN Kod: ${esc(user.fin || '—')}</div>
       <div class="sub">Abituriyentin iş nömrəsi: ${esc(user.workNumber || '—')}</div>
       ${user.group ? `<div class="sub">Qrup: ${esc(user.group)}${user.source ? ' · '+esc(user.source==='mülki'?'Mülki':user.source==='lisey'?'Lisey':user.source) : ''}</div>` : ''}
     </div>
     <div class="info-mid">Topladığı Yekun Bal: <b>${Number(user.score).toFixed(2)}</b></div>
-    <div class="info-right"><div>Sənədin Çap Tarixi: ${printDate}</div><div class="sign-line">Kursantın İmzası</div></div>
+    <div class="info-right"><div>Sənədin Çap Tarixi: ${printDate}</div><div class="sign-line">Təhsil alanın İmzası</div></div>
   </div>
-  ${ranking.length > 0 ? tableHTML : '<div class="no-sub">Bu kursant seçim göndərməyib</div>'}
+  ${ranking.length > 0 ? tableHTML : '<div class="no-sub">Bu təhsil alan seçim göndərməyib</div>'}
   <div class="confirm">Yuxarıdakı seçimlərin mənə aid olduğunu öz imzamla təsdiq edirəm.</div>
 </body>
 <script>window.onload=function(){window.print();window.onafterprint=function(){window.close()}}</script>
@@ -220,7 +220,7 @@ export default function OperatorDashboard() {
       `${wasAlready ? 'Yenidən çap' : 'Çap'}: ${printUser.name}`,
       `FİN: ${printUser.fin || '—'} · Bal: ${Number(printUser.score || 0).toFixed(2)} · ` +
       `Seçim: ${activeSel?.name || '—'} · Müəssisə: ${instLabel} · ` +
-      `${wasAlready ? 'Bu kursant əvvəllər də çap edilmişdi.' : `Seçim sırası: ${ranking.length} ixtisas`}`,
+      `${wasAlready ? 'Bu təhsil alan əvvəllər də çap edilmişdi.' : `Seçim sırası: ${ranking.length} ixtisas`}`,
       opName,
     )
     // ────────────────────────────────────────────────────────────────────────
@@ -237,7 +237,7 @@ export default function OperatorDashboard() {
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', gap: 14 }}>
         <div style={{ fontSize: 52 }}>🗳️</div>
         <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--text)' }}>Aktiv seçim yoxdur</div>
-        <div style={{ fontSize: 13, color: 'var(--muted)' }}>Admin bir seçim yayımladıqda kursantlar burada görünəcək</div>
+        <div style={{ fontSize: 13, color: 'var(--muted)' }}>Admin bir seçim yayımladıqda təhsil alanlar burada görünəcək</div>
       </div>
     )
   }
@@ -253,7 +253,7 @@ export default function OperatorDashboard() {
               <button className="modal-close" onClick={() => setPrintUser(null)}>✕</button>
             </div>
             <div className="modal-body">
-              {/* Kursant məlumatı */}
+              {/* Təhsil alan məlumatı */}
               <div style={{
                 display: 'flex', alignItems: 'center', gap: 14,
                 padding: '14px 16px', borderRadius: 12,
@@ -282,7 +282,7 @@ export default function OperatorDashboard() {
                   fontSize: 12, color: '#d46b08', marginBottom: 16,
                   display: 'flex', gap: 8,
                 }}>
-                  ⚠️ Bu kursant hələ seçim göndərməyib. Yenə də çap edə bilərsiniz.
+                  ⚠️ Bu təhsil alan hələ seçim göndərməyib. Yenə də çap edə bilərsiniz.
                 </div>
               )}
 
@@ -293,12 +293,12 @@ export default function OperatorDashboard() {
                   fontSize: 12, color: '#237804', marginBottom: 16,
                   display: 'flex', gap: 8,
                 }}>
-                  ✅ Bu kursant əvvəllər çap edilib. Yenidən çap edəcəksiniz?
+                  ✅ Bu təhsil alan əvvəllər çap edilib. Yenidən çap edəcəksiniz?
                 </div>
               )}
 
               <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 20 }}>
-                Kursantın seçim vərəqi çap ediləcək və çap statusu <b>«Çap edilib»</b> kimi qeyd olunacaq.
+                Təhsil alanın seçim vərəqi çap ediləcək və çap statusu <b>«Çap edilib»</b> kimi qeyd olunacaq.
               </div>
 
               <div style={{ display: 'flex', gap: 10 }}>
@@ -358,7 +358,7 @@ export default function OperatorDashboard() {
       {/* ── Statistika kartları ── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 12, marginBottom: 16 }}>
         {[
-          { label: 'Cəmi kursant',   value: instUsers.length, icon: '👥', color: '#1677ff', bg: '#e8f4ff' },
+          { label: 'Cəmi təhsil alan',   value: instUsers.length, icon: '👥', color: '#1677ff', bg: '#e8f4ff' },
           { label: 'Seçim etdi',     value: totalSub,          icon: '✅', color: '#237804', bg: '#f0fff4' },
           { label: 'Gözləyir',       value: totalPend,         icon: '⏳', color: '#d46b08', bg: '#fff7e6' },
           { label: 'Çap edildi',     value: totalPrinted,      icon: '🖨️', color: '#b8860b', bg: '#f4f0ff' },
@@ -390,11 +390,11 @@ export default function OperatorDashboard() {
         </div>
       </div>
 
-      {/* ── Kursant siyahısı ── */}
+      {/* ── Təhsil alan siyahısı ── */}
       <div className="card">
         <div className="card-head" style={{ flexWrap: 'wrap', gap: 10 }}>
           <div>
-            <div className="card-title">{activeInst?.icon} {activeInst?.label} — Kursant Siyahısı</div>
+            <div className="card-title">{activeInst?.icon} {activeInst?.label} — Təhsil alan Siyahısı</div>
             <div className="card-sub">{activeSel?.name} · {filtered.length} nəticə</div>
           </div>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -432,7 +432,7 @@ export default function OperatorDashboard() {
             <thead>
               <tr>
                 <th style={{ width: 44 }}>#</th>
-                <th>KURSANT</th>
+                <th>TƏHSİL ALAN</th>
                 <th>İŞ NÖMRƏSİ</th>
                 <th>FİN</th>
                 {hasSources && <th style={{ width: 90, textAlign: 'center' }}>MƏNBƏYİ</th>}

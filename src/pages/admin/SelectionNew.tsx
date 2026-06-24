@@ -4,7 +4,7 @@ import { selectionDb, treeDb, userDb, institutionDb, addLog } from '../../db'
 import { FlatView, NestedView, treeToNested, nestedToFlat } from '../../components/SpecialtyViews'
 import InstIcon from '../../components/InstIcon'
 
-// ── Tələbə görünüşü önizləmə overlay ─────────────────────────────────────────
+// ── Təhsil alan görünüşü önizləmə overlay ─────────────────────────────────────────
 function ViewPreviewOverlay({
   tree, viewMode, onClose, onSelect,
 }: {
@@ -23,9 +23,9 @@ function ViewPreviewOverlay({
 
         <div className="preview-head">
           <div>
-            <div className="preview-head-title">👁 Tələbə Görünüşü — Önizləmə</div>
+            <div className="preview-head-title">👁 Təhsil alan Görünüşü — Önizləmə</div>
             <div style={{ fontSize: 11, color: '#ffffffcc', marginTop: 2 }}>
-              Tələbənin seçim səhifəsini bu görünüşdə görəcəyi kimi yoxlayın.
+              Təhsil alanın seçim səhifəsini bu görünüşdə görəcəyi kimi yoxlayın.
             </div>
           </div>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
@@ -40,8 +40,8 @@ function ViewPreviewOverlay({
           {/* İzahat */}
           <div className="info-box" style={{ marginBottom: 14 }}>
             {current === 'list'
-              ? '📋 Siyahı: Tələbə bütün ixtisasları bir-bir sürüşdürərək prioritet sırasını müəyyənləşdirəcək.'
-              : '⠿ Qrup: Tələbə ana qrupları, alt qrupları və ixtisasları öz daxillərində ayrı-ayrı sürüşdürə biləcək.'}
+              ? '📋 Siyahı: Təhsil alan bütün ixtisasları bir-bir sürüşdürərək prioritet sırasını müəyyənləşdirəcək.'
+              : '⠿ Qrup: Təhsil alan ana qrupları, alt qrupları və ixtisasları öz daxillərində ayrı-ayrı sürüşdürə biləcək.'}
           </div>
 
           {/* Görünüş */}
@@ -52,10 +52,10 @@ function ViewPreviewOverlay({
 
           <div style={{ marginTop: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, color: 'var(--muted)' }}>
-              Tələbə sürüşdürə bilər, lakin bu önizlədə sürüşdürmə deaktivdir.
+              Təhsil alan sürüşdürə bilər, lakin bu önizlədə sürüşdürmə deaktivdir.
             </span>
             <button className="btn btn-outline btn-sm" disabled>
-              Seçimi Təsdiqlə (tələbə tərəfindən aktivləşir)
+              Seçimi Təsdiqlə (təhsil alan tərəfindən aktivləşir)
             </button>
           </div>
         </div>
@@ -117,7 +117,7 @@ export default function SelectionNew() {
       preAssignLevel:     form.preAssignLevel,
     })
     addLog('selection', 'success', `Yeni seçim yaradıldı: "${form.name.trim()}"`,
-      `Müəssisə: ${activeInst?.label || form.institution} · Tələbə: ${studentCount} · Kvota: ${totalQuota} · Görünüş: ${form.viewMode}${form.sourceProportional ? ' · Proporsional bölgü aktiv' : ''}`)
+      `Müəssisə: ${activeInst?.label || form.institution} · Təhsil alan: ${studentCount} · Kvota: ${totalQuota} · Görünüş: ${form.viewMode}${form.sourceProportional ? ' · Proporsional bölgü aktiv' : ''}`)
     navigate(`/admin/selections/${sel.id}`)
   }
 
@@ -186,11 +186,11 @@ export default function SelectionNew() {
                   color: studentCount > 0 ? '#9a7b1e' : 'var(--muted)',
                   fontWeight: 800, fontSize: 13,
                 }}>👥 {studentCount}</span>
-                <span style={{ color: 'var(--muted)', fontSize: 12, marginLeft: 6 }}>tələbə qeydiyyatda</span>
+                <span style={{ color: 'var(--muted)', fontSize: 12, marginLeft: 6 }}>təhsil alan qeydiyyatda</span>
               </div>
               {studentCount === 0 && (
                 <div style={{ fontSize: 11, color: '#d46b08', alignSelf: 'center' }}>
-                  ⚠ Bu müəssisədə hələ tələbə yoxdur
+                  ⚠ Bu müəssisədə hələ təhsil alan yoxdur
                 </div>
               )}
             </div>
@@ -219,13 +219,13 @@ export default function SelectionNew() {
               <label className="form-label">Əvvəlcədən bölgü səviyyəsi</label>
               <select className="form-select" value={form.preAssignLevel ?? ''}
                 onChange={e => set('preAssignLevel', e.target.value === '' ? null : Number(e.target.value))}>
-                <option value="">— Yoxdur (kursant bütün ixtisasları seçə bilər) —</option>
+                <option value="">— Yoxdur (təhsil alan bütün ixtisasları seçə bilər) —</option>
                 {selectedTree.levelNames.map((ln: string, i: number) => (
                   <option key={i} value={i}>{ln}</option>
                 ))}
               </select>
               <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 6, lineHeight: 1.4 }}>
-                Kursantlar bu səviyyəyə görə əvvəlcədən bölünübsə seçin. Hər kursant öz dəyərinə görə yalnız aid olduğu bölmənin ixtisaslarını görəcək (dəyər Excel idxalı və ya kursant redaktəsi ilə doldurulur).
+                Təhsil Alanlar bu səviyyəyə görə əvvəlcədən bölünübsə seçin. Hər təhsil alan öz dəyərinə görə yalnız aid olduğu bölmənin ixtisaslarını görəcək (dəyər Excel idxalı və ya təhsil alan redaktəsi ilə doldurulur).
               </div>
             </div>
           )}
@@ -236,7 +236,7 @@ export default function SelectionNew() {
               {[
                 { label: 'İxtisas sayı',  value: totalSpec,    icon: '📚', color: '#c9962a', bg: '#fbf1d6' },
                 { label: 'Ümumi kvota',   value: totalQuota,   icon: '🎯', color: '#237804', bg: '#f0fff4' },
-                { label: 'Tələbə sayı',   value: studentCount, icon: '👥', color: '#b8860b', bg: '#fbf1d6' },
+                { label: 'Təhsil alan sayı',   value: studentCount, icon: '👥', color: '#b8860b', bg: '#fbf1d6' },
               ].map(item => (
                 <div key={item.label} style={{
                   padding: '14px 16px', borderRadius: 12, textAlign: 'center',
@@ -253,12 +253,12 @@ export default function SelectionNew() {
           {/* ── Xəbərdarlıqlar ── */}
           {selectedTree && totalQuota > 0 && totalQuota < studentCount && (
             <div className="warn-box">
-              ⚠️ Ümumi kvota ({totalQuota}) tələbə sayından ({studentCount}) <strong>azdır</strong> — bəzi tələbələr ixtisassız qala bilər.
+              ⚠️ Ümumi kvota ({totalQuota}) təhsil alan sayından ({studentCount}) <strong>azdır</strong> — bəzi təhsil alanlar ixtisassız qala bilər.
             </div>
           )}
           {selectedTree && totalQuota > 0 && totalQuota > studentCount && studentCount > 0 && (
             <div style={{ background: '#fbf1d6', border: '1.5px solid #ecd9a0', borderRadius: 10, padding: '10px 14px', fontSize: 12, color: '#9a7b1e', marginBottom: 12 }}>
-              ℹ️ Ümumi kvota ({totalQuota}) tələbə sayından ({studentCount}) <strong>çoxdur</strong> — bəzi ixtisas yerləri boş qala bilər.
+              ℹ️ Ümumi kvota ({totalQuota}) təhsil alan sayından ({studentCount}) <strong>çoxdur</strong> — bəzi ixtisas yerləri boş qala bilər.
             </div>
           )}
 

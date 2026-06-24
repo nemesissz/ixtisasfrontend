@@ -121,11 +121,11 @@ function generatePrintHTML(user: any, sel: any, nameMap: Record<string, string>,
   @page{margin:12mm;size:A4 portrait} @media print{body{padding:0}}
 </style></head>
 <body>
-  <div class="doc-title">KURSANTIN İXTİSAS SEÇİM VƏRƏQİ</div>
+  <div class="doc-title">TƏHSİL ALANIN İXTİSAS SEÇİM VƏRƏQİ</div>
 
   <div class="info">
     <div class="info-left">
-      <div class="name">Kursant: ${esc(user.name)}</div>
+      <div class="name">Təhsil alan: ${esc(user.name)}</div>
       <div class="sub">FİN Kod: ${esc(user.fin || '—')}</div>
       <div class="sub">Abituriyentin iş nömrəsi: ${esc(user.workNumber || '—')}</div>
       ${user.group ? `<div class="sub">Qrup: ${esc(user.group)}${user.source ? ' · '+esc(user.source==='mülki'?'Mülki':user.source==='lisey'?'Lisey':user.source) : ''}</div>` : ''}
@@ -133,11 +133,11 @@ function generatePrintHTML(user: any, sel: any, nameMap: Record<string, string>,
     <div class="info-mid">Topladığı Yekun Bal: <b>${Number(user.score).toFixed(2)}</b></div>
     <div class="info-right">
       <div>Sənədin Çap Tarixi: ${printDate}</div>
-      <div class="sign-line">Kursantın İmzası</div>
+      <div class="sign-line">Təhsil alanın İmzası</div>
     </div>
   </div>
 
-  ${ranking.length > 0 ? tableHTML : '<div class="no-sub">Bu kursant seçim göndərməyib</div>'}
+  ${ranking.length > 0 ? tableHTML : '<div class="no-sub">Bu təhsil alan seçim göndərməyib</div>'}
 
   <div class="confirm">Yuxarıdakı seçimlərin mənə aid olduğunu öz imzamla təsdiq edirəm.</div>
 </body>
@@ -148,7 +148,7 @@ function generatePrintHTML(user: any, sel: any, nameMap: Record<string, string>,
 // ── Excel export ──────────────────────────────────────────────────────────────
 function exportToExcel(rows: any[], instLabel: string, instId: string, subCountMap: Record<string, number>, included?: Set<string>) {
   const inc = (c: string) => c === '#' || !included || included.has(c)
-  // ── Kursant seçimlərini hazırla (müəssisənin seçimi üzrə) ──
+  // ── Təhsil alan seçimlərini hazırla (müəssisənin seçimi üzrə) ──
   const allSels = selectionDb.getAll() as any[]
   const sel = allSels.find((s: any) => s.institution === instId && s.status === 'published')
           || allSels.find((s: any) => s.institution === instId && s.status !== 'draft')
@@ -202,21 +202,21 @@ function exportToExcel(rows: any[], instLabel: string, instId: string, subCountM
     if (inc('Seçim statusu'))    base['Seçim statusu'] = hasSub ? 'Seçim edildi' : 'Seçim gözləyir'
     if (inc('Çap statusu'))      base['Çap statusu'] = u.printStatus === 'printed' ? 'Çap edilib' : 'Çap edilməyib'
     if (inc('Yerləşdiyi ixtisas')) base['Yerləşdiyi ixtisas'] = u.placedSpecialty || 'Yerləşdirilməyib'
-    if (inc('Kursantın seçimləri (prioritetlə)')) base['Kursantın seçimləri (prioritetlə)'] = formatChoices(u.id)
+    if (inc('Təhsil alanın seçimləri (prioritetlə)')) base['Təhsil alanın seçimləri (prioritetlə)'] = formatChoices(u.id)
     return base
   })
   const ws = XLSX.utils.json_to_sheet(data)
   // ── Sütun enləri (sütun adına görə dinamik) ──
   const colKeys = Object.keys(data[0] || {})
   ws['!cols'] = colKeys.map(k =>
-    k === 'Kursantın seçimləri (prioritetlə)' ? { wch: 70 }
+    k === 'Təhsil alanın seçimləri (prioritetlə)' ? { wch: 70 }
     : k === 'Yerləşdiyi ixtisas'   ? { wch: 24 }
     : k === 'Ümumi imtahan nəticəsi' ? { wch: 18 }
     : k === 'Təhsil müəssisəsi' || k === 'Seçim statusu' || k === 'Çap statusu' ? { wch: 15 }
     : k === '#' ? { wch: 4 }
     : { wch: 13 }
   )
-  const choiceColIdx = colKeys.indexOf('Kursantın seçimləri (prioritetlə)')
+  const choiceColIdx = colKeys.indexOf('Təhsil alanın seçimləri (prioritetlə)')
   if (choiceColIdx >= 0) {
     const range = XLSX.utils.decode_range(ws['!ref'] || 'A1')
     for (let r = 1; r <= range.e.r; r++) {
@@ -227,7 +227,7 @@ function exportToExcel(rows: any[], instLabel: string, instId: string, subCountM
   const wb = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(wb, ws, instLabel)
   const date = new Date().toLocaleDateString('az-AZ').replace(/\./g, '-')
-  XLSX.writeFile(wb, `${instLabel}_Tələbələr_${date}.xlsx`)
+  XLSX.writeFile(wb, `${instLabel}_Təhsil Alanlar_${date}.xlsx`)
 }
 
 // ── Versiya 2/3 üçün ortaq köməkçi: birləşmiş başlıqlı vərəq qur ──────────────
@@ -268,7 +268,7 @@ function buildLeveledSheet(
   const singleCols = singleAll.filter(inc)
 
   const showPlaced = inc('Yerləşdiyi ixtisas')
-  const showSel    = inc('Kursantın seçimləri (prioritetlə)')
+  const showSel    = inc('Təhsil alanın seçimləri (prioritetlə)')
 
   const row1: any[] = [...singleCols]
   const row2: any[] = singleCols.map(() => '')
@@ -281,10 +281,10 @@ function buildLeveledSheet(
   if (showSel) {
     selStart = row1.length
     if (selMode === 'levels') {
-      row1.push('Kursantın seçimləri (prioritetlə)'); for (let i = 1; i < nLv; i++) row1.push('')
+      row1.push('Təhsil alanın seçimləri (prioritetlə)'); for (let i = 1; i < nLv; i++) row1.push('')
       for (let i = 0; i < nLv; i++) row2.push(lvName(i))
     } else {
-      row1.push('Kursantın seçimləri (prioritetlə)'); row2.push('')
+      row1.push('Təhsil alanın seçimləri (prioritetlə)'); row2.push('')
     }
   }
 
@@ -370,7 +370,7 @@ function exportToExcelV2(rows: any[], instLabel: string, instId: string, subCoun
   const ws = buildLeveledSheet(rows, instLabel, instId, subCountMap, included, 'levels')
   const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, instLabel)
   const date = new Date().toLocaleDateString('az-AZ').replace(/\./g, '-')
-  XLSX.writeFile(wb, `${instLabel}_Tələbələr_v2_${date}.xlsx`)
+  XLSX.writeFile(wb, `${instLabel}_Təhsil Alanlar_v2_${date}.xlsx`)
 }
 
 // ── Versiya 3: yerləşmə səviyyəli, seçimlər düz xətt ──
@@ -378,7 +378,7 @@ function exportToExcelV3(rows: any[], instLabel: string, instId: string, subCoun
   const ws = buildLeveledSheet(rows, instLabel, instId, subCountMap, included, 'flat')
   const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, instLabel)
   const date = new Date().toLocaleDateString('az-AZ').replace(/\./g, '-')
-  XLSX.writeFile(wb, `${instLabel}_Tələbələr_v3_${date}.xlsx`)
+  XLSX.writeFile(wb, `${instLabel}_Təhsil Alanlar_v3_${date}.xlsx`)
 }
 
 // ── Excel import ──────────────────────────────────────────────────────────────
@@ -604,7 +604,7 @@ function ImportModal({ instId, instLabel, onClose, onImported }: {
       localStorage.setItem('mmu_priority_subjects', JSON.stringify(subjectCols))
     }
     setDone(true); onImported()
-    addLog('user', 'success', `Excel idxal: ${preview.length} kursant (${mode === 'replace' ? 'əvəzlə' : 'əlavə et'})`,
+    addLog('user', 'success', `Excel idxal: ${preview.length} təhsil alan (${mode === 'replace' ? 'əvəzlə' : 'əlavə et'})`,
       `Müəssisə: ${instLabel} · İl: ${selectedYear}`)
   }
 
@@ -667,7 +667,7 @@ function ImportModal({ instId, instLabel, onClose, onImported }: {
 
                   {/* ── Canlı ön izləmə ── */}
                   <div style={{ marginBottom: 14 }}>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: '#3a4560', marginBottom: 6 }}>📊 Canlı ön izləmə:</div>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: '#3a4560', marginBottom: 6 }}>📊 Nümunə:</div>
                     <div style={{
                       overflowX: 'auto', borderRadius: 8,
                       border: '1.5px solid #c5d0ff', background: '#fff',
@@ -921,7 +921,7 @@ function ImportModal({ instId, instLabel, onClose, onImported }: {
                     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                   }}>
                     <span>⬇</span>
-                    <span>Şablonu endir</span>
+                    <span>Şablonu yüklə</span>
                     <span style={{ background: 'rgba(255,255,255,0.25)', borderRadius: 20, padding: '1px 9px', fontSize: 11 }}>
                       {allTemplateCols.length} sütun
                     </span>
@@ -944,7 +944,7 @@ function ImportModal({ instId, instLabel, onClose, onImported }: {
             {preview.length > 0 && (<>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                 <div style={{ fontWeight: 700, fontSize: 13, color: '#237804' }}>
-                  ✓ {preview.length} tələbə ·{' '}
+                  ✓ {preview.length} təhsil alan ·{' '}
                   <span style={{ color: '#b8860b', fontWeight: 700 }}>
                     📅 {selectedYear || '—'}
                   </span>
@@ -984,7 +984,7 @@ function ImportModal({ instId, instLabel, onClose, onImported }: {
                   disabled={useCustom && !customValid}
                   style={{ opacity: (useCustom && !customValid) ? 0.5 : 1 }}
                 >
-                  ✓ {preview.length} tələbəni idxal et
+                  ✓ {preview.length} təhsil alanı idxal et
                 </button>
               </div>
             </>)}
@@ -992,7 +992,7 @@ function ImportModal({ instId, instLabel, onClose, onImported }: {
             <div style={{ textAlign: 'center', padding: '32px 16px' }}>
               <div style={{ fontSize: 48, marginBottom: 12 }}>✅</div>
               <div style={{ fontWeight: 800, fontSize: 16, marginBottom: 6 }}>İdxal uğurla tamamlandı!</div>
-              <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 24 }}>{preview.length} tələbə əlavə edildi</div>
+              <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 24 }}>{preview.length} təhsil alan əlavə edildi</div>
               <button className="btn btn-primary" onClick={onClose}>Bağla</button>
             </div>
           )}
@@ -1002,7 +1002,7 @@ function ImportModal({ instId, instLabel, onClose, onImported }: {
   )
 }
 
-// ── Kursant redaktə modalı ───────────────────────────────────────────────────
+// ── Təhsil alan redaktə modalı ───────────────────────────────────────────────────
 function EditUserModal({ user, instLabel, activeSel, hasSub, onClose, onSaved }: {
   user: any; instLabel: string; activeSel: any; hasSub: boolean; onClose: () => void; onSaved: () => void
 }) {
@@ -1023,7 +1023,7 @@ function EditUserModal({ user, instLabel, activeSel, hasSub, onClose, onSaved }:
     printStatus: user.printStatus || 'not_printed',
     placedSpecialty: user.placedSpecialty || '',
   })
-  // Fənn balları (kursantın subjects sahəsi)
+  // Fənn balları (təhsil alanın subjects sahəsi)
   const subjectKeys = Object.keys(user.subjects || {})
   const [subjects, setSubjects] = useState<Record<string, string>>(
     Object.fromEntries(subjectKeys.map(k => [k, String(user.subjects[k] ?? '')]))
@@ -1088,7 +1088,7 @@ function EditUserModal({ user, instLabel, activeSel, hasSub, onClose, onSaved }:
     // ── Seçim statusu dəyişibsə submission yarat/sil ──
     if (selStatus !== (hasSub ? 'submitted' : 'pending')) {
       if (selStatus === 'pending') {
-        // Kursantın BÜTÜN seçimlərini sil (tam sıfırla) + yerləşdirməni təmizlə
+        // Təhsil alanın BÜTÜN seçimlərini sil (tam sıfırla) + yerləşdirməni təmizlə
         const all = submissionDb.getAll() as any[]
         const filtered = all.filter((s: any) => s.userId !== user.id)
         localStorage.setItem('mmu_submissions', JSON.stringify(filtered))
@@ -1111,7 +1111,7 @@ function EditUserModal({ user, instLabel, activeSel, hasSub, onClose, onSaved }:
 
     if (changed.length > 0) {
       addLog('user', 'success',
-        `Kursant redaktə edildi: ${fullName}`,
+        `Təhsil alan redaktə edildi: ${fullName}`,
         `Müəssisə: ${instLabel}\n${changed.join('\n')}`
       )
     }
@@ -1124,7 +1124,7 @@ function EditUserModal({ user, instLabel, activeSel, hasSub, onClose, onSaved }:
     <div className="modal-overlay open" onClick={onClose}>
       <div className="modal" style={{ maxWidth: 520 }} onClick={e => e.stopPropagation()}>
         <div className="modal-head">
-          <span className="modal-title">✏️ Kursant Redaktəsi — {user.name}</span>
+          <span className="modal-title">✏️ Təhsil alan Redaktəsi — {user.name}</span>
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>
         <div className="modal-body">
@@ -1249,11 +1249,6 @@ function EditUserModal({ user, instLabel, activeSel, hasSub, onClose, onSaved }:
               </div>
             )}
 
-            {/* Yerləşdiyi ixtisas */}
-            <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-              <label className="form-label">Yerləşdiyi ixtisas</label>
-              <input className="form-input" value={form.placedSpecialty} placeholder="Yerləşdirilməyib" onChange={e => set('placedSpecialty', e.target.value)} />
-            </div>
 
           </div>
 
@@ -1460,14 +1455,14 @@ function EditInstModal({ inst, onClose, onSaved }: { inst: any; onClose: () => v
   function handleSave() {
     const l = label.trim(); if (!l) return
     institutionDb.update(inst.id, { ...inst, label: l, icon, year: effYear || undefined })
-    // Tədris ilini kursantlara tətbiq et (istəyə görə)
+    // Tədris ilini təhsil alanlara tətbiq et (istəyə görə)
     if (effYear && applyAll) {
       const list = (userDb.getAll() as any[]).map((u: any) =>
         u.institution === inst.id ? { ...u, year: effYear } : u)
       localStorage.setItem('mmu_users', JSON.stringify(list))
     }
     addLog('admin', 'info', `Müəssisə yeniləndi: "${l}"`,
-      effYear ? `Tədris ili: ${effYear}${applyAll ? ` · ${instUserCount} kursanta tətbiq edildi` : ''}` : undefined)
+      effYear ? `Tədris ili: ${effYear}${applyAll ? ` · ${instUserCount} təhsil alana tətbiq edildi` : ''}` : undefined)
     onSaved(); onClose()
   }
 
@@ -1507,7 +1502,7 @@ function EditInstModal({ inst, onClose, onSaved }: { inst: any; onClose: () => v
             {effYear && instUserCount > 0 && (
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, fontSize: 12, color: '#5a6080', cursor: 'pointer' }}>
                 <input type="checkbox" checked={applyAll} onChange={e => setApplyAll(e.target.checked)} />
-                Bu ili müəssisənin bütün kursantlarına tətbiq et ({instUserCount} kursant)
+                Bu ili müəssisənin bütün təhsil alanlarına tətbiq et ({instUserCount} təhsil alan)
               </label>
             )}
           </div>
@@ -1621,8 +1616,8 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
     if (!instUsers.length) return
     showConfirm({
       icon: '🗄️', iconBg: '#f0f2fa', iconColor: '#9a7b1e',
-      title: 'Kursantları arxivlə',
-      message: `${instLabel} üçün ${instUsers.length} kursantın siyahısı arxivlənəcək. Arxiv bölməsindən baxıla bilər.`,
+      title: 'Təhsil Alanları arxivlə',
+      message: `${instLabel} üçün ${instUsers.length} təhsil alanın siyahısı arxivlənəcək. Arxiv bölməsindən baxıla bilər.`,
       confirmLabel: 'Arxivlə', confirmColor: '#9a7b1e',
       onConfirm: () => {
         userArchiveDb.save({ label: instLabel, institution: instId, snapshot: instUsers })
@@ -1630,7 +1625,7 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
         refreshUsers()
         setArchiveDone(true)
         setTimeout(() => setArchiveDone(false), 3000)
-        addLog('user', 'warning', `Kursantlar arxivləndi: ${instUsers.length} nəfər`, `Müəssisə: ${instLabel}`)
+        addLog('user', 'warning', `Təhsil Alanlar arxivləndi: ${instUsers.length} nəfər`, `Müəssisə: ${instLabel}`)
       },
     })
   }
@@ -1693,7 +1688,7 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
     'Ad', 'Soyad', 'Ata adı', 'İş nömrəsi', 'FİN', 'Təhsil müəssisəsi', 'Tədris ili',
     ...(hasGroups ? ['Qrup'] : []), ...(hasSources ? ['Mənbə'] : []), ...(hasGender ? ['Cins'] : []),
     'Ümumi imtahan nəticəsi', ...allSubjectKeys, 'Seçim statusu', 'Çap statusu',
-    'Yerləşdiyi ixtisas', 'Kursantın seçimləri (prioritetlə)',
+    'Yerləşdiyi ixtisas', 'Təhsil alanın seçimləri (prioritetlə)',
   ]
   const includedCols = new Set(exportCols.filter(c => !excludedCols.has(c)))
   const toggleCol = (c: string) => setExcludedCols(prev => {
@@ -1702,10 +1697,10 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
 
   const filtered = instUsers.filter((u: any) => {
     const q           = search.toLowerCase()
-    const matchSearch = u.name.toLowerCase().includes(q) || (u.fin || '').toLowerCase().includes(q) || (u.workNumber || '').includes(q)
+    const matchSearch = u.name.toLowerCase().includes(q) || (u.parentName || '').toLowerCase().includes(q) || (u.fin || '').toLowerCase().includes(q) || (u.workNumber || '').includes(q)
     const hasSub      = subCountMap[u.id] > 0
-    const matchStatus = filter === 'all' || (filter === 'submitted' && hasSub) || (filter === 'pending' && !hasSub)
-    const matchPrint  = printFilter === 'all' || (printFilter === 'printed' && u.printStatus === 'printed') || (printFilter === 'not_printed' && u.printStatus !== 'printed')
+    const matchStatus = filter === 'all' || filter === 'both' || (filter === 'submitted' && hasSub) || (filter === 'pending' && !hasSub)
+    const matchPrint  = printFilter === 'all' || printFilter === 'both' || (printFilter === 'printed' && u.printStatus === 'printed') || (printFilter === 'not_printed' && u.printStatus !== 'printed')
     const matchGroup  = grpFilter === 'all' || String(u.group) === grpFilter
     const matchYear   = yearFilter === 'all' || u.year === yearFilter
     return matchSearch && matchStatus && matchPrint && matchGroup && matchYear
@@ -1735,7 +1730,7 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
 
   function confirmPrint() {
     if (!printUser) return
-    // Kursantın hər hansı submissionunu tap (active olmasa belə)
+    // Təhsil alanın hər hansı submissionunu tap (active olmasa belə)
     const allSubs2 = submissionDb.getAll() as any[]
     const sub = allSubs2.find((s: any) => s.userId === printUser.id) || null
     const ranking: string[] = sub?.ranking || []
@@ -1785,12 +1780,12 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
               )}
               {!subCountMap[printUser.id] && (
                 <div style={{ background: '#fff7e6', border: '1.5px solid #ffd591', borderRadius: 10, padding: '10px 14px', fontSize: 12, color: '#d46b08', marginBottom: 16 }}>
-                  ⚠️ Bu kursant hələ seçim göndərməyib.
+                  ⚠️ Bu təhsil alan hələ seçim göndərməyib.
                 </div>
               )}
               {printUser.printStatus === 'printed' && (
                 <div style={{ background: '#f6ffed', border: '1.5px solid #b7eb8f', borderRadius: 10, padding: '10px 14px', fontSize: 12, color: '#237804', marginBottom: 16 }}>
-                  ✅ Bu kursant əvvəllər çap edilib. Yenidən çap edəcəksiniz?
+                  ✅ Bu təhsil alan əvvəllər çap edilib. Yenidən çap edəcəksiniz?
                 </div>
               )}
               <div style={{ display: 'flex', gap: 10 }}>
@@ -1826,7 +1821,7 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
             </div>
             <div className="modal-body">
               <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 12 }}>
-                {sorted.length} kursant ixrac olunacaq.
+                {sorted.length} təhsil alan ixrac olunacaq.
               </div>
 
               {/* Sütun seçimi */}
@@ -1862,20 +1857,20 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
                 {/* Versiya 1 */}
                 <button
-                  onClick={() => { exportToExcel(sorted, instLabel, instId, subCountMap, includedCols); addLog('user', 'info', `Excel ixrac (Versiya 1): ${sorted.length} kursant`, `Müəssisə: ${instLabel}`); setShowExport(false) }}
+                  onClick={() => { exportToExcel(sorted, instLabel, instId, subCountMap, includedCols); addLog('user', 'info', `Excel ixrac (Versiya 1): ${sorted.length} təhsil alan`, `Müəssisə: ${instLabel}`); setShowExport(false) }}
                   style={{ textAlign: 'left', padding: '16px 18px', borderRadius: 14, border: '1.5px solid #b7eb8f', background: '#f6ffed', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 14 }}
                 >
                   <div style={{ width: 42, height: 42, borderRadius: 11, background: '#1d6f42', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>1</div>
                   <div>
                     <div style={{ fontWeight: 800, fontSize: 14, color: '#1a1a2e' }}>Versiya 1 — Tam siyahı</div>
                     <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 2 }}>
-                      Bütün sütunlar (ad, FİN, fənlər, status) + kursantın bütün seçimləri
+                      Bütün sütunlar (ad, FİN, fənlər, status) + təhsil alanın bütün seçimləri
                     </div>
                   </div>
                 </button>
                 {/* Versiya 2 — səviyyələrə bölünmüş */}
                 <button
-                  onClick={() => { exportToExcelV2(sorted, instLabel, instId, subCountMap, includedCols); addLog('user', 'info', `Excel ixrac (Versiya 2): ${sorted.length} kursant`, `Müəssisə: ${instLabel}`); setShowExport(false) }}
+                  onClick={() => { exportToExcelV2(sorted, instLabel, instId, subCountMap, includedCols); addLog('user', 'info', `Excel ixrac (Versiya 2): ${sorted.length} təhsil alan`, `Müəssisə: ${instLabel}`); setShowExport(false) }}
                   style={{ textAlign: 'left', padding: '16px 18px', borderRadius: 14, border: '1.5px solid #ecd9a0', background: '#fbf1d6', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 14 }}
                 >
                   <div style={{ width: 42, height: 42, borderRadius: 11, background: '#c9962a', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>2</div>
@@ -1888,7 +1883,7 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
                 </button>
                 {/* Versiya 3 — yerləşmə səviyyəli + seçimlər düz xətt */}
                 <button
-                  onClick={() => { exportToExcelV3(sorted, instLabel, instId, subCountMap, includedCols); addLog('user', 'info', `Excel ixrac (Versiya 3): ${sorted.length} kursant`, `Müəssisə: ${instLabel}`); setShowExport(false) }}
+                  onClick={() => { exportToExcelV3(sorted, instLabel, instId, subCountMap, includedCols); addLog('user', 'info', `Excel ixrac (Versiya 3): ${sorted.length} təhsil alan`, `Müəssisə: ${instLabel}`); setShowExport(false) }}
                   style={{ textAlign: 'left', padding: '16px 18px', borderRadius: 14, border: '1.5px solid #ddd0ff', background: '#f6f2ff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 14 }}
                 >
                   <div style={{ width: 42, height: 42, borderRadius: 11, background: '#b8860b', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>3</div>
@@ -1911,54 +1906,53 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
             <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 14 }}>
               {instIcon && <InstIcon icon={instIcon} size={16} />}
               {instLabel}
-              <span style={{ fontSize: 11.5, fontWeight: 500, color: 'var(--muted)' }}>
-                · {instUsers.length} <span style={{ color: '#237804', fontWeight: 700 }}>· {totalSub} göndərdi</span> · {totalPend} gözləyir
-              </span>
             </div>
           </div>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
             {can('users.delete') && (
             <button onClick={() => handleArchiveUsers(instUsers)} disabled={instUsers.length === 0}
               title="Arxivlə"
-              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 10px', borderRadius: 8, cursor: instUsers.length ? 'pointer' : 'not-allowed',
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 16px', borderRadius: 10, cursor: instUsers.length ? 'pointer' : 'not-allowed',
                 border: archiveDone ? '1.5px solid #52c41a' : '1.5px solid #ecd9a0', background: archiveDone ? '#f0fff4' : '#fffdf5',
-                color: archiveDone ? '#237804' : '#9a7b1e', fontWeight: 700, fontSize: 12, opacity: instUsers.length === 0 ? 0.4 : 1 }}>
+                color: archiveDone ? '#237804' : '#9a7b1e', fontWeight: 800, fontSize: 13, boxShadow: '0 2px 8px #1a1f3c14', opacity: instUsers.length === 0 ? 0.4 : 1 }}>
               {archiveDone ? '✅' : '🗄️'} {archiveDone ? 'Arxivləndi' : 'Arxivlə'}
             </button>
             )}
             {can('users.import') && (
-            <button onClick={() => setShowImport(true)} title="Excel İdxal"
-              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 10px', borderRadius: 8, border: '1.5px solid var(--blue)', background: '#fff', color: 'var(--blue)', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>
-              📤 İdxal
+            <button onClick={() => setShowImport(true)} title="Excel ilə əlavə et"
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 16px', borderRadius: 10, border: '1.5px solid var(--blue)', background: '#fff', color: 'var(--blue)', fontWeight: 800, fontSize: 13, boxShadow: '0 2px 8px #e0a92e22', cursor: 'pointer' }}>
+              📤 Əlavə et
             </button>
             )}
             {can('users.export') && (
-            <button onClick={() => setShowExport(true)} title="Excel Export"
-              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 10px', borderRadius: 8, border: 'none', cursor: 'pointer', background: '#1d6f42', color: '#fff', fontWeight: 700, fontSize: 12 }}>
-              📥 Export <span style={{ fontWeight: 400, opacity: 0.85 }}>({sorted.length})</span>
+            <button onClick={() => setShowExport(true)} title={`Excel ilə ixrac et — ${sorted.length} təhsil alan`}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 16px', borderRadius: 10, border: 'none', cursor: 'pointer', background: '#1d6f42', color: '#fff', fontWeight: 800, fontSize: 13, boxShadow: '0 3px 12px #1d6f4244' }}>
+              📥 İxrac et
             </button>
             )}
             {can('users.delete') && (
-            <button onClick={onReset} title="Kursant siyahısını sıfırla"
-              style={{ padding: '6px 9px', borderRadius: 8, border: '1.5px solid #ffd591', background: '#fffbe6', color: '#d46b08', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>🔄</button>
+            <button onClick={onReset} title="Təhsil alan siyahısını sil"
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 16px', borderRadius: 10, border: '1.5px solid #ffd591', background: '#fffbe6', color: '#d46b08', fontWeight: 800, fontSize: 13, boxShadow: '0 2px 8px #d46b0822', cursor: 'pointer' }}>🗑 Siyahını sil</button>
             )}
             {can('inst.delete') && (
             <button onClick={onDelete} title="Müəssisəni sil"
-              style={{ padding: '6px 9px', borderRadius: 8, border: '1.5px solid #ffccc7', background: '#fff5f5', color: '#cf1322', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>🗑</button>
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 16px', borderRadius: 10, border: '1.5px solid #ffccc7', background: '#fff5f5', color: '#cf1322', fontWeight: 800, fontSize: 13, boxShadow: '0 2px 8px #cf132222', cursor: 'pointer' }}>🗑 Müəssisəni sil</button>
             )}
           </div>
         </div>
 
         <div className="search-row" style={{ flexShrink: 0, padding: '10px 16px' }}>
-          <input className="search-input" placeholder="🔍  Ad, FİN və ya iş nömrəsi..."
+          <input className="search-input" placeholder="🔍  Ad, soyad, ata adı, FİN və ya iş nömrəsi ilə axtar..."
             value={search} onChange={e => setSearch(e.target.value)} />
           <select className="filter-select" value={filter} onChange={e => setFilter(e.target.value)}>
-            <option value="all">Seçim statusu</option>
+            <option value="all" disabled>Seçim statusu</option>
+            <option value="both">Hər ikisi</option>
             <option value="submitted">Seçim etdi</option>
             <option value="pending">Seçim etmədi</option>
           </select>
           <select className="filter-select" value={printFilter} onChange={e => setPrintFilter(e.target.value)}>
-            <option value="all">Çap statusu</option>
+            <option value="all" disabled>Çap statusu</option>
+            <option value="both">Hər ikisi</option>
             <option value="printed">Çap edilib</option>
             <option value="not_printed">Çap edilməyib</option>
           </select>
@@ -1967,14 +1961,6 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
               <option value="all">Bütün qruplar</option>
               {allGroups.map(g => (
                 <option key={g} value={g}>Qrup {g}</option>
-              ))}
-            </select>
-          )}
-          {hasYears && (
-            <select className="filter-select" value={yearFilter} onChange={e => setYearFilter(e.target.value)}>
-              <option value="all">Bütün illər</option>
-              {allYears.map(y => (
-                <option key={y} value={y}>{y}</option>
               ))}
             </select>
           )}
@@ -2177,7 +2163,7 @@ export default function Users() {
     const users = JSON.parse(localStorage.getItem('mmu_users') || '[]') as any[]
     const count = users.filter((u: any) => u.institution === inst.id).length
     localStorage.setItem('mmu_users', JSON.stringify(users.filter((u: any) => u.institution !== inst.id)))
-    addLog('admin', 'warning', `Müəssisə sıfırlandı: "${inst.label}"`, `${count} kursant silindi`)
+    addLog('admin', 'warning', `Müəssisə sıfırlandı: "${inst.label}"`, `${count} təhsil alan silindi`)
     setResetTarget(null)
     // UserTable-i yeniləmək üçün tab-ı yenidən yükləyirik
     const cur = tab
@@ -2196,10 +2182,10 @@ export default function Users() {
     // Müəssisəni sil
     const usersInInst = (JSON.parse(localStorage.getItem('mmu_users') || '[]') as any[]).filter((u: any) => u.institution === inst.id)
     institutionDb.delete(inst.id)
-    // Müəssisənin kursantlarını da sil
+    // Müəssisənin təhsil alanlarını da sil
     const users = JSON.parse(localStorage.getItem('mmu_users') || '[]')
     localStorage.setItem('mmu_users', JSON.stringify(users.filter((u: any) => u.institution !== inst.id)))
-    addLog('admin', 'error', `Müəssisə silindi: "${inst.label}"`, `${usersInInst.length} kursant da silindi · Superadmin şifrəsi ilə təsdiqləndi`)
+    addLog('admin', 'error', `Müəssisə silindi: "${inst.label}"`, `${usersInInst.length} təhsil alan da silindi · Superadmin şifrəsi ilə təsdiqləndi`)
     refreshInstitutions()
     setDeleteTarget(null); setDelPassword(''); setDelError('')
     // Başqa taba keç
@@ -2231,7 +2217,7 @@ export default function Users() {
                 Müəssisəni silmək istəyirsiniz?
               </div>
               <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 16, lineHeight: 1.5 }}>
-                <b style={{ display:'inline-flex', alignItems:'center', gap:5, verticalAlign:'middle' }}><InstIcon icon={deleteTarget.icon} size={15} /> {deleteTarget.label}</b> müəssisəsi və ona aid <b>bütün kursantlar</b> silinəcək. Bu əməliyyat geri alına bilməz.
+                <b style={{ display:'inline-flex', alignItems:'center', gap:5, verticalAlign:'middle' }}><InstIcon icon={deleteTarget.icon} size={15} /> {deleteTarget.label}</b> müəssisəsi və ona aid <b>bütün təhsil alanlar</b> silinəcək. Bu əməliyyat geri alına bilməz.
               </div>
 
               {/* Superadmin şifrəsi */}
@@ -2266,15 +2252,15 @@ export default function Users() {
         <div className="modal-overlay open" onClick={() => setResetTarget(null)}>
           <div className="modal" style={{ maxWidth: 400 }} onClick={e => e.stopPropagation()}>
             <div className="modal-head" style={{ borderBottom: 'none', paddingBottom: 0 }}>
-              <span style={{ fontSize: 20 }}>🔄</span>
+              <span style={{ fontSize: 20 }}>🗑</span>
               <button className="modal-close" onClick={() => setResetTarget(null)}>✕</button>
             </div>
             <div className="modal-body" style={{ paddingTop: 8 }}>
               <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', marginBottom: 8 }}>
-                Kursant siyahısını sıfırlamaq istəyirsiniz?
+                Təhsil alan siyahısını silmək istəyirsiniz?
               </div>
               <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 24, lineHeight: 1.5 }}>
-                <b style={{ display:'inline-flex', alignItems:'center', gap:5, verticalAlign:'middle' }}><InstIcon icon={resetTarget.icon} size={15} /> {resetTarget.label}</b> müəssisəsinə aid <b>bütün kursantlar</b> silinəcək. Müəssisənin özü saxlanılacaq. Bu əməliyyat geri alına bilməz.
+                <b style={{ display:'inline-flex', alignItems:'center', gap:5, verticalAlign:'middle' }}><InstIcon icon={resetTarget.icon} size={15} /> {resetTarget.label}</b> müəssisəsinə aid <b>bütün təhsil alanlar</b> silinəcək. Müəssisənin özü saxlanılacaq. Bu əməliyyat geri alına bilməz.
               </div>
               <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
                 <button className="btn btn-outline" onClick={() => setResetTarget(null)}>Ləğv et</button>
@@ -2282,7 +2268,7 @@ export default function Users() {
                   className="btn"
                   style={{ padding: '8px 22px', background: '#ff8c00', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, cursor: 'pointer' }}
                   onClick={() => handleResetInst(resetTarget)}
-                >Sıfırla</button>
+                >Sil</button>
               </div>
             </div>
           </div>

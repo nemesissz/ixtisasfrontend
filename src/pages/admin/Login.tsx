@@ -141,7 +141,7 @@ export default function AdminLogin() {
         <div style={{ textAlign:'center', marginTop: 22 }}>
           <button onClick={() => navigate('/student')}
             style={{ background:'none', border:'none', cursor:'pointer', color:'#9a7b1e', fontSize: 12.5, fontWeight: 700 }}>
-            🎓 Kursant girişi →
+            🎓 Təhsil alan girişi →
           </button>
         </div>
         <div style={{ textAlign:'center', marginTop: 14, fontSize: 11, color:'#aab' }}>

@@ -130,7 +130,7 @@ function PriorityModal({ node, onSave, onClose, groupSubjectsMap, groupScoresMap
   onClose: () => void
   groupSubjectsMap?: { [g: string]: string[] }
   groupScoresMap?: { [g: string]: { [subject: string]: number } }
-  allSubjects?: string[]   // müəssisənin kursantlarının faktiki fənləri (cədvəldən)
+  allSubjects?: string[]   // müəssisənin təhsil alanlarının faktiki fənləri (cədvəldən)
 }) {
   const stored   = getStoredSubjects()
   const hasGroups = (node.groups?.length ?? 0) > 0
@@ -187,7 +187,7 @@ function PriorityModal({ node, onSave, onClose, groupSubjectsMap, groupScoresMap
         </div>
         <div className="modal-body">
           <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 14 }}>
-            Bərabər bal halında kursantlar bu fənlər üzrə göstərilən sıraya görə seçiləcək.
+            Bərabər bal halında təhsil alanlar bu fənlər üzrə göstərilən sıraya görə seçiləcək.
             {hasGroups && <> Hər qrupun öz prioritet fənləri var.</>}
           </div>
 
@@ -272,13 +272,13 @@ function GroupModal({ node, onSave, onClose }: {
         </div>
         <div className="modal-body">
           <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 14 }}>
-            Seçilmiş qruplardan olan kursantlar bu ixtisası görəcək.
+            Seçilmiş qruplardan olan təhsil alanlar bu ixtisası görəcək.
             Heç biri seçilməsə — bütün qruplar üçün görünür.
           </div>
 
           {allGroups.length === 0 ? (
             <div style={{ fontSize: 13, color: 'var(--muted)', textAlign: 'center', padding: '20px 0' }}>
-              Kursant cədvəlində qrup məlumatı tapılmadı
+              Təhsil alan cədvəlində qrup məlumatı tapılmadı
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -294,7 +294,7 @@ function GroupModal({ node, onSave, onClose }: {
                     style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#52c41a' }} />
                   <span style={{ fontSize: 14, fontWeight: 700 }}>Qrup {g}</span>
                   <span style={{ fontSize: 11, color: 'var(--muted)', marginLeft: 'auto' }}>
-                    {(userDb.getAll() as any[]).filter((u: any) => u.group === g).length} kursant
+                    {(userDb.getAll() as any[]).filter((u: any) => u.group === g).length} təhsil alan
                   </span>
                 </label>
               ))}
@@ -529,7 +529,7 @@ function QuotaModeModal({ node, instUsers, onSave, onClose }: {
                 </div>
               </div>
               <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 10, lineHeight: 1.5 }}>
-                Müəssisədə olan kursant nisbətinə görə hər bölüşdürmədə yenidən hesablanır.
+                Müəssisədə olan təhsil alan nisbətinə görə hər yerləşdirmədə yenidən hesablanır.
               </div>
             </div>
           )}
@@ -1036,7 +1036,7 @@ export default function Specialties() {
       cfg ? `Qadın: ${cfg.allowFemale ? 'bəli' : 'xeyr'}${cfg.maxFemale != null ? ' (max '+cfg.maxFemale+')' : ''} · Kişi: ${cfg.allowMale ? 'bəli' : 'xeyr'}${cfg.maxMale != null ? ' (max '+cfg.maxMale+')' : ''}` : 'Məhdudiyyət silindi')
   }
 
-  // ── Müəssisənin kursantlarından ən çox rast gəlinən tədris ilini tap ──────
+  // ── Müəssisənin təhsil alanlarından ən çox rast gəlinən tədris ilini tap ──────
   function getInstYear(instId: string): string {
     const us = (userDb.getAll() as any[]).filter((u: any) => u.institution === instId && u.year)
     if (!us.length) return ''
@@ -1159,7 +1159,7 @@ export default function Specialties() {
         const tree = getTree(priorityNode.treeId)
         const instId = tree?.institution || ''
         const allUsers = (userDb.getAll() as any[]).filter((u: any) => u.institution === instId)
-        // Müəssisənin BÜTÜN kursantlarının faktiki fənləri (cədvəldən avtomatik)
+        // Müəssisənin BÜTÜN təhsil alanlarının faktiki fənləri (cədvəldən avtomatik)
         const instSubjSet = new Set<string>()
         allUsers.forEach((u: any) => {
           if (u.subjects) Object.entries(u.subjects).forEach(([k, v]) => { if (v != null) instSubjSet.add(k) })
@@ -1311,7 +1311,7 @@ export default function Specialties() {
                     background: '#fff8e6', border: '1.5px solid #ffd591',
                     fontSize: 13, color: '#d46b08',
                   }}>
-                    ⚠️ Bu müəssisədə tədris ili olan kursant tapılmadı
+                    ⚠️ Bu müəssisədə tədris ili olan təhsil alan tapılmadı
                   </div>
                 )}
               </div>

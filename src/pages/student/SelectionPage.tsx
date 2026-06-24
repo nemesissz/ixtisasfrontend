@@ -25,7 +25,7 @@ function filterTreeByGroup(tree: any, studentGroup: string | null | undefined): 
 }
 
 // ── Əvvəlcədən bölgü səviyyəsinə görə ağacı filtrə et ────────────────────────
-// preAssignLevel-dəki node adı kursantın branch dəyəri ilə uyğun gələn alt ağac saxlanılır
+// preAssignLevel-dəki node adı təhsil alanın branch dəyəri ilə uyğun gələn alt ağac saxlanılır
 function filterTreeByBranch(tree: any, branchName: string | null | undefined, level: number | null | undefined): any {
   if (!tree || level == null || !branchName) return tree
   const target = String(branchName).trim().toLowerCase()
@@ -44,7 +44,7 @@ function filterTreeByBranch(tree: any, branchName: string | null | undefined, le
 }
 
 // ── Cinsə görə ağacı filtrə et ───────────────────────────────────────────────
-// Kursantın cinsinə icazə verilməyən ixtisaslar siyahıdan çıxarılır
+// Təhsil alanın cinsinə icazə verilməyən ixtisaslar siyahıdan çıxarılır
 function filterTreeByGender(tree: any, gender: string | null | undefined): any {
   if (!tree || !gender) return tree
   function filterNodes(nodes: any[]): any[] {
@@ -125,7 +125,7 @@ export default function SelectionPage() {
     setTimeout(() => {
       submissionDb.save({ selectionId: selId!, userId: student.id, userName: student.name, ranking })
       userDb.update(student.id, { status: 'submitted' })
-      addLog('selection', 'success', `Tələbə seçimini göndərdi: ${student.name}`,
+      addLog('selection', 'success', `Təhsil alan seçimini göndərdi: ${student.name}`,
         `FİN: ${student.fin || '—'} · ${ranking.length} ixtisas sıralandı`, student.name)
       setSaving(false)
       setSubmitted(true)
@@ -347,14 +347,14 @@ export default function SelectionPage() {
         <div style={{ fontSize: 11, color: '#9aa0ac', marginTop: 4 }}>Mərhələ 2 / 3</div>
       </div>
 
-      {/* ── Kursant məlumat kartı ── */}
+      {/* ── Təhsil alan məlumat kartı ── */}
       <div style={{
         background: '#ffffff', border: '1.5px solid #e7eaf0',
         borderRadius: 12, padding: '12px 20px', color: '#2b2f3a',
         display: 'flex', alignItems: 'center', gap: 16,
         borderLeft: '5px solid #e0a92e', marginBottom: 12, boxShadow: '0 2px 10px #1a1f3c0d',
       }}>
-        {/* Kursant məlumatları */}
+        {/* Təhsil alan məlumatları */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
           {/* İkon */}
           <div style={{

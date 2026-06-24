@@ -6,7 +6,7 @@ const NAV = [
 ]
 
 const PAGE_META: Record<string, { title: string; sub: string }> = {
-  '/operator/dashboard': { title: 'Aktiv Seçim', sub: 'Kursant seçim statusları' },
+  '/operator/dashboard': { title: 'Aktiv Seçim', sub: 'Təhsil alan seçim statusları' },
 }
 
 export default function OperatorLayout() {

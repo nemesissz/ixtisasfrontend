@@ -282,7 +282,7 @@ export default function Admins() {
     );
   }
 
-  // ── Yalnız bu müəssisənin kursant datasında mövcud olan sütunlar ──
+  // ── Yalnız bu müəssisənin təhsil alan datasında mövcud olan sütunlar ──
   const instCadets = (userDb.getAll() as any[]).filter(
     (u: any) => u.institution === selInst,
   );
@@ -291,7 +291,7 @@ export default function Admins() {
       (u: any) => u[c.key] != null && String(u[c.key]).trim() !== "",
     ),
   );
-  const availColumns = availColumns0.length ? availColumns0 : STUDENT_COLUMNS; // kursant yoxdursa hamısını göstər
+  const availColumns = availColumns0.length ? availColumns0 : STUDENT_COLUMNS; // təhsil alan yoxdursa hamısını göstər
   const colOptions = (selectedKey: string) =>
     availColumns.some((c) => c.key === selectedKey)
       ? availColumns
@@ -412,6 +412,17 @@ export default function Admins() {
   }
 
   function handleDelete(a: any) {
+    if (a.role === "superadmin") {
+      showInfo({
+        icon: "🔒",
+        iconBg: "#fff0f0",
+        iconColor: "#cf1322",
+        title: "Silinə bilməz",
+        message: "Baş Admin (superadmin) hesabını silmək mümkün deyil.",
+        confirmLabel: "Bağla",
+      });
+      return;
+    }
     showConfirm({
       icon: "🗑️",
       iconBg: "#fff0f0",
@@ -899,12 +910,14 @@ export default function Admins() {
                             🛡️ {(a.permissions || []).length}
                           </button>
                         )}
-                      <button
-                        className="btn-ghost"
-                        onClick={() => handleDelete(a)}
-                      >
-                        🗑
-                      </button>
+                      {a.role !== "superadmin" && (
+                        <button
+                          className="btn-ghost"
+                          onClick={() => handleDelete(a)}
+                        >
+                          🗑
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -949,7 +962,7 @@ export default function Admins() {
                   marginBottom: 3,
                 }}
               >
-                ⚙️ Kursant Giriş Parametrləri
+                ⚙️ Təhsil alan Giriş Parametrləri
               </div>
               <div style={{ fontSize: 12, color: "#ffffffcc" }}>
                 Müəssisəyə görə giriş sahələrini təyin edin
@@ -1135,7 +1148,7 @@ export default function Admins() {
                           marginBottom: 6,
                         }}
                       >
-                        Kursant cədvəlindəki sütun
+                        Təhsil alan cədvəlindəki sütun
                       </label>
                       <select
                         className="form-select"
@@ -1340,7 +1353,7 @@ export default function Admins() {
                     Seçimdən sonra login-ə qayıtma
                   </div>
                   <div style={{ fontSize: 11.5, color: "#8892b0" }}>
-                    Kursant seçimini tamamlayandan sonra bu müddət keçəndə
+                    Təhsil alan seçimini tamamlayandan sonra bu müddət keçəndə
                     avtomatik login səhifəsinə qayıdır
                   </div>
                 </div>

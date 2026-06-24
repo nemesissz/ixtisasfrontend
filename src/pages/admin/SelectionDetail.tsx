@@ -31,7 +31,7 @@ function PreviewOverlay({ sel, tree, onClose, onSaveView }: {
         {/* Başlıq */}
         <div className="preview-head">
           <div>
-            <div className="preview-head-title">👁 Tələbə Görünüşü — {sel.name}</div>
+            <div className="preview-head-title">👁 Təhsil alan Görünüşü — {sel.name}</div>
             <div style={{ fontSize: 11, color: '#8a8ab0', marginTop: 2 }}>
               Görünüşü seçin, yoxlayın, sonra <b>Təyin et</b> düyməsinə basın.
             </div>
@@ -104,8 +104,8 @@ function PreviewOverlay({ sel, tree, onClose, onSaveView }: {
           {/* ── İzahat ── */}
           <div className="info-box" style={{ marginBottom: 14 }}>
             {view === 'list'
-              ? '📋 Siyahı: Tələbə bütün ixtisasları bir-bir sürüşdürərək prioritet sırasını müəyyənləşdirəcək.'
-              : '⠿ Qrup: Tələbə ana qrupları, alt qrupları və ixtisasları öz daxillərində ayrı-ayrı sürüşdürə biləcək.'}
+              ? '📋 Siyahı: Təhsil alan bütün ixtisasları bir-bir sürüşdürərək prioritet sırasını müəyyənləşdirəcək.'
+              : '⠿ Qrup: Təhsil alan ana qrupları, alt qrupları və ixtisasları öz daxillərində ayrı-ayrı sürüşdürə biləcək.'}
           </div>
 
           {/* ── Görünüş (statik önizlə) ── */}
@@ -117,10 +117,10 @@ function PreviewOverlay({ sel, tree, onClose, onSaveView }: {
           {/* Alt düymə */}
           <div style={{ marginTop: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 12, color: 'var(--muted)' }}>
-              Tələbə sürüşdürə bilər, lakin bu önizlədə sürüşdürmə deaktivdir.
+              Təhsil alan sürüşdürə bilər, lakin bu önizlədə sürüşdürmə deaktivdir.
             </span>
             <button className="btn btn-outline btn-sm" disabled>
-              Seçimi Təsdiqlə (tələbə tərəfindən aktivləşir)
+              Seçimi Təsdiqlə (təhsil alan tərəfindən aktivləşir)
             </button>
           </div>
         </div>
@@ -231,7 +231,7 @@ export default function SelectionDetail() {
     showConfirm({
       icon: '🗑️', iconBg: '#fff0f0', iconColor: '#ff4d4f',
       title: 'Seçimləri sıfırla',
-      message: `"${sel!.name}" seçimi üçün ${instUsers.length} tələbənin bütün mövcud seçimləri silinəcək. Bu əməliyyat geri alına bilməz.`,
+      message: `"${sel!.name}" seçimi üçün ${instUsers.length} təhsil alanın bütün mövcud seçimləri silinəcək. Bu əməliyyat geri alına bilməz.`,
       confirmLabel: 'Sıfırla', confirmColor: '#ff4d4f',
       onConfirm: () => {
         const subList = JSON.parse(localStorage.getItem('mmu_submissions') || '[]')
@@ -247,11 +247,11 @@ export default function SelectionDetail() {
     showConfirm({
       icon: '🔄', iconBg: '#fff7e6', iconColor: '#d46b08',
       title: 'Seçimləri avtomatik doldur',
-      message: `"${sel!.name}" seçimi üçün ${instUsers.length} tələbəyə avtomatik seçim yaradılacaq. Mövcud seçimlər silinəcək.`,
+      message: `"${sel!.name}" seçimi üçün ${instUsers.length} təhsil alana avtomatik seçim yaradılacaq. Mövcud seçimlər silinəcək.`,
       confirmLabel: 'Doldur', confirmColor: '#d46b08',
       onConfirm: () => {
         const { count } = resetAndAutoSeedSubmissions(sel!.id)
-        addLog('selection', 'info', `Seçimlər avtomatik dolduruldu: "${sel!.name}"`, `${count} tələbə üçün seçim yaradıldı`)
+        addLog('selection', 'info', `Seçimlər avtomatik dolduruldu: "${sel!.name}"`, `${count} təhsil alan üçün seçim yaradıldı`)
         setResetDone(true)
         setTimeout(() => setResetDone(false), 4000)
         refresh()
@@ -279,7 +279,7 @@ export default function SelectionDetail() {
               } else {
                 selectionDb.update(sel.id, { viewMode: v })
                 refresh()
-                addLog('selection', 'info', `Tələbə görünüşü dəyişdirildi: "${v}" — "${sel.name}"`)
+                addLog('selection', 'info', `Təhsil alan görünüşü dəyişdirildi: "${v}" — "${sel.name}"`)
               }
             }}
           />
@@ -322,12 +322,12 @@ export default function SelectionDetail() {
 
       {sel.status === 'draft' && (
         <div className="info-box">
-          ℹ️ Bu seçim hələ yayımlanmayıb. Tələbələr görə bilmir. Yayımlamadan əvvəl tələbə görünüşünü yoxlayın.
+          ℹ️ Bu seçim hələ yayımlanmayıb. Təhsil Alanlar görə bilmir. Yayımlamadan əvvəl təhsil alan görünüşünü yoxlayın.
         </div>
       )}
       {sel.status === 'published' && (
         <div style={{ background: '#e6faf2', border: '1.5px solid #a3e8c8', borderRadius: 10, padding: '10px 14px', fontSize: 12, color: '#1a6e4a', marginBottom: 16 }}>
-          ✅ Seçim yayımlanıb. Tələbələr öz seçimlərini edə bilər.
+          ✅ Seçim yayımlanıb. Təhsil Alanlar öz seçimlərini edə bilər.
         </div>
       )}
 
@@ -375,7 +375,7 @@ export default function SelectionDetail() {
                     </select>
                   </div>
                   <div className="form-group">
-                    <label className="form-label">Tələbə Görünüşü</label>
+                    <label className="form-label">Təhsil alan Görünüşü</label>
                     <div style={{ display: 'flex', gap: 10, marginBottom: 8 }}>
                       {([
                         { v: 'list',   icon: '📋', label: 'Siyahı görünüşü' },
@@ -430,10 +430,10 @@ export default function SelectionDetail() {
                     {[
                       ['Ad',           sel.name],
                       ['Müəssisə',     instLabel],
-                      ['Tələbə sayı',  sel.studentCount],
+                      ['Təhsil alan sayı',  sel.studentCount],
                       ['Seçim sayı',   sel.choiceCount],
                       ['Yaradılıb',    new Date(sel.createdAt).toLocaleDateString('az-AZ')],
-                      ['Tələbə görünüşü', sel.viewMode === 'nested' ? '⠿ Qrup görünüşü' : '📋 Siyahı görünüşü'],
+                      ['Təhsil alan görünüşü', sel.viewMode === 'nested' ? '⠿ Qrup görünüşü' : '📋 Siyahı görünüşü'],
                     ].map(([k, v]) => (
                       <tr key={k as string}>
                         <td style={{ padding: '7px 0', color: 'var(--muted)', width: 140 }}>{k}</td>
@@ -446,31 +446,6 @@ export default function SelectionDetail() {
             </div>
           </div>
 
-          {/* ── İxtisas strukturu ── */}
-          {!editing && (
-            <div className="card">
-              <div className="card-head">
-                <div className="card-title">İxtisas Strukturu</div>
-              </div>
-              <div className="card-body pad">
-                {tree ? (
-                  <>
-                    <div style={{ fontWeight: 700, marginBottom: 6 }}>{tree.name}</div>
-                    <div style={{ fontSize: 12, color: 'var(--muted)' }}>
-                      {totalSpec} ixtisas · Ümumi kvota: {totalQuota}
-                    </div>
-                    {totalQuota < sel.studentCount && (
-                      <div className="warn-box" style={{ marginTop: 10 }}>
-                        ⚠️ Kvota ({totalQuota}) tələbə sayından ({sel.studentCount}) azdır!
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <div className="text-muted">Struktur tapılmadı</div>
-                )}
-              </div>
-            </div>
-          )}
         </div>
 
       </div>

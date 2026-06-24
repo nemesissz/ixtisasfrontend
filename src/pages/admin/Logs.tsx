@@ -3,7 +3,7 @@ import { logDb, type LogEntry, type LogCategory, type LogType } from '../../db'
 
 // ── Sabit etiketlər ──────────────────────────────────────────────────────────
 const CAT_LABEL: Record<LogCategory, string> = {
-  system: 'Sistem', selection: 'Seçim', distribution: 'Bölüşdürmə', user: 'Kursant', admin: 'Admin',
+  system: 'Sistem', selection: 'Seçim', distribution: 'Yerləşdirmə', user: 'Təhsil alan', admin: 'Admin',
 }
 const CAT_ICON: Record<LogCategory, string> = {
   system: '⚙️', selection: '🗳️', distribution: '⚖️', user: '👤', admin: '🔐',

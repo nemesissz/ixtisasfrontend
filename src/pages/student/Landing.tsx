@@ -80,14 +80,14 @@ export default function Landing() {
       setLoading(false)
       if (!found) {
         setError(`${cfg.field1.label} və ya ${cfg.field2.label} yanlışdır`)
-        addLog('user', 'warning', `Uğursuz tələbə girişi`, `${cfg.field1.label}: ${finT} · ${cfg.field2.label}: ${wT}`)
+        addLog('user', 'warning', `Uğursuz təhsil alan girişi`, `${cfg.field1.label}: ${finT} · ${cfg.field2.label}: ${wT}`)
         return
       }
 
       sessionStorage.setItem('mmu_student', JSON.stringify(found))
-      addLog('user', 'success', `Tələbə daxil oldu: ${found.name}`, `FİN: ${found.fin || '—'}`, found.name)
+      addLog('user', 'success', `Təhsil alan daxil oldu: ${found.name}`, `FİN: ${found.fin || '—'}`, found.name)
 
-      // Kursantın müəssisəsinə uyğun aktiv seçimi tap
+      // Təhsil alanın müəssisəsinə uyğun aktiv seçimi tap
       const mySelection = allPublished.find(
         (s: any) => s.institution === found.institution
       )

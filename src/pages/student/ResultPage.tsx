@@ -76,7 +76,7 @@ export default function ResultPage() {
         {!instLabel && (
           <div style={{ borderTop: '1px solid var(--border)', paddingTop: 14, marginTop: 2 }}>
             <div style={{ background: '#fffbe6', border: '1.5px solid #ffe58f', borderRadius: 10, padding: '12px 16px', fontSize: 13, color: '#7a5f00' }}>
-              ⏳ Müəssisəyə hələ təyin edilməmisiniz. Admin tərəfindən bölüşdürmə tamamlandıqdan sonra burada görünəcək.
+              ⏳ Müəssisəyə hələ təyin edilməmisiniz. Admin tərəfindən yerləşdirmə tamamlandıqdan sonra burada görünəcək.
             </div>
           </div>
         )}

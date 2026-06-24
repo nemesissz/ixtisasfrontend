@@ -41,7 +41,7 @@ export default function Results() {
   const tree = sel ? treeDb.get(sel.treeId) : null
   const subs = sel ? (submissionDb.getBySelection(sel.id) as any[]) : []
   const nameMap = tree ? buildNameMap(tree) : {}
-  // Hər leaf üçün tam yol (Qoşun növü → ... → İxtisas) və kursant üzrə seçim sıralaması
+  // Hər leaf üçün tam yol (Qoşun növü → ... → İxtisas) və təhsil alan üzrə seçim sıralaması
   const leafPaths = useMemo(() => {
     const m: Record<string, string> = {}
     if (tree) for (const { leaf, path } of getLeavesWithPath(tree.nodes || [])) m[leaf.id] = path.map((n: any) => n.name).join(' → ')
@@ -86,7 +86,7 @@ export default function Results() {
 
   function exportExcel() {
     const data = rows.map((u, i) => ({
-      '#': i + 1, 'Kursant': u.name, 'FİN': u.fin || '—', 'İş nömrəsi': u.workNumber || '—',
+      '#': i + 1, 'Təhsil alan': u.name, 'FİN': u.fin || '—', 'İş nömrəsi': u.workNumber || '—',
       'Müəssisə': (u.institution && instMap[u.institution]?.label) || '—', 'Bal': Number(u.score).toFixed(2),
       ...(showGroup ? { 'Qrup': u.group || '—' } : {}),
       'Seçim sırası': u.choiceNum ? `${u.choiceNum}-ci` : '—',
@@ -98,7 +98,7 @@ export default function Results() {
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, 'Nəticələr')
     XLSX.writeFile(wb, `Neticeler_${new Date().toLocaleDateString('az-AZ').replace(/\./g, '-')}.xlsx`)
-    addLog('distribution', 'info', `Nəticələr Excel-ə ixrac edildi`, `${data.length} kursant · ${sel?.name || ''}`)
+    addLog('distribution', 'info', `Nəticələr Excel-ə ixrac edildi`, `${data.length} təhsil alan · ${sel?.name || ''}`)
   }
 
   if (allSelections.length === 0) {
@@ -112,7 +112,7 @@ export default function Results() {
   }
 
   const KPIS = [
-    { label: 'Ümumi kursant', val: stats.total, icon: '👥', color: '#c9962a' },
+    { label: 'Ümumi təhsil alan', val: stats.total, icon: '👥', color: '#c9962a' },
     { label: 'Yerləşdi', val: stats.placed, sub: `${stats.rate}%`, icon: '✅', color: '#52c41a' },
     { label: 'Yerləşməyib', val: stats.unplaced, icon: '⏳', color: '#fa8c16' },
     { label: '1-ci seçim', val: stats.placed ? `${stats.sat}%` : '—', icon: '🏆', color: '#722ed1' },
@@ -196,7 +196,7 @@ export default function Results() {
             <thead>
               <tr>
                 <th style={{ width: 40 }}>#</th>
-                <th>KURSANT</th>
+                <th>TƏHSİL ALAN</th>
                 <th>FİN</th>
                 <th style={{ width: 80 }}>BAL</th>
                 <th>MÜƏSSİSƏ</th>
