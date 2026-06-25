@@ -54,7 +54,7 @@ function AdminLayoutInner() {
   // Bu səhifələrdə yuxarı başlıq gizlədilir (məzmun yuxarı qalxsın)
   const hideHeaderText = pathname === '/admin/users' || pathname === '/admin/specialties' || pathname === '/admin/distribution' || pathname === '/admin/redistribute' || pathname === '/admin/results'
   // Arxa fonda background şəkli göstərilən səhifələr (ağ deyil, şəffaf)
-  const showBgImage = pathname === '/admin/specialties'
+  const showBgImage = pathname === '/admin/specialties' || pathname === '/admin/users' || pathname === '/admin/distribution' || pathname === '/admin/redistribute' || pathname === '/admin/results'
 
   // ── İcazəyə görə nav filtri (boş qalan bölmə başlıqları da gizlədilir) ──
   const visibleNav = (() => {
