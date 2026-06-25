@@ -75,7 +75,7 @@ export default function OperatorLogin() {
             Operator Girişi
           </div>
           <div style={{ fontSize: 12, color: '#3a6050', marginTop: 6 }}>
-            MMU İxtisas Sistemi
+            İxtisas Seçim Proqramı
           </div>
         </div>
 

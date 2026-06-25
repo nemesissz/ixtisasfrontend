@@ -38,7 +38,7 @@ export default function OperatorLayout() {
             <img src="/mmu-logo.png" alt="MMU" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
           </div>
           <div>
-            <div className="sidebar-logo-title">MMU İxtisas</div>
+            <div className="sidebar-logo-title">İxtisas Seçim Proqramı</div>
             <div className="sidebar-logo-sub">Operator Panel</div>
           </div>
         </div>

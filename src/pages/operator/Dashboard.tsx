@@ -20,6 +20,8 @@ function buildLeafPaths(nodes: any[], prefix: any[] = [], map: Record<string, an
   return map
 }
 const esc = (s: any) => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+// Yalnız baş hərfi böyük (qalan kiçik) — çap başlıqları üçün
+const sentenceCase = (s: any) => { const t = String(s ?? ''); return t.charAt(0) + t.slice(1).toLowerCase() }
 
 // ── Seçim vərəqi cədvəli (viewMode-a görə dinamik) ────────────────────────────
 function buildSheetTable(ranking: string[], pathMap: Record<string, any[]>, nameMap: Record<string, string>, lv: string[], isNested: boolean): string {
@@ -58,9 +60,9 @@ function buildSheetTable(ranking: string[], pathMap: Record<string, any[]>, name
     }
     return `<table>
       <thead><tr>
-        <th class="t-ord">${esc(lv0)}<br/>sırası</th><th>${esc(lv0).toUpperCase()}</th>
-        <th class="t-ord">${esc(lv1)}<br/>sırası</th><th>${esc(lv1).toUpperCase()}</th>
-        <th class="t-ord">${esc(lv2)}<br/>sırası</th><th>${esc(lv2).toUpperCase()}</th>
+        <th class="t-ord">${esc(lv0)}<br/>sırası</th><th>${esc(sentenceCase(lv0))}</th>
+        <th class="t-ord">${esc(lv1)}<br/>sırası</th><th>${esc(sentenceCase(lv1))}</th>
+        <th class="t-ord">${esc(lv2)}<br/>sırası</th><th>${esc(sentenceCase(lv2))}</th>
       </tr></thead><tbody>${rows}</tbody></table>`
   }
 
@@ -74,7 +76,7 @@ function buildSheetTable(ranking: string[], pathMap: Record<string, any[]>, name
   })
   return `<table>
     <thead><tr>
-      <th class="t-ord">Seçim sırası</th><th>${esc(lv0).toUpperCase()}</th><th>${esc(lv1).toUpperCase()}</th><th>${esc(lv2).toUpperCase()}</th>
+      <th class="t-ord">Seçim sırası</th><th>${esc(sentenceCase(lv0))}</th><th>${esc(sentenceCase(lv1))}</th><th>${esc(sentenceCase(lv2))}</th>
     </tr></thead><tbody>${rows}</tbody></table>`
 }
 
@@ -103,13 +105,13 @@ function generatePrintHTML(user: any, sel: any, nameMap: Record<string, string>,
   th,td{border:1px solid #000;padding:6px 10px;vertical-align:middle;color:#000}
   th{background:#fff;font-size:11px;font-weight:bold;text-align:left;line-height:1.3}
   th.t-ord{text-align:center;width:70px}
-  .c-ord{text-align:center;font-weight:bold;width:70px}.c-grp{font-weight:bold}.c-sub{font-weight:bold}.c-rep{color:#000}
-  .confirm{margin-top:14px;padding-top:10px;font-size:12px;font-weight:bold}
+  .c-ord{text-align:center;font-weight:bold;width:70px}.c-grp{font-weight:normal}.c-sub{font-weight:normal}.c-rep{color:#000}
+  .confirm{margin-top:40px;border-top:1px solid #000;padding-top:10px;font-size:12px;font-weight:normal}
   .no-sub{text-align:center;padding:20px;border:1px solid #000;font-size:13px}
   @page{margin:12mm;size:A4 portrait} @media print{body{padding:0}}
 </style></head>
 <body>
-  <div class="doc-title">TƏHSİL ALANIN İXTİSAS SEÇİM VƏRƏQİ</div>
+  <div class="doc-title">Təhsil alanın ixtisas seçim vərəqi</div>
   <div class="info">
     <div class="info-left">
       <div class="name">Təhsil alan: ${esc(user.name)}</div>
@@ -117,8 +119,8 @@ function generatePrintHTML(user: any, sel: any, nameMap: Record<string, string>,
       <div class="sub">Abituriyentin iş nömrəsi: ${esc(user.workNumber || '—')}</div>
       ${user.group ? `<div class="sub">Qrup: ${esc(user.group)}${user.source ? ' · '+esc(user.source==='mülki'?'Mülki':user.source==='lisey'?'Lisey':user.source) : ''}</div>` : ''}
     </div>
-    <div class="info-mid">Topladığı Yekun Bal: <b>${Number(user.score).toFixed(2)}</b></div>
-    <div class="info-right"><div>Sənədin Çap Tarixi: ${printDate}</div><div class="sign-line">Təhsil alanın İmzası</div></div>
+    <div class="info-mid">Topladığı yekun bal: <b>${Number(user.score).toFixed(2)}</b></div>
+    <div class="info-right"><div>Sənədin çap tarixi: ${printDate}</div><div class="sign-line">Təhsil alanın imzası</div></div>
   </div>
   ${ranking.length > 0 ? tableHTML : '<div class="no-sub">Bu təhsil alan seçim göndərməyib</div>'}
   <div class="confirm">Yuxarıdakı seçimlərin mənə aid olduğunu öz imzamla təsdiq edirəm.</div>

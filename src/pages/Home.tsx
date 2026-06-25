@@ -38,7 +38,7 @@ export default function Home() {
           <img src="/mmu-logo.png" alt="MMU" style={{ width: '100%', height: '100%', objectFit: 'contain', filter: 'drop-shadow(0 6px 20px #0006)' }} />
         </div>
         <div style={{ fontSize: 26, fontWeight: 900, color: '#fff', letterSpacing: -.5 }}>
-          MMU İxtisas Sistemi
+          İxtisas Seçim Proqramı
         </div>
         <div style={{ fontSize: 13, color: '#5a6080', marginTop: 8, fontWeight: 500 }}>
           Daxil olmaq üçün rol seçin
@@ -85,7 +85,7 @@ export default function Home() {
 
       {/* Alt yazı */}
       <div style={{ position: 'absolute', bottom: 24, fontSize: 11, color: '#2a304a', zIndex: 1 }}>
-        MMU İxtisas Seçim Sistemi © {new Date().getFullYear()}
+        İxtisas Seçim Proqramı © {new Date().getFullYear()}
       </div>
     </div>
   )

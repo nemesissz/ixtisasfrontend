@@ -65,7 +65,7 @@ export default function AdminLogin() {
             <img src="/mmu-logo.png" alt="MMU" style={{ width:'100%', height:'100%', objectFit:'contain', filter:'drop-shadow(0 6px 18px #0007)' }} />
           </div>
           <div style={{ fontSize: 22, fontWeight: 900, color: '#2b2f3a', letterSpacing: -0.5 }}>Admin Paneli</div>
-          <div style={{ fontSize: 13, color: '#8a909c', marginTop: 6 }}>MMU İxtisas Sistemi</div>
+          <div style={{ fontSize: 13, color: '#8a909c', marginTop: 6 }}>İxtisas Seçim Proqramı</div>
         </div>
 
         {/* Form */}
@@ -145,7 +145,7 @@ export default function AdminLogin() {
           </button>
         </div>
         <div style={{ textAlign:'center', marginTop: 14, fontSize: 11, color:'#aab' }}>
-          MMU İxtisas Seçim Sistemi
+          İxtisas Seçim Proqramı
         </div>
       </div>
     </div>
