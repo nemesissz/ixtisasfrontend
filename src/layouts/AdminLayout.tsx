@@ -53,6 +53,8 @@ function AdminLayoutInner() {
   const meta = PAGE_META[pathname] ?? { title: 'Seçim Detalı', sub: 'Seçimi idarə et' }
   // Bu səhifələrdə yuxarı başlıq gizlədilir (məzmun yuxarı qalxsın)
   const hideHeaderText = pathname === '/admin/users' || pathname === '/admin/specialties' || pathname === '/admin/distribution' || pathname === '/admin/redistribute' || pathname === '/admin/results'
+  // Arxa fonda background şəkli göstərilən səhifələr (ağ deyil, şəffaf)
+  const showBgImage = pathname === '/admin/specialties'
 
   // ── İcazəyə görə nav filtri (boş qalan bölmə başlıqları da gizlədilir) ──
   const visibleNav = (() => {
@@ -175,7 +177,7 @@ function AdminLayoutInner() {
           </div>
         </header>
 
-        <div className={`page-body${hideHeaderText ? ' page-body--white' : ''}`}>
+        <div className={`page-body${hideHeaderText ? (showBgImage ? '' : ' page-body--white') : ''}`}>
           {allowed ? <Outlet /> : (
             <div style={{ background: '#fff', border: '1.5px dashed #ffccc7', borderRadius: 16, padding: '56px 32px', textAlign: 'center', marginTop: 24 }}>
               <div style={{ fontSize: 44, marginBottom: 12 }}>🔒</div>
