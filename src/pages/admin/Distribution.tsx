@@ -905,6 +905,7 @@ export default function Distribution() {
   const [storyOpen, setStoryOpen] = useState(false)
   const [mode,     setMode]     = useState<Mode>(null)
   const [saved,    setSaved]    = useState(false)
+  const [running,  setRunning]  = useState(false)
   const [showConf, setShowConf] = useState(false)
   const [algorithm, setAlgorithm] = useState<'greedy' | 'gale-shapley'>('greedy')
   const [animEnabled]  = useState(true)    // animasiya həmişə aktiv
@@ -1351,7 +1352,15 @@ export default function Distribution() {
   }
 
   // ── Yerləşdir ──────────────────────────────────────────────────────────────
-  function handleDistribute() { setSaved(false); setMode('distribute'); resetSim(); addLog('distribution', 'info', `Yerləşdirmə hesablandı`, `Seçim: ${sel?.name} · Metod: ${method} · Alqoritm: ${algorithm}`) }
+  function handleDistribute() {
+    if (running) return
+    setRunning(true)
+    setTimeout(() => {
+      setSaved(false); setMode('distribute'); resetSim()
+      addLog('distribution', 'info', `Yerləşdirmə hesablandı`, `Seçim: ${sel?.name} · Metod: ${method} · Alqoritm: ${algorithm}`)
+      setRunning(false)
+    }, 800)
+  }
 
   function handleConfirm() {
     if (!placement) return
@@ -1785,6 +1794,17 @@ export default function Distribution() {
         )}
       </div>
 
+      {/* ── Yerləşdirmə yükləmə animasiyası ── */}
+      {running && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(43,47,58,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000 }}>
+          <div style={{ background: '#fff', borderRadius: 14, padding: '22px 32px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, boxShadow: '0 12px 40px rgba(0,0,0,.25)' }}>
+            <div style={{ width: 38, height: 38, border: '4px solid #f0e3bd', borderTopColor: '#e0a92e', borderRadius: '50%', animation: 'distrib-spin 0.8s linear infinite' }} />
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#2b2f3a' }}>Yerləşdirilir…</div>
+          </div>
+          <style>{`@keyframes distrib-spin { to { transform: rotate(360deg) } }`}</style>
+        </div>
+      )}
+
       {/* ── Metod seçimi (method === null) ── */}
       {!method && sel && tree && (() => {
         const leaves = getLeavesWithPath(tree?.nodes || [])
@@ -1934,7 +1954,7 @@ export default function Distribution() {
                     opacity: submittedUsers.length === 0 ? 0.4 : 1 }}>
                   📖 İzahlı simulyasiya
                 </button>
-                <button onClick={handleDistribute} disabled={submittedUsers.length === 0 || saved}
+                <button onClick={handleDistribute} disabled={submittedUsers.length === 0 || saved || running}
                   style={{ padding: '10px 22px', borderRadius: 10, fontWeight: 800, fontSize: 13, cursor: 'pointer',
                     border: `1.5px solid ${mode === 'distribute' ? '#52c41a' : '#e0e4f0'}`,
                     background: mode === 'distribute' ? '#52c41a' : '#e7eaf0',
@@ -2069,7 +2089,7 @@ export default function Distribution() {
                       opacity: submittedUsers.length === 0 ? 0.4 : 1 }}>
                     📖 İzahlı simulyasiya
                   </button>
-                  <button onClick={handleDistribute} disabled={saved}
+                  <button onClick={handleDistribute} disabled={saved || running}
                     style={{ padding: '10px 22px', borderRadius: 10, fontWeight: 800, fontSize: 13, cursor: 'pointer',
                       border: `1.5px solid ${mode === 'distribute' ? '#52c41a' : '#e0e4f0'}`,
                       background: mode === 'distribute' ? '#52c41a' : '#e7eaf0',
@@ -2286,8 +2306,8 @@ function PlacementResult({ mode, saved, placement, submittedUsers, studentRows,
 
   return (
     <>
-      {/* ════ YERLƏŞDİRMƏ HESABATI ════ */}
-      {placement && (() => {
+      {/* ════ YERLƏŞDİRMƏ HESABATI ════ (gizlədilib — statistika Statistika səhifəsindədir) */}
+      {false && placement && (() => {
         const rows = (placement as any)
         const totalSub = submittedUsers.length
         const totalPlaced = placedCount
@@ -2363,8 +2383,8 @@ function PlacementResult({ mode, saved, placement, submittedUsers, studentRows,
         )
       })()}
 
-      {/* ════ İXTİSAS KVOTA DOLULLUĞU ════ */}
-      {specStats.length > 0 && (
+      {/* ════ İXTİSAS KVOTA DOLULLUĞU ════ (gizlədilib — statistika Statistika səhifəsindədir) */}
+      {false && specStats.length > 0 && (
         <div className="card" style={{ marginBottom: 14 }}>
           <div className="card-head">
             <div>

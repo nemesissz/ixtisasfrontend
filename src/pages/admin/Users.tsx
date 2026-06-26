@@ -1057,15 +1057,12 @@ function EditUserModal({ user, instLabel, activeSel, hasSub, onClose, onSaved }:
     Object.fromEntries(subjectKeys.map(k => [k, String(user.subjects[k] ?? '')]))
   )
 
-  // ── Əvvəlcədən bölgü (branch) — seçimdə preAssignLevel varsa o səviyyə, yoxdursa ağac strukturunun bütün səviyyələri ──
+  // ── Ağac strukturunun səviyyələri — şablonda olan bütün səviyyələr redaktə/əlavə oluna bilər ──
   const preTree   = activeSel ? treeDb.get(activeSel.treeId) : null
   const instBranchTree = preTree || (treeDb.getAll() as any[]).find((t: any) => t.institution === user.institution) || null
   const branchLevelLabels = effectiveLevelNames(instBranchTree)
-  const selPreLevel: number | null = (activeSel && activeSel.preAssignLevel != null) ? activeSel.preAssignLevel : null
-  // Redaktə oluna bilən səviyyələr: seçimdə təyin olunubsa yalnız o, yoxdursa şablondakı bütün ağac səviyyələri
-  const branchLevelIdxs: number[] = selPreLevel != null
-    ? [selPreLevel]
-    : branchLevelLabels.map((_, i) => i)
+  // Strukturun bütün səviyyələri redaktə oluna bilir (seçimdən asılı olmadan)
+  const branchLevelIdxs: number[] = branchLevelLabels.map((_, i) => i)
   const branchOptionsFor = (lvl: number): string[] => {
     if (!instBranchTree) return []
     const acc = new Set<string>()
@@ -1711,8 +1708,9 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
   const hasGender  = instUsers.some((u: any) => u.gender)
   // ── Əvvəlcədən bölgü (branch) sütunları — datada olan səviyyələr ──
   const instTreeU    = (treeDb.getAll() as any[]).find((t: any) => t.institution === instId)
+  const instTreeULevelNames = effectiveLevelNames(instTreeU)
   const branchLevels = [...new Set(instUsers.flatMap((u: any) => Object.keys(u.branchByLevel || {}).map(Number)))].sort((a, b) => a - b)
-  const branchLevelName = (i: number) => instTreeU?.levelNames?.[i] || `Səviyyə ${i + 1}`
+  const branchLevelName = (i: number) => instTreeULevelNames[i] || `Səviyyə ${i + 1}`
   // Yerləşdirmə tamamlanıbsa branch sütunu lazım deyil — "Yerləşdiyi ixtisas" bəs edir
   const placementDone = instUsers.length > 0 && instUsers.every((u: any) => u.placedSpecialty)
   const showBranch    = branchLevels.length > 0 && !placementDone
