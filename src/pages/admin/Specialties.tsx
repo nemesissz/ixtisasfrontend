@@ -1039,10 +1039,14 @@ export default function Specialties() {
   // ── Müəssisənin təhsil alanlarından ən çox rast gəlinən tədris ilini tap ──────
   function getInstYear(instId: string): string {
     const us = (userDb.getAll() as any[]).filter((u: any) => u.institution === instId && u.year)
-    if (!us.length) return ''
-    const counts: Record<string, number> = {}
-    for (const u of us) counts[u.year] = (counts[u.year] || 0) + 1
-    return Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0]
+    if (us.length) {
+      const counts: Record<string, number> = {}
+      for (const u of us) counts[u.year] = (counts[u.year] || 0) + 1
+      return Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0]
+    }
+    // Təhsil alan yoxdursa, müəssisənin öz tədris ilini götür
+    const inst = (insts as any[]).find((i: any) => i.id === instId)
+    return inst?.year || ''
   }
 
   // ── Struktur CRUD ─────────────────────────────────────────────────────────
@@ -1053,7 +1057,7 @@ export default function Specialties() {
     const extra  = (modal.name || '').trim()
     const name   = [label, extra].filter(Boolean).join(' - ').trim()
     if (!instId || !name) return
-    const created = treeDb.create({ name, year: modal.year?.trim() || '', icon: modal.icon || inst?.icon || '', institution: instId })
+    const created = treeDb.create({ name, year: modal.year?.trim() || '', icon: modal.icon || inst?.icon || '', institution: instId, levelNames: [...DEFAULT_LEVEL_NAMES] })
     addLog('admin', 'success', `Yeni ixtisas strukturu yaradıldı: "${name}"`, `İl: ${modal.year?.trim() || '—'} · Müəssisə: ${inst?.label || '—'}`)
     refreshTrees(); setOpenTreeId(created.id); setModal(null)
   }

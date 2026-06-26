@@ -20,6 +20,18 @@ const esc = (s: any) => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;
 // Yalnız baş hərfi böyük (qalan kiçik) — çap başlıqları üçün
 const sentenceCase = (s: any) => { const t = String(s ?? ''); return t.charAt(0) + t.slice(1).toLowerCase() }
 
+// İxtisas strukturu UI-ı ilə eyni default səviyyə adları (levelNames boş olduqda)
+const DEFAULT_LEVEL_NAMES = ['Qoşun növü', 'Mülki ixtisas', 'Hərbi uçot ixtisası']
+// Ağacın faktiki dərinliyinə görə effektiv səviyyə adları
+function effectiveLevelNames(tree: any): string[] {
+  if (!tree) return []
+  let depth = 0
+  const walk = (nodes: any[], cur: number) => { for (const n of nodes || []) { depth = Math.max(depth, cur + 1); if (n.children?.length) walk(n.children, cur + 1) } }
+  walk(tree.nodes || [], 0)
+  const count = Math.max(depth, tree.levelNames?.length || 0)
+  return Array.from({ length: count }, (_, i) => tree.levelNames?.[i] || DEFAULT_LEVEL_NAMES[i] || `Səviyyə ${i + 1}`)
+}
+
 // ── Seçim vərəqi cədvəli (viewMode-a görə dinamik) ────────────────────────────
 function buildSheetTable(ranking: string[], pathMap: Record<string, any[]>, nameMap: Record<string, string>, lv: string[], isNested: boolean): string {
   const lv0 = lv[0], lv1 = lv[1], lv2 = lv[2]
@@ -489,8 +501,8 @@ function parseExcel(file: File, instId: string, subjectCols: string[] = [], leve
               // Ağacın səviyyə adı ilə eyni sütun → əvvəlcədən bölgü dəyəri
               const lvIdx = levelNames.findIndex(ln => normalizeColKey(ln) === nk)
               if (lvIdx >= 0) {
-                const bv = String(v).trim()
-                if (bv) branchByLevel[lvIdx] = bv
+                // Səviyyə sütunu mövcuddursa (boş olsa belə) qeyd et — sonradan redaktə oluna bilsin
+                branchByLevel[lvIdx] = String(v).trim()
               } else {
                 // subjectCols içindən tap, tapılmasa sütun adının özünü işlət
                 const matchedSubj = subjectCols.find(s => normalizeColKey(s) === nk) || k.trim()
@@ -566,7 +578,8 @@ function ImportModal({ instId, instLabel, onClose, onImported }: {
 
   // ── İxtisas strukturundan oxunan səviyyə adları → əlavə şablon sütunları ──
   const instTreeForCols = (treeDb.getAll() as any[]).find((t: any) => t.institution === instId)
-  const levelCols: { label: string; col: string }[] = (instTreeForCols?.levelNames || []).map((ln: string) => ({ label: ln, col: ln }))
+  const effLevelNames = effectiveLevelNames(instTreeForCols)
+  const levelCols: { label: string; col: string }[] = effLevelNames.map((ln: string) => ({ label: ln, col: ln }))
   const predefCols = [...EXTRA_COLS, ...levelCols]
   // Səviyyə sütunları üçün nümunə dəyərlər (həmin səviyyədəki ilk node adları)
   const levelExamples: Record<string, string[]> = {}
@@ -581,7 +594,7 @@ function ImportModal({ instId, instLabel, onClose, onImported }: {
     const f = e.target.files?.[0]; if (!f) return
     setLoading(true)
     const instTree = (treeDb.getAll() as any[]).find((t: any) => t.institution === instId)
-    const { ok, errors: errs } = await parseExcel(f, instId, subjectCols, instTree?.levelNames || [])
+    const { ok, errors: errs } = await parseExcel(f, instId, subjectCols, effectiveLevelNames(instTree))
     setPreview(ok); setErrors(errs); setLoading(false)
   }
 
@@ -1044,18 +1057,25 @@ function EditUserModal({ user, instLabel, activeSel, hasSub, onClose, onSaved }:
     Object.fromEntries(subjectKeys.map(k => [k, String(user.subjects[k] ?? '')]))
   )
 
-  // ── Əvvəlcədən bölgü (branch) — aktiv seçimin preAssignLevel-inə görə ──
+  // ── Əvvəlcədən bölgü (branch) — seçimdə preAssignLevel varsa o səviyyə, yoxdursa ağac strukturunun bütün səviyyələri ──
   const preTree   = activeSel ? treeDb.get(activeSel.treeId) : null
-  const preLevel: number | null = (activeSel && activeSel.preAssignLevel != null) ? activeSel.preAssignLevel : null
-  const preLevelName = (preLevel != null && preTree?.levelNames?.[preLevel]) ? preTree.levelNames[preLevel] : ''
-  const branchOptions = (() => {
-    if (preLevel == null || !preTree) return [] as string[]
+  const instBranchTree = preTree || (treeDb.getAll() as any[]).find((t: any) => t.institution === user.institution) || null
+  const branchLevelLabels = effectiveLevelNames(instBranchTree)
+  const selPreLevel: number | null = (activeSel && activeSel.preAssignLevel != null) ? activeSel.preAssignLevel : null
+  // Redaktə oluna bilən səviyyələr: seçimdə təyin olunubsa yalnız o, yoxdursa şablondakı bütün ağac səviyyələri
+  const branchLevelIdxs: number[] = selPreLevel != null
+    ? [selPreLevel]
+    : branchLevelLabels.map((_, i) => i)
+  const branchOptionsFor = (lvl: number): string[] => {
+    if (!instBranchTree) return []
     const acc = new Set<string>()
-    const walk = (nodes: any[], cur: number) => { for (const n of nodes || []) { if (cur === preLevel) acc.add(n.name); else if (n.children?.length) walk(n.children, cur + 1) } }
-    walk(preTree.nodes || [], 0)
+    const walk = (nodes: any[], cur: number) => { for (const n of nodes || []) { if (cur === lvl) acc.add(n.name); else if (n.children?.length) walk(n.children, cur + 1) } }
+    walk(instBranchTree.nodes || [], 0)
     return [...acc]
-  })()
-  const [branch, setBranch] = useState<string>(user.branchByLevel?.[preLevel ?? -1] || '')
+  }
+  const [branchMap, setBranchMap] = useState<Record<number, string>>(
+    Object.fromEntries(branchLevelIdxs.map(i => [i, user.branchByLevel?.[i] || '']))
+  )
 
   const set = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }))
   const setSubj = (k: string, v: string) => setSubjects(p => ({ ...p, [k]: v }))
@@ -1097,7 +1117,11 @@ function EditUserModal({ user, instLabel, activeSel, hasSub, onClose, onSaved }:
       printStatus:     form.printStatus,
       placedSpecialty: form.placedSpecialty || null,
       ...(subjectKeys.length > 0 ? { subjects: newSubjects } : {}),
-      ...(preLevel != null ? { branchByLevel: { ...(user.branchByLevel || {}), [preLevel]: branch || undefined } } : {}),
+      ...(branchLevelIdxs.length > 0 ? { branchByLevel: (() => {
+        const m: Record<number, any> = { ...(user.branchByLevel || {}) }
+        for (const i of branchLevelIdxs) { const v = branchMap[i]; if (v) m[i] = v; else delete m[i] }
+        return m
+      })() } : {}),
     })
 
     // ── Seçim statusu dəyişibsə submission yarat/sil ──
@@ -1218,16 +1242,16 @@ function EditUserModal({ user, instLabel, activeSel, hasSub, onClose, onSaved }:
               </select>
             </div>
 
-            {/* Əvvəlcədən bölgü (branch) — yalnız seçimdə preAssignLevel təyin olunubsa */}
-            {preLevel != null && (
-              <div className="form-group">
-                <label className="form-label">{preLevelName || 'Əvvəlcədən bölmə'}</label>
-                <select className="form-input" value={branch} onChange={e => setBranch(e.target.value)} style={{ cursor: 'pointer' }}>
+            {/* Əvvəlcədən bölgü (branch) — qoşun növü və s. səviyyələr */}
+            {branchLevelIdxs.map(i => (
+              <div className="form-group" key={'br' + i}>
+                <label className="form-label">{branchLevelLabels[i] || `Səviyyə ${i + 1}`}</label>
+                <select className="form-input" value={branchMap[i] || ''} onChange={e => setBranchMap(p => ({ ...p, [i]: e.target.value }))} style={{ cursor: 'pointer' }}>
                   <option value="">— Təyin edilməyib (bütün ixtisaslar) —</option>
-                  {branchOptions.map(b => <option key={b} value={b}>{b}</option>)}
+                  {branchOptionsFor(i).map(b => <option key={b} value={b}>{b}</option>)}
                 </select>
               </div>
-            )}
+            ))}
 
             {/* Seçim statusu */}
             <div className="form-group">
