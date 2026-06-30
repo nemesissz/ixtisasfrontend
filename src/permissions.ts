@@ -11,9 +11,9 @@ export const PERM_GROUPS: PermGroup[] = [
     ],
   },
   {
-    group: 'Təhsil Alanlar', icon: '👥', perms: [
+    group: 'Təhsilalanlar', icon: '👥', perms: [
       { code: 'users.view',   label: 'Siyahıya baxış' },
-      { code: 'users.edit',   label: 'Təhsil alan redaktəsi' },
+      { code: 'users.edit',   label: 'Təhsilalan redaktəsi' },
       { code: 'users.import', label: 'Excel idxal' },
       { code: 'users.export', label: 'Excel export' },
       { code: 'users.print',  label: 'Çap əməliyyatı' },

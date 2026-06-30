@@ -32,80 +32,79 @@ function effectiveLevelNames(tree: any): string[] {
   return Array.from({ length: count }, (_, i) => tree.levelNames?.[i] || DEFAULT_LEVEL_NAMES[i] || `Səviyyə ${i + 1}`)
 }
 
-// ── Seçim vərəqi cədvəli (viewMode-a görə dinamik) ────────────────────────────
+// ── Seçim vərəqi cədvəli (N səviyyəli dinamik — viewMode-a görə) ───────────────
 function buildSheetTable(ranking: string[], pathMap: Record<string, any[]>, nameMap: Record<string, string>, lv: string[], isNested: boolean): string {
-  const lv0 = lv[0], lv1 = lv[1], lv2 = lv[2]
-  const resolve = (leafId: string) => {
+  // Dinamik səviyyə sayı: ən dərin yola və levelNames-ə görə
+  const maxPath = ranking.reduce((m, id) => Math.max(m, (pathMap[id] || []).length), 0)
+  const L = Math.max(lv.length || 0, maxPath, 1)
+  const levelName = (i: number) => lv[i] || `Səviyyə ${i + 1}`
+  // Hər yarpaq üçün L ölçülü ad massivi (yol qısadırsa kənar sütunlar '—')
+  const cells = (leafId: string): string[] => {
     const path = pathMap[leafId]
-    if (path && path.length >= 3)      return { g: path[0].name, s: path[1].name, l: path[path.length-1].name }
-    if (path && path.length === 2)     return { g: path[0].name, s: '—',          l: path[1].name }
-    if (path && path.length === 1)     return { g: '—',          s: '—',          l: path[0].name }
-    return { g: '—', s: '—', l: (nameMap[leafId] || leafId) }
+    if (!path || !path.length) {
+      const arr = Array(L).fill('—'); arr[L - 1] = nameMap[leafId] || leafId; return arr
+    }
+    return Array.from({ length: L }, (_, i) =>
+      i < path.length ? path[i].name : '—')
   }
 
   if (isNested) {
-    // ── Qrup görünüşü: hər səviyyədə ayrıca seçim sırası + rowspan ──
-    const groups: any[] = []
-    const gIdx = new Map<string, number>()
+    // ── Qrup görünüşü: rekursiv qruplaşma + rowspan (istənilən sayda səviyyə) ──
+    const root: any = { children: [], idx: new Map() }
     for (const id of ranking) {
-      const { g, s, l } = resolve(id)
-      if (!gIdx.has(g)) { gIdx.set(g, groups.length); groups.push({ name: g, order: groups.length + 1, subs: [], sIdx: new Map() }) }
-      const G = groups[gIdx.get(g)!]
-      if (!G.sIdx.has(s)) { G.sIdx.set(s, G.subs.length); G.subs.push({ name: s, order: G.subs.length + 1, leaves: [] }) }
-      G.subs[G.sIdx.get(s)!].leaves.push({ name: l, order: G.subs[G.sIdx.get(s)!].leaves.length + 1 })
-    }
-    let rows = ''
-    for (const G of groups) {
-      const gSpan = G.subs.reduce((a: number, x: any) => a + x.leaves.length, 0)
-      let gP = false
-      for (const S of G.subs) {
-        let sP = false
-        for (const leaf of S.leaves) {
-          rows += '<tr>'
-          if (!gP) { rows += `<td class="c-ord" rowspan="${gSpan}">${G.order}</td><td class="c-grp" rowspan="${gSpan}">${esc(G.name)}</td>`; gP = true }
-          if (!sP) { rows += `<td class="c-ord" rowspan="${S.leaves.length}">${S.order}</td><td class="c-sub" rowspan="${S.leaves.length}">${esc(S.name)}</td>`; sP = true }
-          rows += `<td class="c-ord">${leaf.order}</td><td>${esc(leaf.name)}</td></tr>`
-        }
+      const c = cells(id)
+      let node = root
+      for (let level = 0; level < L; level++) {
+        const nm = c[level]
+        if (!node.idx.has(nm)) { node.idx.set(nm, node.children.length); node.children.push({ name: nm, order: node.children.length + 1, children: [], idx: new Map() }) }
+        node = node.children[node.idx.get(nm)]
       }
     }
-    return `<table>
-      <thead><tr>
-        <th class="t-ord">${esc(lv0)}<br/>sırası</th><th>${esc(sentenceCase(lv0))}</th>
-        <th class="t-ord">${esc(lv1)}<br/>sırası</th><th>${esc(sentenceCase(lv1))}</th>
-        <th class="t-ord">${esc(lv2)}<br/>sırası</th><th>${esc(sentenceCase(lv2))}</th>
-      </tr></thead>
-      <tbody>${rows}</tbody>
-    </table>`
+    const countRows = (n: any): number => n.children.length ? n.children.reduce((a: number, c: any) => a + countRows(c), 0) : 1
+    const emit = (node: any, level: number): string[] => {
+      const out: string[] = []
+      for (const child of node.children) {
+        const isLeafLevel = level === L - 1
+        const childRows = isLeafLevel ? [''] : emit(child, level + 1)
+        const span = isLeafLevel ? 1 : countRows(child)
+        const cls = level === 0 ? 'c-grp' : (isLeafLevel ? '' : 'c-sub')
+        const nameTd = cls ? `<td class="${cls}" rowspan="${span}">${esc(child.name)}</td>` : `<td rowspan="${span}">${esc(child.name)}</td>`
+        childRows[0] = `<td class="c-ord" rowspan="${span}">${child.order}</td>${nameTd}` + childRows[0]
+        out.push(...childRows)
+      }
+      return out
+    }
+    const rows = emit(root, 0).map(r => `<tr>${r}</tr>`).join('')
+    const header = Array.from({ length: L }, (_, i) =>
+      `<th class="t-ord">${esc(levelName(i))}<br/>sırası</th><th>${esc(sentenceCase(levelName(i)))}</th>`).join('')
+    return `<table><thead><tr>${header}</tr></thead><tbody>${rows}</tbody></table>`
   }
 
-  // ── Siyahı görünüşü: vahid sıra (1..N) ──
-  let rows = ''
-  let prevG = '', prevS = ''
-  ranking.forEach((id, i) => {
-    const { g, s, l } = resolve(id)
-    const gCh = g !== prevG, sCh = gCh || s !== prevS
-    rows += `<tr>
-      <td class="c-ord">${i + 1}</td>
-      <td class="${gCh ? 'c-grp' : 'c-rep'}">${esc(g)}</td>
-      <td class="${sCh ? 'c-sub' : 'c-rep'}">${esc(s)}</td>
-      <td>${esc(l)}</td>
-    </tr>`
-    prevG = g; prevS = s
-  })
-  return `<table>
-    <thead><tr>
-      <th class="t-ord">Seçim sırası</th><th>${esc(sentenceCase(lv0))}</th><th>${esc(sentenceCase(lv1))}</th><th>${esc(sentenceCase(lv2))}</th>
-    </tr></thead>
-    <tbody>${rows}</tbody>
-  </table>`
+  // ── Siyahı görünüşü: vahid sıra (1..N), N səviyyə sütunu ──
+  let prev: string[] = Array(L).fill('')
+  const rows = ranking.map((id, idx) => {
+    const c = cells(id)
+    let changed = false
+    const tds = c.map((nm, i) => {
+      if (nm !== prev[i]) changed = true
+      const isLeaf = i === L - 1
+      const cls = isLeaf ? '' : (changed ? (i === 0 ? 'c-grp' : 'c-sub') : 'c-rep')
+      return cls ? `<td class="${cls}">${esc(nm)}</td>` : `<td>${esc(nm)}</td>`
+    }).join('')
+    prev = c
+    return `<tr><td class="c-ord">${idx + 1}</td>${tds}</tr>`
+  }).join('')
+  const header = `<th class="t-ord">Seçim sırası</th>` + Array.from({ length: L }, (_, i) => `<th>${esc(sentenceCase(levelName(i)))}</th>`).join('')
+  return `<table><thead><tr>${header}</tr></thead><tbody>${rows}</tbody></table>`
 }
 
 // ── Çap HTML generasiyası (seçim vərəqi — viewMode-a görə dinamik) ────────────
 function generatePrintHTML(user: any, sel: any, nameMap: Record<string, string>, _instLabel: string, ranking: string[], tree: any): string {
-  const lv: string[] = tree?.levelNames?.length ? tree.levelNames : ['Ana Qrup', 'Alt Qrup', 'İxtisas']
+  const lvDyn = tree ? effectiveLevelNames(tree) : []
+  const lv: string[] = lvDyn.length ? lvDyn : ['Ana Qrup', 'Alt Qrup', 'İxtisas']
   const pathMap = tree ? buildLeafPaths(tree.nodes || []) : {}
   const isNested = sel?.viewMode === 'nested'
-  const tableHTML = buildSheetTable(ranking, pathMap, nameMap, [lv[0]||'Ana Qrup', lv[1]||'Alt Qrup', lv[2]||'İxtisas'], isNested)
+  const tableHTML = buildSheetTable(ranking, pathMap, nameMap, lv, isNested)
 
   const printDate = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}` })()
 
@@ -135,11 +134,11 @@ function generatePrintHTML(user: any, sel: any, nameMap: Record<string, string>,
   @page{margin:12mm;size:A4 portrait} @media print{body{padding:0}}
 </style></head>
 <body>
-  <div class="doc-title">Təhsil alanın ixtisas seçim vərəqi</div>
+  <div class="doc-title">Təhsilalanın ixtisas seçim vərəqi</div>
 
   <div class="info">
     <div class="info-left">
-      <div class="name">Təhsil alan: ${esc(user.name)}</div>
+      <div class="name">Təhsilalan: ${esc(user.name)}</div>
       <div class="sub">FİN Kod: ${esc(user.fin || '—')}</div>
       <div class="sub">Abituriyentin iş nömrəsi: ${esc(user.workNumber || '—')}</div>
       ${user.group ? `<div class="sub">Qrup: ${esc(user.group)}${user.source ? ' · '+esc(user.source==='mülki'?'Mülki':user.source==='lisey'?'Lisey':user.source) : ''}</div>` : ''}
@@ -147,11 +146,11 @@ function generatePrintHTML(user: any, sel: any, nameMap: Record<string, string>,
     <div class="info-mid">Topladığı yekun bal: <b>${Number(user.score).toFixed(2)}</b></div>
     <div class="info-right">
       <div>Sənədin çap tarixi: ${printDate}</div>
-      <div class="sign-line">Təhsil alanın imzası</div>
+      <div class="sign-line">Təhsilalanın imzası</div>
     </div>
   </div>
 
-  ${ranking.length > 0 ? tableHTML : '<div class="no-sub">Bu təhsil alan seçim göndərməyib</div>'}
+  ${ranking.length > 0 ? tableHTML : '<div class="no-sub">Bu təhsilalan seçim göndərməyib</div>'}
 
   <div class="confirm">Yuxarıdakı seçimlərin mənə aid olduğunu öz imzamla təsdiq edirəm.</div>
 </body>
@@ -162,7 +161,7 @@ function generatePrintHTML(user: any, sel: any, nameMap: Record<string, string>,
 // ── Excel export ──────────────────────────────────────────────────────────────
 function exportToExcel(rows: any[], instLabel: string, instId: string, subCountMap: Record<string, number>, included?: Set<string>) {
   const inc = (c: string) => c === '#' || !included || included.has(c)
-  // ── Təhsil alan seçimlərini hazırla (müəssisənin seçimi üzrə) ──
+  // ── Təhsilalan seçimlərini hazırla (müəssisənin seçimi üzrə) ──
   const allSels = selectionDb.getAll() as any[]
   const sel = allSels.find((s: any) => s.institution === instId && s.status === 'published')
           || allSels.find((s: any) => s.institution === instId && s.status !== 'draft')
@@ -216,21 +215,21 @@ function exportToExcel(rows: any[], instLabel: string, instId: string, subCountM
     if (inc('Seçim statusu'))    base['Seçim statusu'] = hasSub ? 'Seçim edildi' : 'Seçim gözləyir'
     if (inc('Çap statusu'))      base['Çap statusu'] = u.printStatus === 'printed' ? 'Çap edilib' : 'Çap edilməyib'
     if (inc('Yerləşdiyi ixtisas')) base['Yerləşdiyi ixtisas'] = u.placedSpecialty || 'Yerləşdirilməyib'
-    if (inc('Təhsil alanın seçimləri (prioritetlə)')) base['Təhsil alanın seçimləri (prioritetlə)'] = formatChoices(u.id)
+    if (inc('Təhsilalanın seçimləri (prioritetlə)')) base['Təhsilalanın seçimləri (prioritetlə)'] = formatChoices(u.id)
     return base
   })
   const ws = XLSX.utils.json_to_sheet(data)
   // ── Sütun enləri (sütun adına görə dinamik) ──
   const colKeys = Object.keys(data[0] || {})
   ws['!cols'] = colKeys.map(k =>
-    k === 'Təhsil alanın seçimləri (prioritetlə)' ? { wch: 70 }
+    k === 'Təhsilalanın seçimləri (prioritetlə)' ? { wch: 70 }
     : k === 'Yerləşdiyi ixtisas'   ? { wch: 24 }
     : k === 'Ümumi imtahan nəticəsi' ? { wch: 18 }
     : k === 'Təhsil müəssisəsi' || k === 'Seçim statusu' || k === 'Çap statusu' ? { wch: 15 }
     : k === '#' ? { wch: 4 }
     : { wch: 13 }
   )
-  const choiceColIdx = colKeys.indexOf('Təhsil alanın seçimləri (prioritetlə)')
+  const choiceColIdx = colKeys.indexOf('Təhsilalanın seçimləri (prioritetlə)')
   if (choiceColIdx >= 0) {
     const range = XLSX.utils.decode_range(ws['!ref'] || 'A1')
     for (let r = 1; r <= range.e.r; r++) {
@@ -241,7 +240,7 @@ function exportToExcel(rows: any[], instLabel: string, instId: string, subCountM
   const wb = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(wb, ws, instLabel)
   const date = new Date().toLocaleDateString('az-AZ').replace(/\./g, '-')
-  XLSX.writeFile(wb, `${instLabel}_Təhsil Alanlar_${date}.xlsx`)
+  XLSX.writeFile(wb, `${instLabel}_Təhsilalanlar_${date}.xlsx`)
 }
 
 // ── Versiya 2/3 üçün ortaq köməkçi: birləşmiş başlıqlı vərəq qur ──────────────
@@ -256,7 +255,8 @@ function buildLeveledSheet(
           || allSels.find((s: any) => s.institution === instId)
   const tree = sel ? treeDb.get(sel.treeId) : null
   const pathMap = tree ? buildLeafPaths(tree.nodes || []) : {}
-  const lv: string[] = (tree?.levelNames && tree.levelNames.length) ? tree.levelNames : ['Qoşun növü', 'Orta ixtisas təhsili üzrə ixtisaslar', 'Hərbi Uçot İxtisası']
+  const lvDyn = effectiveLevelNames(tree)
+  const lv: string[] = lvDyn.length ? lvDyn : ['Qoşun növü', 'Orta ixtisas təhsili üzrə ixtisaslar', 'Hərbi Uçot İxtisası']
   const nLv = lv.length
   const lvName = (i: number) => lv[i] || `Səviyyə ${i + 1}`
   const subsByUser: Record<string, string[]> = {}
@@ -282,7 +282,7 @@ function buildLeveledSheet(
   const singleCols = singleAll.filter(inc)
 
   const showPlaced = inc('Yerləşdiyi ixtisas')
-  const showSel    = inc('Təhsil alanın seçimləri (prioritetlə)')
+  const showSel    = inc('Təhsilalanın seçimləri (prioritetlə)')
 
   const row1: any[] = [...singleCols]
   const row2: any[] = singleCols.map(() => '')
@@ -295,10 +295,10 @@ function buildLeveledSheet(
   if (showSel) {
     selStart = row1.length
     if (selMode === 'levels') {
-      row1.push('Təhsil alanın seçimləri (prioritetlə)'); for (let i = 1; i < nLv; i++) row1.push('')
+      row1.push('Təhsilalanın seçimləri (prioritetlə)'); for (let i = 1; i < nLv; i++) row1.push('')
       for (let i = 0; i < nLv; i++) row2.push(lvName(i))
     } else {
-      row1.push('Təhsil alanın seçimləri (prioritetlə)'); row2.push('')
+      row1.push('Təhsilalanın seçimləri (prioritetlə)'); row2.push('')
     }
   }
 
@@ -384,7 +384,7 @@ function exportToExcelV2(rows: any[], instLabel: string, instId: string, subCoun
   const ws = buildLeveledSheet(rows, instLabel, instId, subCountMap, included, 'levels')
   const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, instLabel)
   const date = new Date().toLocaleDateString('az-AZ').replace(/\./g, '-')
-  XLSX.writeFile(wb, `${instLabel}_Təhsil Alanlar_v2_${date}.xlsx`)
+  XLSX.writeFile(wb, `${instLabel}_Təhsilalanlar_v2_${date}.xlsx`)
 }
 
 // ── Versiya 3: yerləşmə səviyyəli, seçimlər düz xətt ──
@@ -392,7 +392,7 @@ function exportToExcelV3(rows: any[], instLabel: string, instId: string, subCoun
   const ws = buildLeveledSheet(rows, instLabel, instId, subCountMap, included, 'flat')
   const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, instLabel)
   const date = new Date().toLocaleDateString('az-AZ').replace(/\./g, '-')
-  XLSX.writeFile(wb, `${instLabel}_Təhsil Alanlar_v3_${date}.xlsx`)
+  XLSX.writeFile(wb, `${instLabel}_Təhsilalanlar_v3_${date}.xlsx`)
 }
 
 // ── Excel import ──────────────────────────────────────────────────────────────
@@ -501,8 +501,9 @@ function parseExcel(file: File, instId: string, subjectCols: string[] = [], leve
               // Ağacın səviyyə adı ilə eyni sütun → əvvəlcədən bölgü dəyəri
               const lvIdx = levelNames.findIndex(ln => normalizeColKey(ln) === nk)
               if (lvIdx >= 0) {
-                // Səviyyə sütunu mövcuddursa (boş olsa belə) qeyd et — sonradan redaktə oluna bilsin
-                branchByLevel[lvIdx] = String(v).trim()
+                // Yalnız dolu səviyyə dəyəri saxlanılır (boş açar yaranmasın)
+                const bv = String(v).trim()
+                if (bv) branchByLevel[lvIdx] = bv
               } else {
                 // subjectCols içindən tap, tapılmasa sütun adının özünü işlət
                 const matchedSubj = subjectCols.find(s => normalizeColKey(s) === nk) || k.trim()
@@ -620,7 +621,7 @@ function ImportModal({ instId, instLabel, onClose, onImported }: {
       localStorage.setItem('mmu_priority_subjects', JSON.stringify(subjectCols))
     }
     setDone(true); onImported()
-    addLog('user', 'success', `Excel idxal: ${preview.length} təhsil alan (${mode === 'replace' ? 'əvəzlə' : 'əlavə et'})`,
+    addLog('user', 'success', `Excel idxal: ${preview.length} təhsilalan (${mode === 'replace' ? 'əvəzlə' : 'əlavə et'})`,
       `Müəssisə: ${instLabel} · İl: ${selectedYear}`)
   }
 
@@ -979,7 +980,7 @@ function ImportModal({ instId, instLabel, onClose, onImported }: {
             {preview.length > 0 && (<>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                 <div style={{ fontWeight: 700, fontSize: 13, color: '#237804' }}>
-                  ✓ {preview.length} təhsil alan ·{' '}
+                  ✓ {preview.length} təhsilalan ·{' '}
                   <span style={{ color: '#b8860b', fontWeight: 700 }}>
                     📅 {selectedYear || '—'}
                   </span>
@@ -1012,7 +1013,7 @@ function ImportModal({ instId, instLabel, onClose, onImported }: {
                   disabled={useCustom && !customValid}
                   style={{ opacity: (useCustom && !customValid) ? 0.5 : 1 }}
                 >
-                  ✓ {preview.length} təhsil alanı idxal et
+                  ✓ {preview.length} təhsilalanı idxal et
                 </button>
               </div>
             </>)}
@@ -1020,7 +1021,7 @@ function ImportModal({ instId, instLabel, onClose, onImported }: {
             <div style={{ textAlign: 'center', padding: '32px 16px' }}>
               <div style={{ fontSize: 48, marginBottom: 12 }}>✅</div>
               <div style={{ fontWeight: 800, fontSize: 16, marginBottom: 6 }}>İdxal uğurla tamamlandı!</div>
-              <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 24 }}>{preview.length} təhsil alan əlavə edildi</div>
+              <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 24 }}>{preview.length} təhsilalan əlavə edildi</div>
               <button className="btn btn-primary" onClick={onClose}>Bağla</button>
             </div>
           )}
@@ -1030,7 +1031,7 @@ function ImportModal({ instId, instLabel, onClose, onImported }: {
   )
 }
 
-// ── Təhsil alan redaktə modalı ───────────────────────────────────────────────────
+// ── Təhsilalan redaktə modalı ───────────────────────────────────────────────────
 function EditUserModal({ user, instLabel, activeSel, hasSub, onClose, onSaved }: {
   user: any; instLabel: string; activeSel: any; hasSub: boolean; onClose: () => void; onSaved: () => void
 }) {
@@ -1051,18 +1052,25 @@ function EditUserModal({ user, instLabel, activeSel, hasSub, onClose, onSaved }:
     printStatus: user.printStatus || 'not_printed',
     placedSpecialty: user.placedSpecialty || '',
   })
-  // Fənn balları (təhsil alanın subjects sahəsi)
+  // Fənn balları (təhsilalanın subjects sahəsi)
   const subjectKeys = Object.keys(user.subjects || {})
   const [subjects, setSubjects] = useState<Record<string, string>>(
     Object.fromEntries(subjectKeys.map(k => [k, String(user.subjects[k] ?? '')]))
   )
 
-  // ── Ağac strukturunun səviyyələri — şablonda olan bütün səviyyələr redaktə/əlavə oluna bilər ──
+  // ── Ağac səviyyələri — yalnız ŞABLONDA gələn (kursantda mövcud olan) səviyyələr redaktə/əlavə oluna bilər ──
   const preTree   = activeSel ? treeDb.get(activeSel.treeId) : null
   const instBranchTree = preTree || (treeDb.getAll() as any[]).find((t: any) => t.institution === user.institution) || null
   const branchLevelLabels = effectiveLevelNames(instBranchTree)
-  // Strukturun bütün səviyyələri redaktə oluna bilir (seçimdən asılı olmadan)
-  const branchLevelIdxs: number[] = branchLevelLabels.map((_, i) => i)
+  // Şablonda seçilmiş səviyyə sütunları (müəssisə üzrə) + kursantın artıq dəyəri olan səviyyələr
+  const tmplExtraCols: string[] = (() => {
+    try { const c = JSON.parse(localStorage.getItem(`mmu_import_tmpl_${user.institution}`) || '{}'); return Array.isArray(c.extraCols) ? c.extraCols : [] }
+    catch { return [] }
+  })()
+  const branchLevelIdxs: number[] = [...new Set([
+    ...branchLevelLabels.map((name, i) => tmplExtraCols.includes(name) ? i : -1).filter(i => i >= 0),
+    ...Object.keys(user.branchByLevel || {}).map(Number),
+  ])].sort((a, b) => a - b)
   const branchOptionsFor = (lvl: number): string[] => {
     if (!instBranchTree) return []
     const acc = new Set<string>()
@@ -1124,7 +1132,7 @@ function EditUserModal({ user, instLabel, activeSel, hasSub, onClose, onSaved }:
     // ── Seçim statusu dəyişibsə submission yarat/sil ──
     if (selStatus !== (hasSub ? 'submitted' : 'pending')) {
       if (selStatus === 'pending') {
-        // Təhsil alanın BÜTÜN seçimlərini sil (tam sıfırla) + yerləşdirməni təmizlə
+        // Təhsilalanın BÜTÜN seçimlərini sil (tam sıfırla) + yerləşdirməni təmizlə
         const all = submissionDb.getAll() as any[]
         const filtered = all.filter((s: any) => s.userId !== user.id)
         localStorage.setItem('mmu_submissions', JSON.stringify(filtered))
@@ -1147,7 +1155,7 @@ function EditUserModal({ user, instLabel, activeSel, hasSub, onClose, onSaved }:
 
     if (changed.length > 0) {
       addLog('user', 'success',
-        `Təhsil alan redaktə edildi: ${fullName}`,
+        `Təhsilalan redaktə edildi: ${fullName}`,
         `Müəssisə: ${instLabel}\n${changed.join('\n')}`
       )
     }
@@ -1160,7 +1168,7 @@ function EditUserModal({ user, instLabel, activeSel, hasSub, onClose, onSaved }:
     <div className="modal-overlay open" onClick={onClose}>
       <div className="modal" style={{ maxWidth: 520 }} onClick={e => e.stopPropagation()}>
         <div className="modal-head">
-          <span className="modal-title">✏️ Təhsil alan Redaktəsi — {user.name}</span>
+          <span className="modal-title">✏️ Təhsilalan Redaktəsi — {user.name}</span>
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>
         <div className="modal-body">
@@ -1491,14 +1499,14 @@ function EditInstModal({ inst, onClose, onSaved }: { inst: any; onClose: () => v
   function handleSave() {
     const l = label.trim(); if (!l) return
     institutionDb.update(inst.id, { ...inst, label: l, icon, year: effYear || undefined })
-    // Tədris ilini təhsil alanlara tətbiq et (istəyə görə)
+    // Tədris ilini təhsilalanlara tətbiq et (istəyə görə)
     if (effYear && applyAll) {
       const list = (userDb.getAll() as any[]).map((u: any) =>
         u.institution === inst.id ? { ...u, year: effYear } : u)
       localStorage.setItem('mmu_users', JSON.stringify(list))
     }
     addLog('admin', 'info', `Müəssisə yeniləndi: "${l}"`,
-      effYear ? `Tədris ili: ${effYear}${applyAll ? ` · ${instUserCount} təhsil alana tətbiq edildi` : ''}` : undefined)
+      effYear ? `Tədris ili: ${effYear}${applyAll ? ` · ${instUserCount} təhsilalana tətbiq edildi` : ''}` : undefined)
     onSaved(); onClose()
   }
 
@@ -1538,7 +1546,7 @@ function EditInstModal({ inst, onClose, onSaved }: { inst: any; onClose: () => v
             {effYear && instUserCount > 0 && (
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, fontSize: 12, color: '#5a6080', cursor: 'pointer' }}>
                 <input type="checkbox" checked={applyAll} onChange={e => setApplyAll(e.target.checked)} />
-                Bu ili müəssisənin bütün təhsil alanlarına tətbiq et ({instUserCount} təhsil alan)
+                Bu ili müəssisənin bütün təhsilalanlarına tətbiq et ({instUserCount} təhsilalan)
               </label>
             )}
           </div>
@@ -1652,8 +1660,8 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
     if (!instUsers.length) return
     showConfirm({
       icon: '🗄️', iconBg: '#f0f2fa', iconColor: '#9a7b1e',
-      title: 'Təhsil Alanları arxivlə',
-      message: `${instLabel} üçün ${instUsers.length} təhsil alanın siyahısı arxivlənəcək. Arxiv bölməsindən baxıla bilər.`,
+      title: 'Təhsilalanları arxivlə',
+      message: `${instLabel} üçün ${instUsers.length} təhsilalanın siyahısı arxivlənəcək. Arxiv bölməsindən baxıla bilər.`,
       confirmLabel: 'Arxivlə', confirmColor: '#9a7b1e',
       onConfirm: () => {
         userArchiveDb.save({ label: instLabel, institution: instId, snapshot: instUsers })
@@ -1661,7 +1669,7 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
         refreshUsers()
         setArchiveDone(true)
         setTimeout(() => setArchiveDone(false), 3000)
-        addLog('user', 'warning', `Təhsil Alanlar arxivləndi: ${instUsers.length} nəfər`, `Müəssisə: ${instLabel}`)
+        addLog('user', 'warning', `Təhsilalanlar arxivləndi: ${instUsers.length} nəfər`, `Müəssisə: ${instLabel}`)
       },
     })
   }
@@ -1713,6 +1721,8 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
   const branchLevelName = (i: number) => instTreeULevelNames[i] || `Səviyyə ${i + 1}`
   // Yerləşdirmə tamamlanıbsa branch sütunu lazım deyil — "Yerləşdiyi ixtisas" bəs edir
   const placementDone = instUsers.length > 0 && instUsers.every((u: any) => u.placedSpecialty)
+  // Hər hansı yerləşdirmə yazılıbsa redaktə bağlanır (geri alındıqda yenidən açılır)
+  const hasPlacement = instUsers.some((u: any) => u.placedSpecialty)
   const showBranch    = branchLevels.length > 0 && !placementDone
   const allSubjectKeys: string[] = (() => {
     const keys = new Set<string>()
@@ -1725,7 +1735,7 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
     'Ad', 'Soyad', 'Ata adı', 'İş nömrəsi', 'FİN', 'Təhsil müəssisəsi', 'Tədris ili',
     ...(hasGroups ? ['Qrup'] : []), ...(hasSources ? ['Mənbə'] : []), ...(hasGender ? ['Cins'] : []),
     'Ümumi imtahan nəticəsi', ...allSubjectKeys, 'Seçim statusu', 'Çap statusu',
-    'Yerləşdiyi ixtisas', 'Təhsil alanın seçimləri (prioritetlə)',
+    'Yerləşdiyi ixtisas', 'Təhsilalanın seçimləri (prioritetlə)',
   ]
   const includedCols = new Set(exportCols.filter(c => !excludedCols.has(c)))
   const toggleCol = (c: string) => setExcludedCols(prev => {
@@ -1767,7 +1777,7 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
 
   function confirmPrint() {
     if (!printUser) return
-    // Təhsil alanın hər hansı submissionunu tap (active olmasa belə)
+    // Təhsilalanın hər hansı submissionunu tap (active olmasa belə)
     const allSubs2 = submissionDb.getAll() as any[]
     const sub = allSubs2.find((s: any) => s.userId === printUser.id) || null
     const ranking: string[] = sub?.ranking || []
@@ -1817,12 +1827,12 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
               )}
               {!subCountMap[printUser.id] && (
                 <div style={{ background: '#fff7e6', border: '1.5px solid #ffd591', borderRadius: 10, padding: '10px 14px', fontSize: 12, color: '#d46b08', marginBottom: 16 }}>
-                  ⚠️ Bu təhsil alan hələ seçim göndərməyib.
+                  ⚠️ Bu təhsilalan hələ seçim göndərməyib.
                 </div>
               )}
               {printUser.printStatus === 'printed' && (
                 <div style={{ background: '#f6ffed', border: '1.5px solid #b7eb8f', borderRadius: 10, padding: '10px 14px', fontSize: 12, color: '#237804', marginBottom: 16 }}>
-                  ✅ Bu təhsil alan əvvəllər çap edilib. Yenidən çap edəcəksiniz?
+                  ✅ Bu təhsilalan əvvəllər çap edilib. Yenidən çap edəcəksiniz?
                 </div>
               )}
               <div style={{ display: 'flex', gap: 10 }}>
@@ -1858,7 +1868,7 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
             </div>
             <div className="modal-body">
               <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 12 }}>
-                {sorted.length} təhsil alan ixrac olunacaq.
+                {sorted.length} təhsilalan ixrac olunacaq.
               </div>
 
               {/* Sütun seçimi */}
@@ -1894,20 +1904,20 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
                 {/* Versiya 1 */}
                 <button
-                  onClick={() => { exportToExcel(sorted, instLabel, instId, subCountMap, includedCols); addLog('user', 'info', `Excel ixrac (Versiya 1): ${sorted.length} təhsil alan`, `Müəssisə: ${instLabel}`); setShowExport(false) }}
+                  onClick={() => { exportToExcel(sorted, instLabel, instId, subCountMap, includedCols); addLog('user', 'info', `Excel ixrac (Versiya 1): ${sorted.length} təhsilalan`, `Müəssisə: ${instLabel}`); setShowExport(false) }}
                   style={{ textAlign: 'left', padding: '16px 18px', borderRadius: 14, border: '1.5px solid #b7eb8f', background: '#f6ffed', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 14 }}
                 >
                   <div style={{ width: 42, height: 42, borderRadius: 11, background: '#1d6f42', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>1</div>
                   <div>
                     <div style={{ fontWeight: 800, fontSize: 14, color: '#1a1a2e' }}>Versiya 1 — Tam siyahı</div>
                     <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 2 }}>
-                      Bütün sütunlar (ad, FİN, fənlər, status) + təhsil alanın bütün seçimləri
+                      Bütün sütunlar (ad, FİN, fənlər, status) + təhsilalanın bütün seçimləri
                     </div>
                   </div>
                 </button>
                 {/* Versiya 2 — səviyyələrə bölünmüş */}
                 <button
-                  onClick={() => { exportToExcelV2(sorted, instLabel, instId, subCountMap, includedCols); addLog('user', 'info', `Excel ixrac (Versiya 2): ${sorted.length} təhsil alan`, `Müəssisə: ${instLabel}`); setShowExport(false) }}
+                  onClick={() => { exportToExcelV2(sorted, instLabel, instId, subCountMap, includedCols); addLog('user', 'info', `Excel ixrac (Versiya 2): ${sorted.length} təhsilalan`, `Müəssisə: ${instLabel}`); setShowExport(false) }}
                   style={{ textAlign: 'left', padding: '16px 18px', borderRadius: 14, border: '1.5px solid #ecd9a0', background: '#fbf1d6', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 14 }}
                 >
                   <div style={{ width: 42, height: 42, borderRadius: 11, background: '#c9962a', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>2</div>
@@ -1920,7 +1930,7 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
                 </button>
                 {/* Versiya 3 — yerləşmə səviyyəli + seçimlər düz xətt */}
                 <button
-                  onClick={() => { exportToExcelV3(sorted, instLabel, instId, subCountMap, includedCols); addLog('user', 'info', `Excel ixrac (Versiya 3): ${sorted.length} təhsil alan`, `Müəssisə: ${instLabel}`); setShowExport(false) }}
+                  onClick={() => { exportToExcelV3(sorted, instLabel, instId, subCountMap, includedCols); addLog('user', 'info', `Excel ixrac (Versiya 3): ${sorted.length} təhsilalan`, `Müəssisə: ${instLabel}`); setShowExport(false) }}
                   style={{ textAlign: 'left', padding: '16px 18px', borderRadius: 14, border: '1.5px solid #ddd0ff', background: '#f6f2ff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 14 }}
                 >
                   <div style={{ width: 42, height: 42, borderRadius: 11, background: '#b8860b', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>3</div>
@@ -1956,13 +1966,13 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
             </button>
             )}
             {can('users.export') && (
-            <button onClick={() => setShowExport(true)} title={`Excel ilə ixrac et — ${sorted.length} təhsil alan`}
+            <button onClick={() => setShowExport(true)} title={`Excel ilə ixrac et — ${sorted.length} təhsilalan`}
               style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 16px', borderRadius: 10, border: 'none', cursor: 'pointer', background: '#1d6f42', color: '#fff', fontWeight: 800, fontSize: 13, boxShadow: '0 3px 12px #1d6f4244' }}>
               📥 İxrac et
             </button>
             )}
             {can('users.delete') && (
-            <button onClick={onReset} title="Təhsil alan siyahısını sil"
+            <button onClick={onReset} title="Təhsilalan siyahısını sil"
               style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 16px', borderRadius: 10, border: '1.5px solid #ffd591', background: '#fffbe6', color: '#d46b08', fontWeight: 800, fontSize: 13, boxShadow: '0 2px 8px #d46b0822', cursor: 'pointer' }}>🗑 Siyahını sil</button>
             )}
             {can('inst.delete') && (
@@ -2004,7 +2014,7 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
               <tr>
                 <th className="sticky-col sticky-col-1" style={{ textAlign: 'center' }}>№</th>
                 <th className="sticky-col sticky-col-2"></th>
-                <th className="sticky-col sticky-col-3">Təhsil alan</th>
+                <th className="sticky-col sticky-col-3">Təhsilalan</th>
                 <th>İş Nömrəsi</th>
                 <th>FİN</th>
                 <th style={{ textAlign: 'center' }}>Tədris İli</th>
@@ -2036,12 +2046,17 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
                     <td className="sticky-col sticky-col-1" style={{ color: 'var(--muted)', fontWeight: 700, textAlign: 'center' }}>{i + 1}</td>
                     <td className="sticky-col sticky-col-2" style={{ textAlign: 'center' }}>
                       {can('users.edit') && (
+                      hasPlacement ? (
+                      <button disabled title="Yerləşdirmə tamamlandığı üçün redaktə bağlıdır — əvvəlcə yerləşdirməni geri alın"
+                        style={{ width: 26, height: 26, borderRadius: 7, border: '1.5px solid #e7eaf0', background: '#f4f5f8', color: '#c0c4d0', cursor: 'not-allowed', fontSize: 12, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                      >🔒</button>
+                      ) : (
                       <button onClick={() => setEditUser(u)} title="Redaktə et"
                         style={{ width: 26, height: 26, borderRadius: 7, border: '1.5px solid #c5d0ff', background: '#f4f7ff', color: '#c9962a', cursor: 'pointer', fontSize: 12, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', transition: 'all .15s' }}
                         onMouseEnter={e => { (e.currentTarget.style.background = '#e8f0ff'); (e.currentTarget.style.borderColor = 'var(--blue)') }}
                         onMouseLeave={e => { (e.currentTarget.style.background = '#f4f7ff'); (e.currentTarget.style.borderColor = '#c5d0ff') }}
                       >✏️</button>
-                      )}
+                      ))}
                     </td>
                     <td className="sticky-col sticky-col-3">
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -2194,7 +2209,7 @@ export default function Users() {
     const users = JSON.parse(localStorage.getItem('mmu_users') || '[]') as any[]
     const count = users.filter((u: any) => u.institution === inst.id).length
     localStorage.setItem('mmu_users', JSON.stringify(users.filter((u: any) => u.institution !== inst.id)))
-    addLog('admin', 'warning', `Müəssisə sıfırlandı: "${inst.label}"`, `${count} təhsil alan silindi`)
+    addLog('admin', 'warning', `Müəssisə sıfırlandı: "${inst.label}"`, `${count} təhsilalan silindi`)
     setResetTarget(null)
     // UserTable-i yeniləmək üçün tab-ı yenidən yükləyirik
     const cur = tab
@@ -2213,10 +2228,10 @@ export default function Users() {
     // Müəssisəni sil
     const usersInInst = (JSON.parse(localStorage.getItem('mmu_users') || '[]') as any[]).filter((u: any) => u.institution === inst.id)
     institutionDb.delete(inst.id)
-    // Müəssisənin təhsil alanlarını da sil
+    // Müəssisənin təhsilalanlarını da sil
     const users = JSON.parse(localStorage.getItem('mmu_users') || '[]')
     localStorage.setItem('mmu_users', JSON.stringify(users.filter((u: any) => u.institution !== inst.id)))
-    addLog('admin', 'error', `Müəssisə silindi: "${inst.label}"`, `${usersInInst.length} təhsil alan da silindi · Superadmin şifrəsi ilə təsdiqləndi`)
+    addLog('admin', 'error', `Müəssisə silindi: "${inst.label}"`, `${usersInInst.length} təhsilalan da silindi · Superadmin şifrəsi ilə təsdiqləndi`)
     refreshInstitutions()
     setDeleteTarget(null); setDelPassword(''); setDelError('')
     // Başqa taba keç
@@ -2248,7 +2263,7 @@ export default function Users() {
                 Müəssisəni silmək istəyirsiniz?
               </div>
               <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 16, lineHeight: 1.5 }}>
-                <b style={{ display:'inline-flex', alignItems:'center', gap:5, verticalAlign:'middle' }}><InstIcon icon={deleteTarget.icon} size={15} /> {deleteTarget.label}</b> müəssisəsi və ona aid <b>bütün təhsil alanlar</b> silinəcək. Bu əməliyyat geri alına bilməz.
+                <b style={{ display:'inline-flex', alignItems:'center', gap:5, verticalAlign:'middle' }}><InstIcon icon={deleteTarget.icon} size={15} /> {deleteTarget.label}</b> müəssisəsi və ona aid <b>bütün təhsilalanlar</b> silinəcək. Bu əməliyyat geri alına bilməz.
               </div>
 
               {/* Superadmin şifrəsi */}
@@ -2288,10 +2303,10 @@ export default function Users() {
             </div>
             <div className="modal-body" style={{ paddingTop: 8 }}>
               <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', marginBottom: 8 }}>
-                Təhsil alan siyahısını silmək istəyirsiniz?
+                Təhsilalan siyahısını silmək istəyirsiniz?
               </div>
               <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 24, lineHeight: 1.5 }}>
-                <b style={{ display:'inline-flex', alignItems:'center', gap:5, verticalAlign:'middle' }}><InstIcon icon={resetTarget.icon} size={15} /> {resetTarget.label}</b> müəssisəsinə aid <b>bütün təhsil alanlar</b> silinəcək. Müəssisənin özü saxlanılacaq. Bu əməliyyat geri alına bilməz.
+                <b style={{ display:'inline-flex', alignItems:'center', gap:5, verticalAlign:'middle' }}><InstIcon icon={resetTarget.icon} size={15} /> {resetTarget.label}</b> müəssisəsinə aid <b>bütün təhsilalanlar</b> silinəcək. Müəssisənin özü saxlanılacaq. Bu əməliyyat geri alına bilməz.
               </div>
               <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
                 <button className="btn btn-outline" onClick={() => setResetTarget(null)}>Ləğv et</button>

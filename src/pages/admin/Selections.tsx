@@ -86,7 +86,7 @@ export default function Selections() {
     showConfirm({
       icon: '🚀', iconBg: '#f0fff4', iconColor: '#52c41a',
       title: 'Seçimi yayımla',
-      message: `"${s.name}" seçimi yayımlanacaq. Təhsil Alanlar öz seçimlərini edə biləcək.`,
+      message: `"${s.name}" seçimi yayımlanacaq. Təhsilalanlar öz seçimlərini edə biləcək.`,
       confirmLabel: 'Yayımla', confirmColor: '#52c41a',
       onConfirm: () => { selectionDb.publish(s.id); refresh(); addLog('selection', 'success', `Seçim yayımlandı: "${s.name}"`, `id: ${s.id}`) },
     })
@@ -148,7 +148,7 @@ export default function Selections() {
             <div className="sel-card-body">
               <div className="sel-card-name">{s.name}</div>
               <div className="sel-card-meta">
-                {s.studentCount ? `${s.studentCount} təhsil alan · ` : ''}{s.packetCount ? `${s.packetCount} paket · ` : ''}{s.choiceCount ? `${s.choiceCount} seçim · ` : ''}
+                {s.studentCount ? `${s.studentCount} təhsilalan · ` : ''}{s.packetCount ? `${s.packetCount} paket · ` : ''}{s.choiceCount ? `${s.choiceCount} seçim · ` : ''}
                 {s.startDate || '—'} → {s.endDate || '—'}
               </div>
             </div>

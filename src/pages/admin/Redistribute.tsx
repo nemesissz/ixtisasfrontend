@@ -146,7 +146,7 @@ export default function Redistribute() {
     return { leafStats: stats, pathMap: pm, placedById: pbi }
   }, [sel?.id, JSON.stringify(tree?.nodes || []), allUsers.length])
 
-  // Hovuz (seçilmiş ixtisaslardakı təhsil alanlar) + balans
+  // Hovuz (seçilmiş ixtisaslardakı təhsilalanlar) + balans
   const pool        = leafStats.filter(s => selected.has(s.id)).flatMap(s => placedById[s.id] || [])
   const selQuotaSum = leafStats.filter(s => selected.has(s.id)).reduce((a, s) => a + s.quota, 0)
   const balanced    = selected.size > 0 && selQuotaSum === pool.length
@@ -211,7 +211,7 @@ export default function Redistribute() {
     showConfirm({
       icon: '⚖️', iconBg: '#fbf1d6', iconColor: '#c9962a',
       title: 'Qismən yerləşdirməni tətbiq et',
-      message: `${pool.length} təhsil alanın yerləşməsi yenidən hesablanıb bazaya yazılacaq. Əvvəlki vəziyyət snapshot kimi saxlanılacaq (geri alına bilər).`,
+      message: `${pool.length} təhsilalanın yerləşməsi yenidən hesablanıb bazaya yazılacaq. Əvvəlki vəziyyət snapshot kimi saxlanılacaq (geri alına bilər).`,
       confirmLabel: 'Tətbiq et', confirmColor: '#c9962a',
       onConfirm: () => {
         setBusy(true)
@@ -240,10 +240,10 @@ export default function Redistribute() {
           })
         })
         const changed = pool.filter((u: any) => preview[u.id]?.specId !== u.placedSpecialtyId).length
-        addLog('distribution', 'success', `Qismən yenidən yerləşdirmə: ${pool.length} təhsil alan`,
+        addLog('distribution', 'success', `Qismən yenidən yerləşdirmə: ${pool.length} təhsilalan`,
           `Seçilmiş ixtisas: ${selected.size} · Yerini dəyişən: ${changed} · Seçim: ${sel.name}`)
         refreshUsers(); setPreview(null); setSelected(new Set()); setBusy(false)
-        showInfo({ icon: '✅', iconBg: '#f0fff4', iconColor: '#52c41a', title: 'Tətbiq edildi', message: `${pool.length} təhsil alan yenidən bölündü (${changed} təhsil alan yerini dəyişdi).`, confirmLabel: 'Bağla' })
+        showInfo({ icon: '✅', iconBg: '#f0fff4', iconColor: '#52c41a', title: 'Tətbiq edildi', message: `${pool.length} təhsilalan yenidən bölündü (${changed} təhsilalan yerini dəyişdi).`, confirmLabel: 'Bağla' })
       },
     })
   }
@@ -282,8 +282,8 @@ export default function Redistribute() {
         <>
           {/* İzah */}
           <div style={{ background: '#fbf1d6', border: '1.5px solid #ecd9a0', borderRadius: 12, padding: '12px 16px', marginBottom: 16, fontSize: 12.5, color: '#3a4cad', lineHeight: 1.6 }}>
-            ℹ️ Kvota dəyişdiyi ixtisasları seçin. <b>Yalnız seçilmiş ixtisaslardakı təhsil alanlar</b> yenidən bölünür (digərlərinə toxunulmur).
-            Seçilmiş ixtisasların <b>yeni kvota cəmi = bu ixtisaslardakı təhsil alan sayı</b> olmalıdır.
+            ℹ️ Kvota dəyişdiyi ixtisasları seçin. <b>Yalnız seçilmiş ixtisaslardakı təhsilalanlar</b> yenidən bölünür (digərlərinə toxunulmur).
+            Seçilmiş ixtisasların <b>yeni kvota cəmi = bu ixtisaslardakı təhsilalan sayı</b> olmalıdır.
           </div>
 
           {/* İxtisas seçimi */}
@@ -318,8 +318,8 @@ export default function Redistribute() {
               background: balanced ? '#f0fff4' : '#fff1f0', border: `1.5px solid ${balanced ? '#b7eb8f' : '#ffccc7'}`, borderRadius: 12, padding: '14px 18px', marginBottom: 16 }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: balanced ? '#237804' : '#cf1322' }}>
                 {balanced
-                  ? `✅ Balans düzdür: ${selected.size} ixtisas · ${pool.length} təhsil alan = ${selQuotaSum} yeni kvota`
-                  : `⚠️ Balans pozulub: ${pool.length} təhsil alan ≠ ${selQuotaSum} yeni kvota — fərq ${Math.abs(pool.length - selQuotaSum)}`}
+                  ? `✅ Balans düzdür: ${selected.size} ixtisas · ${pool.length} təhsilalan = ${selQuotaSum} yeni kvota`
+                  : `⚠️ Balans pozulub: ${pool.length} təhsilalan ≠ ${selQuotaSum} yeni kvota — fərq ${Math.abs(pool.length - selQuotaSum)}`}
               </div>
               <button onClick={handlePreview} disabled={!balanced}
                 style={{ padding: '10px 24px', borderRadius: 10, border: 'none', cursor: balanced ? 'pointer' : 'not-allowed',
@@ -335,7 +335,7 @@ export default function Redistribute() {
               <div className="card-head">
                 <div>
                   <div className="card-title">Önbaxış — nəticə</div>
-                  <div className="card-sub">{pool.filter((u: any) => preview[u.id]?.specId !== u.placedSpecialtyId).length} təhsil alan yerini dəyişir · {pool.length} cəmi</div>
+                  <div className="card-sub">{pool.filter((u: any) => preview[u.id]?.specId !== u.placedSpecialtyId).length} təhsilalan yerini dəyişir · {pool.length} cəmi</div>
                 </div>
                 <button onClick={handleApply} disabled={busy}
                   style={{ padding: '9px 22px', borderRadius: 10, border: 'none', cursor: 'pointer', background: '#1d6f42', color: '#fff', fontWeight: 800, fontSize: 13 }}>
@@ -344,7 +344,7 @@ export default function Redistribute() {
               </div>
               <div className="card-body" style={{ padding: 0, maxHeight: 460, overflowY: 'auto' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 60px 1fr 1fr 70px', gap: 8, padding: '9px 18px', background: '#f8f9fd', borderBottom: '2px solid #eef0f8', fontSize: 10, fontWeight: 700, color: '#9090a8', letterSpacing: .5, position: 'sticky', top: 0 }}>
-                  <span>TƏHSİL ALAN</span><span style={{ textAlign: 'center' }}>BAL</span><span>ƏVVƏL</span><span>İNDİ</span><span style={{ textAlign: 'center' }}>SEÇİM №</span>
+                  <span>TƏHSİLALAN</span><span style={{ textAlign: 'center' }}>BAL</span><span>ƏVVƏL</span><span>İNDİ</span><span style={{ textAlign: 'center' }}>SEÇİM №</span>
                 </div>
                 {[...pool].sort((a: any, b: any) => (b.score || 0) - (a.score || 0)).map((u: any, i: number) => {
                   const nw = preview[u.id]

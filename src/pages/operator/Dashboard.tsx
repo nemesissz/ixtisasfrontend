@@ -22,67 +22,81 @@ function buildLeafPaths(nodes: any[], prefix: any[] = [], map: Record<string, an
 const esc = (s: any) => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
 // Yalnız baş hərfi böyük (qalan kiçik) — çap başlıqları üçün
 const sentenceCase = (s: any) => { const t = String(s ?? ''); return t.charAt(0) + t.slice(1).toLowerCase() }
+const DEFAULT_LEVEL_NAMES = ['Qoşun növü', 'Mülki ixtisas', 'Hərbi uçot ixtisası']
+function effectiveLevelNames(tree: any): string[] {
+  if (!tree) return []
+  let depth = 0
+  const walk = (nodes: any[], cur: number) => { for (const n of nodes || []) { depth = Math.max(depth, cur + 1); if (n.children?.length) walk(n.children, cur + 1) } }
+  walk(tree.nodes || [], 0)
+  const count = Math.max(depth, tree.levelNames?.length || 0)
+  return Array.from({ length: count }, (_, i) => tree.levelNames?.[i] || DEFAULT_LEVEL_NAMES[i] || `Səviyyə ${i + 1}`)
+}
 
-// ── Seçim vərəqi cədvəli (viewMode-a görə dinamik) ────────────────────────────
+// ── Seçim vərəqi cədvəli (N səviyyəli dinamik — viewMode-a görə) ───────────────
 function buildSheetTable(ranking: string[], pathMap: Record<string, any[]>, nameMap: Record<string, string>, lv: string[], isNested: boolean): string {
-  const lv0 = lv[0], lv1 = lv[1], lv2 = lv[2]
-  const resolve = (leafId: string) => {
+  const maxPath = ranking.reduce((m, id) => Math.max(m, (pathMap[id] || []).length), 0)
+  const L = Math.max(lv.length || 0, maxPath, 1)
+  const levelName = (i: number) => lv[i] || `Səviyyə ${i + 1}`
+  const cells = (leafId: string): string[] => {
     const path = pathMap[leafId]
-    if (path && path.length >= 3)      return { g: path[0].name, s: path[1].name, l: path[path.length-1].name }
-    if (path && path.length === 2)     return { g: path[0].name, s: '—',          l: path[1].name }
-    if (path && path.length === 1)     return { g: '—',          s: '—',          l: path[0].name }
-    return { g: '—', s: '—', l: (nameMap[leafId] || leafId) }
+    if (!path || !path.length) {
+      const arr = Array(L).fill('—'); arr[L - 1] = nameMap[leafId] || leafId; return arr
+    }
+    return Array.from({ length: L }, (_, i) => i < path.length ? path[i].name : '—')
   }
 
   if (isNested) {
-    const groups: any[] = []
-    const gIdx = new Map<string, number>()
+    const root: any = { children: [], idx: new Map() }
     for (const id of ranking) {
-      const { g, s, l } = resolve(id)
-      if (!gIdx.has(g)) { gIdx.set(g, groups.length); groups.push({ name: g, order: groups.length + 1, subs: [], sIdx: new Map() }) }
-      const G = groups[gIdx.get(g)!]
-      if (!G.sIdx.has(s)) { G.sIdx.set(s, G.subs.length); G.subs.push({ name: s, order: G.subs.length + 1, leaves: [] }) }
-      G.subs[G.sIdx.get(s)!].leaves.push({ name: l, order: G.subs[G.sIdx.get(s)!].leaves.length + 1 })
-    }
-    let rows = ''
-    for (const G of groups) {
-      const gSpan = G.subs.reduce((a: number, x: any) => a + x.leaves.length, 0)
-      let gP = false
-      for (const S of G.subs) {
-        let sP = false
-        for (const leaf of S.leaves) {
-          rows += '<tr>'
-          if (!gP) { rows += `<td class="c-ord" rowspan="${gSpan}">${G.order}</td><td class="c-grp" rowspan="${gSpan}">${esc(G.name)}</td>`; gP = true }
-          if (!sP) { rows += `<td class="c-ord" rowspan="${S.leaves.length}">${S.order}</td><td class="c-sub" rowspan="${S.leaves.length}">${esc(S.name)}</td>`; sP = true }
-          rows += `<td class="c-ord">${leaf.order}</td><td>${esc(leaf.name)}</td></tr>`
-        }
+      const c = cells(id)
+      let node = root
+      for (let level = 0; level < L; level++) {
+        const nm = c[level]
+        if (!node.idx.has(nm)) { node.idx.set(nm, node.children.length); node.children.push({ name: nm, order: node.children.length + 1, children: [], idx: new Map() }) }
+        node = node.children[node.idx.get(nm)]
       }
     }
-    return `<table>
-      <thead><tr>
-        <th class="t-ord">${esc(lv0)}<br/>sırası</th><th>${esc(sentenceCase(lv0))}</th>
-        <th class="t-ord">${esc(lv1)}<br/>sırası</th><th>${esc(sentenceCase(lv1))}</th>
-        <th class="t-ord">${esc(lv2)}<br/>sırası</th><th>${esc(sentenceCase(lv2))}</th>
-      </tr></thead><tbody>${rows}</tbody></table>`
+    const countRows = (n: any): number => n.children.length ? n.children.reduce((a: number, c: any) => a + countRows(c), 0) : 1
+    const emit = (node: any, level: number): string[] => {
+      const out: string[] = []
+      for (const child of node.children) {
+        const isLeafLevel = level === L - 1
+        const childRows = isLeafLevel ? [''] : emit(child, level + 1)
+        const span = isLeafLevel ? 1 : countRows(child)
+        const cls = level === 0 ? 'c-grp' : (isLeafLevel ? '' : 'c-sub')
+        const nameTd = cls ? `<td class="${cls}" rowspan="${span}">${esc(child.name)}</td>` : `<td rowspan="${span}">${esc(child.name)}</td>`
+        childRows[0] = `<td class="c-ord" rowspan="${span}">${child.order}</td>${nameTd}` + childRows[0]
+        out.push(...childRows)
+      }
+      return out
+    }
+    const rows = emit(root, 0).map(r => `<tr>${r}</tr>`).join('')
+    const header = Array.from({ length: L }, (_, i) =>
+      `<th class="t-ord">${esc(levelName(i))}<br/>sırası</th><th>${esc(sentenceCase(levelName(i)))}</th>`).join('')
+    return `<table><thead><tr>${header}</tr></thead><tbody>${rows}</tbody></table>`
   }
 
-  let rows = ''
-  let prevG = '', prevS = ''
-  ranking.forEach((id, i) => {
-    const { g, s, l } = resolve(id)
-    const gCh = g !== prevG, sCh = gCh || s !== prevS
-    rows += `<tr><td class="c-ord">${i + 1}</td><td class="${gCh ? 'c-grp' : 'c-rep'}">${esc(g)}</td><td class="${sCh ? 'c-sub' : 'c-rep'}">${esc(s)}</td><td>${esc(l)}</td></tr>`
-    prevG = g; prevS = s
-  })
-  return `<table>
-    <thead><tr>
-      <th class="t-ord">Seçim sırası</th><th>${esc(sentenceCase(lv0))}</th><th>${esc(sentenceCase(lv1))}</th><th>${esc(sentenceCase(lv2))}</th>
-    </tr></thead><tbody>${rows}</tbody></table>`
+  let prev: string[] = Array(L).fill('')
+  const rows = ranking.map((id, idx) => {
+    const c = cells(id)
+    let changed = false
+    const tds = c.map((nm, i) => {
+      if (nm !== prev[i]) changed = true
+      const isLeaf = i === L - 1
+      const cls = isLeaf ? '' : (changed ? (i === 0 ? 'c-grp' : 'c-sub') : 'c-rep')
+      return cls ? `<td class="${cls}">${esc(nm)}</td>` : `<td>${esc(nm)}</td>`
+    }).join('')
+    prev = c
+    return `<tr><td class="c-ord">${idx + 1}</td>${tds}</tr>`
+  }).join('')
+  const header = `<th class="t-ord">Seçim sırası</th>` + Array.from({ length: L }, (_, i) => `<th>${esc(sentenceCase(levelName(i)))}</th>`).join('')
+  return `<table><thead><tr>${header}</tr></thead><tbody>${rows}</tbody></table>`
 }
 
 // ── Çap HTML-i (seçim vərəqi — viewMode-a görə dinamik) ───────────────────────
 function generatePrintHTML(user: any, sel: any, nameMap: Record<string, string>, _instLabel: string, ranking: string[], tree?: any): string {
-  const lv: string[] = tree?.levelNames?.length ? tree.levelNames : ['Ana Qrup', 'Alt Qrup', 'İxtisas']
+  const lvDyn = tree ? effectiveLevelNames(tree) : []
+  const lv: string[] = lvDyn.length ? lvDyn : ['Ana Qrup', 'Alt Qrup', 'İxtisas']
   const pathMap = tree ? buildLeafPaths(tree.nodes || []) : {}
   const isNested = sel?.viewMode === 'nested'
   const tableHTML = buildSheetTable(ranking, pathMap, nameMap, [lv[0]||'Ana Qrup', lv[1]||'Alt Qrup', lv[2]||'İxtisas'], isNested)
@@ -111,18 +125,18 @@ function generatePrintHTML(user: any, sel: any, nameMap: Record<string, string>,
   @page{margin:12mm;size:A4 portrait} @media print{body{padding:0}}
 </style></head>
 <body>
-  <div class="doc-title">Təhsil alanın ixtisas seçim vərəqi</div>
+  <div class="doc-title">Təhsilalanın ixtisas seçim vərəqi</div>
   <div class="info">
     <div class="info-left">
-      <div class="name">Təhsil alan: ${esc(user.name)}</div>
+      <div class="name">Təhsilalan: ${esc(user.name)}</div>
       <div class="sub">FİN Kod: ${esc(user.fin || '—')}</div>
       <div class="sub">Abituriyentin iş nömrəsi: ${esc(user.workNumber || '—')}</div>
       ${user.group ? `<div class="sub">Qrup: ${esc(user.group)}${user.source ? ' · '+esc(user.source==='mülki'?'Mülki':user.source==='lisey'?'Lisey':user.source) : ''}</div>` : ''}
     </div>
     <div class="info-mid">Topladığı yekun bal: <b>${Number(user.score).toFixed(2)}</b></div>
-    <div class="info-right"><div>Sənədin çap tarixi: ${printDate}</div><div class="sign-line">Təhsil alanın imzası</div></div>
+    <div class="info-right"><div>Sənədin çap tarixi: ${printDate}</div><div class="sign-line">Təhsilalanın imzası</div></div>
   </div>
-  ${ranking.length > 0 ? tableHTML : '<div class="no-sub">Bu təhsil alan seçim göndərməyib</div>'}
+  ${ranking.length > 0 ? tableHTML : '<div class="no-sub">Bu təhsilalan seçim göndərməyib</div>'}
   <div class="confirm">Yuxarıdakı seçimlərin mənə aid olduğunu öz imzamla təsdiq edirəm.</div>
 </body>
 <script>window.onload=function(){window.print();window.onafterprint=function(){window.close()}}</script>
@@ -222,7 +236,7 @@ export default function OperatorDashboard() {
       `${wasAlready ? 'Yenidən çap' : 'Çap'}: ${printUser.name}`,
       `FİN: ${printUser.fin || '—'} · Bal: ${Number(printUser.score || 0).toFixed(2)} · ` +
       `Seçim: ${activeSel?.name || '—'} · Müəssisə: ${instLabel} · ` +
-      `${wasAlready ? 'Bu təhsil alan əvvəllər də çap edilmişdi.' : `Seçim sırası: ${ranking.length} ixtisas`}`,
+      `${wasAlready ? 'Bu təhsilalan əvvəllər də çap edilmişdi.' : `Seçim sırası: ${ranking.length} ixtisas`}`,
       opName,
     )
     // ────────────────────────────────────────────────────────────────────────
@@ -239,7 +253,7 @@ export default function OperatorDashboard() {
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', gap: 14 }}>
         <div style={{ fontSize: 52 }}>🗳️</div>
         <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--text)' }}>Aktiv seçim yoxdur</div>
-        <div style={{ fontSize: 13, color: 'var(--muted)' }}>Admin bir seçim yayımladıqda təhsil alanlar burada görünəcək</div>
+        <div style={{ fontSize: 13, color: 'var(--muted)' }}>Admin bir seçim yayımladıqda təhsilalanlar burada görünəcək</div>
       </div>
     )
   }
@@ -255,7 +269,7 @@ export default function OperatorDashboard() {
               <button className="modal-close" onClick={() => setPrintUser(null)}>✕</button>
             </div>
             <div className="modal-body">
-              {/* Təhsil alan məlumatı */}
+              {/* Təhsilalan məlumatı */}
               <div style={{
                 display: 'flex', alignItems: 'center', gap: 14,
                 padding: '14px 16px', borderRadius: 12,
@@ -284,7 +298,7 @@ export default function OperatorDashboard() {
                   fontSize: 12, color: '#d46b08', marginBottom: 16,
                   display: 'flex', gap: 8,
                 }}>
-                  ⚠️ Bu təhsil alan hələ seçim göndərməyib. Yenə də çap edə bilərsiniz.
+                  ⚠️ Bu təhsilalan hələ seçim göndərməyib. Yenə də çap edə bilərsiniz.
                 </div>
               )}
 
@@ -295,12 +309,12 @@ export default function OperatorDashboard() {
                   fontSize: 12, color: '#237804', marginBottom: 16,
                   display: 'flex', gap: 8,
                 }}>
-                  ✅ Bu təhsil alan əvvəllər çap edilib. Yenidən çap edəcəksiniz?
+                  ✅ Bu təhsilalan əvvəllər çap edilib. Yenidən çap edəcəksiniz?
                 </div>
               )}
 
               <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 20 }}>
-                Təhsil alanın seçim vərəqi çap ediləcək və çap statusu <b>«Çap edilib»</b> kimi qeyd olunacaq.
+                Təhsilalanın seçim vərəqi çap ediləcək və çap statusu <b>«Çap edilib»</b> kimi qeyd olunacaq.
               </div>
 
               <div style={{ display: 'flex', gap: 10 }}>
@@ -360,7 +374,7 @@ export default function OperatorDashboard() {
       {/* ── Statistika kartları ── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 12, marginBottom: 16 }}>
         {[
-          { label: 'Cəmi təhsil alan',   value: instUsers.length, icon: '👥', color: '#1677ff', bg: '#e8f4ff' },
+          { label: 'Cəmi təhsilalan',   value: instUsers.length, icon: '👥', color: '#1677ff', bg: '#e8f4ff' },
           { label: 'Seçim etdi',     value: totalSub,          icon: '✅', color: '#237804', bg: '#f0fff4' },
           { label: 'Gözləyir',       value: totalPend,         icon: '⏳', color: '#d46b08', bg: '#fff7e6' },
           { label: 'Çap edildi',     value: totalPrinted,      icon: '🖨️', color: '#b8860b', bg: '#f4f0ff' },
@@ -392,11 +406,11 @@ export default function OperatorDashboard() {
         </div>
       </div>
 
-      {/* ── Təhsil alan siyahısı ── */}
+      {/* ── Təhsilalan siyahısı ── */}
       <div className="card">
         <div className="card-head" style={{ flexWrap: 'wrap', gap: 10 }}>
           <div>
-            <div className="card-title">{activeInst?.icon} {activeInst?.label} — Təhsil alan Siyahısı</div>
+            <div className="card-title">{activeInst?.icon} {activeInst?.label} — Təhsilalan Siyahısı</div>
             <div className="card-sub">{activeSel?.name} · {filtered.length} nəticə</div>
           </div>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -434,7 +448,7 @@ export default function OperatorDashboard() {
             <thead>
               <tr>
                 <th style={{ width: 44 }}>#</th>
-                <th>TƏHSİL ALAN</th>
+                <th>TƏHSİLALAN</th>
                 <th>İŞ NÖMRƏSİ</th>
                 <th>FİN</th>
                 {hasSources && <th style={{ width: 90, textAlign: 'center' }}>MƏNBƏYİ</th>}

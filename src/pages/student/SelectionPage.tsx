@@ -25,7 +25,7 @@ function filterTreeByGroup(tree: any, studentGroup: string | null | undefined): 
 }
 
 // ── Əvvəlcədən bölgü səviyyəsinə görə ağacı filtrə et ────────────────────────
-// preAssignLevel-dəki node adı təhsil alanın branch dəyəri ilə uyğun gələn alt ağac saxlanılır
+// preAssignLevel-dəki node adı təhsilalanın branch dəyəri ilə uyğun gələn alt ağac saxlanılır
 function filterTreeByBranch(tree: any, branchName: string | null | undefined, level: number | null | undefined): any {
   if (!tree || level == null || !branchName) return tree
   const target = String(branchName).trim().toLowerCase()
@@ -44,7 +44,7 @@ function filterTreeByBranch(tree: any, branchName: string | null | undefined, le
 }
 
 // ── Cinsə görə ağacı filtrə et ───────────────────────────────────────────────
-// Təhsil alanın cinsinə icazə verilməyən ixtisaslar siyahıdan çıxarılır
+// Təhsilalanın cinsinə icazə verilməyən ixtisaslar siyahıdan çıxarılır
 function filterTreeByGender(tree: any, gender: string | null | undefined): any {
   if (!tree || !gender) return tree
   function filterNodes(nodes: any[]): any[] {
@@ -125,7 +125,7 @@ export default function SelectionPage() {
     setTimeout(() => {
       submissionDb.save({ selectionId: selId!, userId: student.id, userName: student.name, ranking })
       userDb.update(student.id, { status: 'submitted' })
-      addLog('selection', 'success', `Təhsil alan seçimini göndərdi: ${student.name}`,
+      addLog('selection', 'success', `Təhsilalan seçimini göndərdi: ${student.name}`,
         `FİN: ${student.fin || '—'} · ${ranking.length} ixtisas sıralandı`, student.name)
       setSaving(false)
       setSubmitted(true)
@@ -194,7 +194,7 @@ export default function SelectionPage() {
           <img src="/mmu-logo.png" alt="MMU"
             style={{ width: 104, height: 104, objectFit: 'contain', marginBottom: 8, filter: 'drop-shadow(0 4px 10px #0002)' }}
             onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} />
-          <div style={{ fontSize: 28, fontWeight: 800, color: '#2b2f3a', letterSpacing: 0.2 }}>Milli Müdafiə Universiteti</div>
+          <div style={{ fontSize: 28, fontWeight: 800, color: '#2b2f3a', letterSpacing: 0.2 }}>İxtisas Seçim Proqramı</div>
           <div style={{ fontSize: 15, color: '#8a909c', marginTop: 2, marginBottom: 16 }}>İxtisas Seçimi Formu</div>
           {/* Mərhələ 3 / 3 */}
           <div style={{ display: 'flex', alignItems: 'center' }}>
@@ -321,7 +321,7 @@ export default function SelectionPage() {
           style={{ width: 74, height: 74, objectFit: 'contain', marginBottom: 4, filter: 'drop-shadow(0 4px 10px #0002)' }}
           onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} />
         <div style={{ fontSize: 22, fontWeight: 800, color: '#2b2f3a', letterSpacing: 0.2 }}>
-          Milli Müdafiə Universiteti
+          İxtisas Seçim Proqramı
         </div>
         <div style={{ fontSize: 13, color: '#8a909c', marginTop: 1, marginBottom: 10 }}>
           İxtisas Seçimi Formu
@@ -347,14 +347,14 @@ export default function SelectionPage() {
         <div style={{ fontSize: 11, color: '#9aa0ac', marginTop: 4 }}>Mərhələ 2 / 3</div>
       </div>
 
-      {/* ── Təhsil alan məlumat kartı ── */}
+      {/* ── Təhsilalan məlumat kartı ── */}
       <div style={{
         background: '#ffffff', border: '1.5px solid #e7eaf0',
         borderRadius: 12, padding: '12px 20px', color: '#2b2f3a',
         display: 'flex', alignItems: 'center', gap: 16,
         borderLeft: '5px solid #e0a92e', marginBottom: 12, boxShadow: '0 2px 10px #1a1f3c0d',
       }}>
-        {/* Təhsil alan məlumatları */}
+        {/* Təhsilalan məlumatları */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
           {/* İkon */}
           <div style={{

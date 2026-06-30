@@ -97,7 +97,7 @@ export function FlatView({ flat, onChange, submitted = false, levelNames }: {
   submitted?: boolean
   levelNames?: string[]
 }) {
-  const lv = levelNames && levelNames.length ? levelNames : ['Ana Qrup', 'Alt Qrup', 'İxtisas']
+  const lv = levelNames && levelNames.length ? levelNames : []
   const dragIdx  = useRef<number | null>(null)
   const movedId  = useRef<string | null>(null)
   const [dragging,    setDragging]    = useState<number | null>(null)
@@ -133,7 +133,7 @@ export function FlatView({ flat, onChange, submitted = false, levelNames }: {
         background: '#f3e3b8', border: '2px solid #ecd9a0',
         borderRadius: '12px 12px 0 0', overflow: 'hidden',
       }}>
-        {[['#','center'],[lv[0] || 'Ana Qrup','left'],[lv[1] || 'Alt Qrup','left'],[lv[2] || 'İxtisas','left'],['','center']].map(([h, align], i) => (
+        {[['#','center'],[lv[0] || 'Səviyyə 1','left'],[lv[1] || 'Səviyyə 2','left'],[lv[2] || 'Səviyyə 3','left'],['','center']].map(([h, align], i) => (
           <div key={i} style={{
             padding: '10px 14px', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5,
             borderRight: i < 4 ? '2px solid #ecd9a0' : 'none', textAlign: align as any,
@@ -146,8 +146,6 @@ export function FlatView({ flat, onChange, submitted = false, levelNames }: {
       {/* Sətirler */}
       <div style={{ border: '2px solid #ecd9a0', borderTop: 'none', borderRadius: '0 0 12px 12px', overflow: 'hidden', marginBottom: 10 }}>
         {flat.map((row, i) => {
-          const sameG   = i > 0 && flat[i].groupId === flat[i - 1].groupId
-          const sameS   = sameG && flat[i].subId === flat[i - 1].subId
           const isDrag  = dragging === i
           const isOver  = overIdx === i
           const isFlash = flashedId === row.specId
@@ -178,15 +176,15 @@ export function FlatView({ flat, onChange, submitted = false, levelNames }: {
                 {i + 1}
               </div>
               {/* Ana Qrup */}
-              <div style={{ padding: '9px 12px', display: 'flex', alignItems: 'center', fontSize: 12, fontWeight: sameG ? 400 : 700, color: sameG ? '#9aa0ac' : '#5a4a12', background: sameG ? '#fafbff' : '#f8f9ff', borderRight: '2px solid #dde2f5' }}>
+              <div style={{ padding: '9px 12px', display: 'flex', alignItems: 'center', fontSize: 12, fontWeight: 500, color: '#5a4a12', background: '#f8f9ff', borderRight: '2px solid #dde2f5' }}>
                 {row.groupName}
               </div>
               {/* Alt Qrup */}
-              <div style={{ padding: '9px 12px', display: 'flex', alignItems: 'center', fontSize: 12, fontWeight: sameS ? 400 : 600, color: sameS ? '#b39a6a' : '#6a4a12', background: sameS ? '#fdfaff' : '#faf8ff', borderRight: '1.5px solid #ece8ff' }}>
+              <div style={{ padding: '9px 12px', display: 'flex', alignItems: 'center', fontSize: 12, fontWeight: 500, color: '#5a4a12', background: '#faf8ff', borderRight: '1.5px solid #ece8ff' }}>
                 {row.subName}
               </div>
               {/* İxtisas */}
-              <div style={{ padding: '9px 12px', display: 'flex', alignItems: 'center', fontSize: 12, fontWeight: 500, color: '#7a2a10' }}>
+              <div style={{ padding: '9px 12px', display: 'flex', alignItems: 'center', fontSize: 12, fontWeight: 500, color: '#5a4a12' }}>
                 {row.specName}
               </div>
               {/* Sürükləmə tutacağı */}

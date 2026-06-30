@@ -16,7 +16,7 @@ function getLeavesWithPath(nodes: any[], anc: any[] = []): Array<{ leaf: any; pa
 
 const SECTIONS = [
   { id: 'selections',  icon: '🗳',  label: 'Seçimlər' },
-  { id: 'users',       icon: '👥', label: 'Təhsil Alanlar' },
+  { id: 'users',       icon: '👥', label: 'Təhsilalanlar' },
   { id: 'specialties', icon: '🎓', label: 'Müəssisə/İxtisaslar' },
 ]
 
@@ -62,17 +62,17 @@ export default function Archive() {
   function handleDeleteUArc(id: string) {
     showConfirm({
       icon: '🗑️', iconBg: '#fff0f0', iconColor: '#ff4d4f',
-      title: 'Təhsil alan arxivini sil',
-      message: 'Bu təhsil alan arxivi tamamilə silinəcək. Əməliyyat geri qaytarıla bilməz.',
+      title: 'Təhsilalan arxivini sil',
+      message: 'Bu təhsilalan arxivi tamamilə silinəcək. Əməliyyat geri qaytarıla bilməz.',
       confirmLabel: 'Sil', confirmColor: '#ff4d4f',
-      onConfirm: () => { const a = uarcs.find((x: any) => x.id === id); userArchiveDb.delete(id); addLog('user', 'error', `Təhsil alan arxivi silindi: "${a?.label || id}"`, `${a?.snapshot?.length ?? 0} təhsil alan qeydi`); refreshUArcs() },
+      onConfirm: () => { const a = uarcs.find((x: any) => x.id === id); userArchiveDb.delete(id); addLog('user', 'error', `Təhsilalan arxivi silindi: "${a?.label || id}"`, `${a?.snapshot?.length ?? 0} təhsilalan qeydi`); refreshUArcs() },
     })
   }
   function handleRestoreUserArc(arc: any) {
     showConfirm({
       icon: '👥', iconBg: '#fbf1d6', iconColor: '#c9962a',
-      title: 'Təhsil Alanları bərpa et',
-      message: `"${arc.label}" arxivindəki ${arc.snapshot?.length ?? 0} təhsil alan aktiv siyahıya əlavə ediləcək.`,
+      title: 'Təhsilalanları bərpa et',
+      message: `"${arc.label}" arxivindəki ${arc.snapshot?.length ?? 0} təhsilalan aktiv siyahıya əlavə ediləcək.`,
       confirmLabel: 'Bərpa et', confirmColor: '#c9962a',
       onConfirm: () => {
         const existing  = userDb.getAll() as any[]
@@ -81,12 +81,12 @@ export default function Archive() {
         toAdd.forEach((u: any) => { const { id: _id, ...rest } = u; userDb.create(rest) })
         const skipped = (arc.snapshot?.length ?? 0) - toAdd.length
         userArchiveDb.delete(arc.id)
-        addLog('user', 'success', `Təhsil Alanlar arxivdən bərpa edildi: "${arc.label}"`, `${toAdd.length} bərpa${skipped ? ` · ${skipped} mövcud idi` : ''}`)
+        addLog('user', 'success', `Təhsilalanlar arxivdən bərpa edildi: "${arc.label}"`, `${toAdd.length} bərpa${skipped ? ` · ${skipped} mövcud idi` : ''}`)
         refreshUArcs()
         showInfo({
           icon: '✅', iconBg: '#f0fff4', iconColor: '#52c41a',
           title: 'Bərpa tamamlandı',
-          message: `${toAdd.length} təhsil alan bərpa edildi.${skipped ? ` ${skipped} təhsil alan artıq mövcud idi.` : ''} Arxivdən silindi.`,
+          message: `${toAdd.length} təhsilalan bərpa edildi.${skipped ? ` ${skipped} təhsilalan artıq mövcud idi.` : ''} Arxivdən silindi.`,
           confirmLabel: 'Bağla',
         })
       },
@@ -225,13 +225,13 @@ export default function Archive() {
         )
       })()}
 
-      {/* ── TƏHSİL ALANLAR bölməsi ── */}
+      {/* ── TƏHSİLALANLAR bölməsi ── */}
       {section === 'users' && (() => {
         const shown = uarcs.filter((a: any) => a.institution === instId)
         return (
           <>
             {shown.length === 0 ? (
-              <EmptyState icon="👥" text="Təhsil alan arxivi boşdur" sub="Təhsil Alanlar bölməsindən 'Arxivlə' düyməsini istifadə etdikdə burada görünəcək." />
+              <EmptyState icon="👥" text="Təhsilalan arxivi boşdur" sub="Təhsilalanlar bölməsindən 'Arxivlə' düyməsini istifadə etdikdə burada görünəcək." />
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 {shown.map((arc: any, idx: number) => (
@@ -341,7 +341,7 @@ function EmptyState({ icon, text, sub }: { icon: string; text: string; sub: stri
   )
 }
 
-// ── Təhsil alan Arxiv Kartı ───────────────────────────────────────────────────────
+// ── Təhsilalan Arxiv Kartı ───────────────────────────────────────────────────────
 function UserArchiveCard({ arc, idx, expanded, searchQ, onToggle, onSearch, onDelete, onRestore }: any) {
   const snapshot: any[] = arc.snapshot || []
 
@@ -374,9 +374,9 @@ function UserArchiveCard({ arc, idx, expanded, searchQ, onToggle, onSearch, onDe
     const ws = XLSX.utils.json_to_sheet(data)
     ws['!cols'] = [{ wch: 4 }, { wch: 22 }, { wch: 12 }, { wch: 12 }, { wch: 10 }, { wch: 7 }, { wch: 8 }, { wch: 28 }]
     const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, 'Təhsil Alanlar')
+    XLSX.utils.book_append_sheet(wb, ws, 'Təhsilalanlar')
     XLSX.writeFile(wb, `Arxiv_${arc.label.replace(/\s/g, '_')}_${archivedDate}.xlsx`)
-    addLog('user', 'info', `Arxiv təhsil alan ixracı: "${arc.label}"`, `${arc.snapshot?.length ?? 0} təhsil alan`)
+    addLog('user', 'info', `Arxiv təhsilalan ixracı: "${arc.label}"`, `${arc.snapshot?.length ?? 0} təhsilalan`)
   }
 
   return (
@@ -416,7 +416,7 @@ function UserArchiveCard({ arc, idx, expanded, searchQ, onToggle, onSearch, onDe
             }}>🗄️ {archivedDate}</span>
           </div>
           <div style={{ fontSize: 12, color: 'var(--muted)', display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-            <span>👥 {snapshot.length} təhsil alan</span>
+            <span>👥 {snapshot.length} təhsilalan</span>
             <span>✅ {placed} yerləşdirildi</span>
             {hasGroups && <span>📋 {grpSet.size} qrup</span>}
           </div>
@@ -465,7 +465,7 @@ function UserArchiveCard({ arc, idx, expanded, searchQ, onToggle, onSearch, onDe
             borderBottom: '1px solid var(--border)',
           }}>
             {[
-              { icon: '👥', label: 'Cəmi təhsil alan',    val: snapshot.length, color: instColor },
+              { icon: '👥', label: 'Cəmi təhsilalan',    val: snapshot.length, color: instColor },
               { icon: '✅', label: 'Yerləşdirilib',    val: placed,          color: '#52c41a' },
               { icon: '⏳', label: 'Yerləşdirilməyib', val: snapshot.length - placed, color: '#f5a623' },
             ].map(s => (
@@ -506,7 +506,7 @@ function UserArchiveCard({ arc, idx, expanded, searchQ, onToggle, onSearch, onDe
               <thead>
                 <tr>
                   <th style={{ width: 40 }}>#</th>
-                  <th>TƏHSİL ALAN</th>
+                  <th>TƏHSİLALAN</th>
                   <th>İŞ NÖMRƏSİ</th>
                   <th>FİN</th>
                   {hasGroups && <th style={{ width: 70, textAlign: 'center' }}>QRUP</th>}
@@ -595,7 +595,7 @@ function ArchiveCard({ sel, idx, allUsers, expanded, instFlt, searchQ,
 
   function exportExcel() {
     const data = rows.map((u: any, i: number) => ({
-      '#': i + 1, 'Təhsil alan': u.name, 'FİN': u.fin || '—',
+      '#': i + 1, 'Təhsilalan': u.name, 'FİN': u.fin || '—',
       'İş nömrəsi': u.workNumber || '—',
       'Müəssisə': u.institution === 'kollec' ? 'Hərbi Kollec' : 'AHM',
       'Bal': Number(u.score).toFixed(2), 'Qrup': u.group || '—',
@@ -650,7 +650,7 @@ function ArchiveCard({ sel, idx, allUsers, expanded, instFlt, searchQ,
             }}>🗄️ Arxivləndi: {archivedDate}</span>
           </div>
           <div style={{ fontSize: 12, color: 'var(--muted)', display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-            <span>👥 {submitted.length} təhsil alan</span>
+            <span>👥 {submitted.length} təhsilalan</span>
             <span>✅ {placed.length} yerləşdirildi</span>
             <span>🎓 {leaves.length} ixtisas · {totalQuota} kvota</span>
             {sel.deadline && <span>⏰ Son tarix: {new Date(sel.deadline).toLocaleDateString('az-AZ')}</span>}
@@ -747,7 +747,7 @@ function ArchiveCard({ sel, idx, allUsers, expanded, instFlt, searchQ,
               <thead>
                 <tr>
                   <th style={{ width: 40 }}>#</th>
-                  <th>TƏHSİL ALAN</th>
+                  <th>TƏHSİLALAN</th>
                   <th>FİN</th>
                   <th style={{ width: 90 }}>BAL</th>
                   <th>MÜƏSSİSƏ</th>

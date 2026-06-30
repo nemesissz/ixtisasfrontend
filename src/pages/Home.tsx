@@ -60,12 +60,12 @@ export default function Home() {
           onClick={() => navigate('/admin/login')}
         />
 
-        {/* Təhsil alan portalı */}
+        {/* Təhsilalan portalı */}
         <RoleCard
           icon="🎓"
           iconBg="linear-gradient(135deg,#b8860b,#5a33cc)"
           iconShadow="#b8860b44"
-          title="Təhsil alan Girişi"
+          title="Təhsilalan Girişi"
           subtitle={hasActive ? `${published.length} aktiv seçim` : 'Aktiv seçim yoxdur'}
           accentColor="#b8860b"
           active={hasActive}
@@ -79,7 +79,7 @@ export default function Home() {
           background: '#ffffff08', border: '1px solid #ffffff10',
           borderRadius: 10, padding: '10px 20px', zIndex: 1,
         }}>
-          ℹ️ Təhsil alan portalı üçün admin aktiv seçim yayımlamalıdır
+          ℹ️ Təhsilalan portalı üçün admin aktiv seçim yayımlamalıdır
         </div>
       )}
 

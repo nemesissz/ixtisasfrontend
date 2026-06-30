@@ -196,7 +196,7 @@ export default function Dashboard() {
 
   const LEVEL_ICONS = ['⚔️', '🎖️', '🎓', '📘', '📗']
   const INST_KPIS = [
-    { label: 'Təhsil alan', value: A.instUsers.length, icon: '👥', accent: '#722ed1' },
+    { label: 'Təhsilalan', value: A.instUsers.length, icon: '👥', accent: '#722ed1' },
     ...A.levelStats.map((l: any, i: number) => ({ label: l.name, value: l.count, icon: LEVEL_ICONS[i] || '🎓', accent: '#13c2c2' })),
     { label: 'Ümumi kvota', value: A.totalQuota, icon: '🎯', accent: '#fa8c16' },
     { label: 'Yerləşmə', value: `${pct(A.placed, A.instUsers.length)}%`, icon: '✅', accent: '#52c41a', sub: `${A.placed}/${A.instUsers.length}` },

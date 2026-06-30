@@ -4,7 +4,7 @@ import { userDb, submissionDb, selectionDb, treeDb, institutionDb, useLocalState
 import InstIcon from '../../components/InstIcon'
 import { can } from '../../permissions'
 
-// ── Tiebreaker: təhsil alanı sıralamaq üçün bal massivi ──────────────────────────
+// ── Tiebreaker: təhsilalanı sıralamaq üçün bal massivi ──────────────────────────
 const UMUMI_KEY = 'Ümumi imtahan nəticəsi'
 
 function getTiebreakerSubjects(specId: string, userGroup: string | null, pathMap: Record<string, any[]>): string[] {
@@ -67,7 +67,7 @@ function genderCapReached(leaf: any, gender: any, femCount: number, malCount: nu
 // Greedy nəticəsi saxlanılır (bal ədaləti), üstündən cins-qapılı MAX-AXIN (max-flow)
 // tətbiq olunur. Greedy yerləşdirmələri başlanğıc axın kimi qoyulur; yalnız yerləşməyənlər
 // üçün artırıcı yollar axtarılır. Beləcə kvotanı aşmadan, cins məhdudiyyətlərini pozmadan
-// mümkün olan maksimum təhsil alan yerləşir və boş yer kənarda qalanla yanaşı qalmır.
+// mümkün olan maksimum təhsilalan yerləşir və boş yer kənarda qalanla yanaşı qalmır.
 function rebalanceUnplaced(opts: {
   users: any[]; subs: any[];
   leafById: Record<string, any>;
@@ -86,7 +86,7 @@ function rebalanceUnplaced(opts: {
 
   const rankingOf = (uid: string): string[] => subs.find((s: any) => s.userId === uid)?.ranking || []
 
-  // ── Şəbəkə qur: S=0, T=1, sonra təhsil alan / femGate / malGate / spec node-ları ──
+  // ── Şəbəkə qur: S=0, T=1, sonra təhsilalan / femGate / malGate / spec node-ları ──
   let n = 2; const S = 0, T = 1
   const uNode: Record<string, number> = {}, fg: Record<string, number> = {}, mg: Record<string, number> = {}, sp: Record<string, number> = {}
   for (const u of users) uNode[u.id] = n++
@@ -146,7 +146,7 @@ function rebalanceUnplaced(opts: {
     for (const sid of rankingOf(u.id)) {
       if (quotas[sid] === undefined) continue
       const gate = gateOf(g, sid)
-      // bu təhsil alandan həmin spec-ə axın varsa (reverse residual > 0)
+      // bu təhsilalandan həmin spec-ə axın varsa (reverse residual > 0)
       if (cap[gate][uNode[u.id]] > 0) {
         const i = rankingOf(u.id).indexOf(sid)
         assignments[u.id] = { specId: sid, choiceNum: i >= 0 ? i + 1 : 0 }
@@ -227,13 +227,13 @@ function runPacketPlacement(
     const lisey = packetStudents.filter((u: any) => u.source === 'lisey')
     const other = packetStudents.filter((u: any) => !u.source)
 
-    // Mərhələ 1: Mülki təhsil alanlar mülki slotlar üçün
+    // Mərhələ 1: Mülki təhsilalanlar mülki slotlar üçün
     tryPlace(mülki, mülkiQ)
-    // Mərhələ 2: Lisey təhsil alanlar lisey slotlar üçün
+    // Mərhələ 2: Lisey təhsilalanlar lisey slotlar üçün
     tryPlace(lisey, liseyQ)
 
     // Mərhələ 3: Deficit filling — qalan slotlar hər iki mənbənin
-    //            yerləşdirilməmiş təhsil alanlarına verilir
+    //            yerləşdirilməmiş təhsilalanlarına verilir
     for (const spec of packetSpecs) {
       deficitQ[spec.id] = mülkiQ[spec.id] + liseyQ[spec.id]  // qalan slotlar
     }
@@ -272,7 +272,7 @@ function runPlacement(users: any[], subs: any[], tree: any, sourceProportional =
   const assignments: Record<string, { specId: string; choiceNum: number }> = {}
 
   function tryPlace(students: any[], availQuota: Record<string, number>) {
-    // Hər təhsil alan üçün birinci əlçatan ixtisasın tiebreaker-ına görə sırala
+    // Hər təhsilalan üçün birinci əlçatan ixtisasın tiebreaker-ına görə sırala
     const sorted = [...students].sort((a, b) => {
       const aSub = subs.find((s: any) => s.userId === a.id)
       const bSub = subs.find((s: any) => s.userId === b.id)
@@ -338,7 +338,7 @@ function runPlacement(users: any[], subs: any[], tree: any, sourceProportional =
     tryPlace(mülki, mülkiQ)
     // Mərhələ 2: lisey
     tryPlace(lisey, liseyQ)
-    // Mərhələ 3: deficit — qalan slotlar hər iki qrupun yerləşdirilməmiş təhsil alanlarına
+    // Mərhələ 3: deficit — qalan slotlar hər iki qrupun yerləşdirilməmiş təhsilalanlarına
     for (const sid of Object.keys(quotas)) deficitQ[sid] = mülkiQ[sid] + liseyQ[sid]
     tryPlace([...mülki, ...lisey, ...other].filter((u: any) => !assignments[u.id]), deficitQ)
 
@@ -404,7 +404,7 @@ function runGaleShapley(users: any[], subs: any[], tree: any) {
     const leaf = leafById[specId]
     const g = genderOf[uid]
 
-    // Cinsə icazə yoxdursa — bu ixtisası ötür (təhsil alan azad qalır, növbəti seçimə keçəcək)
+    // Cinsə icazə yoxdursa — bu ixtisası ötür (təhsilalan azad qalır, növbəti seçimə keçəcək)
     if (!genderAllowed(leaf, g)) continue
 
     const gCount = h.filter(x => genderOf[x] === g).length
@@ -590,15 +590,15 @@ function StorySim({ students, packets, subs, tree, onClose }: { students?: any[]
   const pkPlaced = Object.values(filled).reduce((a, b) => a + b, 0)
   const pkQuota = curMeta ? Object.values(curMeta.quota).reduce((a, b) => a + b, 0) : 0
   const pkTotal = curMeta?.count ?? 0
-  const pkSteps = data.steps.map((s, i) => ({ s, i })).filter(x => x.s.packetNum === curPk)   // cari paketin təhsil alanları (sıra ilə)
+  const pkSteps = data.steps.map((s, i) => ({ s, i })).filter(x => x.s.packetNum === curPk)   // cari paketin təhsilalanları (sıra ilə)
 
   const narration = (() => {
-    if (!cur) return 'Başlamaq üçün “Növbəti addım” və ya “Avtomatik” düyməsini seçin. Təhsil Alanlar bala görə ardıcıl yerləşdiriləcək.'
+    if (!cur) return 'Başlamaq üçün “Növbəti addım” və ya “Avtomatik” düyməsini seçin. Təhsilalanlar bala görə ardıcıl yerləşdiriləcək.'
     const nm = cur.u.name, sc = Number(cur.u.score).toFixed(1)
-    if (!cur.placed) return `${nm} (${sc} bal): bütün seçdiyi ixtisaslar dolu olduğu üçün bu təhsil alan yerləşdirilmədi (əl ilə baxılmalıdır).`
+    if (!cur.placed) return `${nm} (${sc} bal): bütün seçdiyi ixtisaslar dolu olduğu üçün bu təhsilalan yerləşdirilmədi (əl ilə baxılmalıdır).`
     const fulls = cur.attempts.filter(a => a.full)
     const tieNote = cur.tieRivals.length
-      ? ` ⚖️ Bərabər bal: “${data.leafName[cur.tieRivals[0].id]}” üçün ${cur.tieRivals[0].rival} ilə ${sc} bal eyni idi — üstünlük meyarı (fənn balları) ${cur.tieRivals[0].rival}-ı öndə tutdu, ona görə bu təhsil alan oraya yerləşdirilmədi.`
+      ? ` ⚖️ Bərabər bal: “${data.leafName[cur.tieRivals[0].id]}” üçün ${cur.tieRivals[0].rival} ilə ${sc} bal eyni idi — üstünlük meyarı (fənn balları) ${cur.tieRivals[0].rival}-ı öndə tutdu, ona görə bu təhsilalan oraya yerləşdirilmədi.`
       : ''
     if (fulls.length === 0) return `${nm} (${sc} bal): 1-ci seçimi “${data.leafName[cur.placed]}”-də boş yer olduğu üçün birbaşa oraya yerləşdirildi.`
     return `${nm} (${sc} bal): ${fulls.map((a, i) => `${i + 1}-ci seçim “${data.leafName[a.id]}” dolu`).join(', ')} → ${cur.choiceNum}-ci seçim “${data.leafName[cur.placed]}”-ə yerləşdirildi.${tieNote}`
@@ -628,7 +628,7 @@ function StorySim({ students, packets, subs, tree, onClose }: { students?: any[]
         <div style={{ flex: 1 }} />
         <div style={{ display: 'flex', alignItems: 'center', gap: 4, paddingLeft: 6, borderLeft: '1px solid #e7eaf0' }}>
           <span style={{ fontSize: 11, color: '#9aa0ac', marginRight: 2 }}>Önə çıxar:</span>
-          {([['left', '📚', 'İxtisaslar'], ['center', '👤', 'Təhsil alan'], ['right', '📦', 'Paket/Növbə']] as const).map(([k, ic, lbl]) => (
+          {([['left', '📚', 'İxtisaslar'], ['center', '👤', 'Təhsilalan'], ['right', '📦', 'Paket/Növbə']] as const).map(([k, ic, lbl]) => (
             <button key={k} onClick={() => setFocusCol(focusCol === k ? null : k)} title={lbl}
               style={{ width: 32, height: 32, borderRadius: 8, fontSize: 14, cursor: 'pointer',
                 border: `1.5px solid ${focusCol === k ? '#e0a92e' : '#e0e4f0'}`,
@@ -650,7 +650,7 @@ function StorySim({ students, packets, subs, tree, onClose }: { students?: any[]
             const q = curMeta.quota[id], f = filled[id] || 0, isFull = f >= q && q > 0
             const justPlaced = cur?.placed === id
             return (
-              <div key={id} onClick={() => setSelLeaf(id)} title="Yerləşən təhsil alanları gör"
+              <div key={id} onClick={() => setSelLeaf(id)} title="Yerləşən təhsilalanları gör"
                 style={{ marginBottom: 10, padding: 8, borderRadius: 10, cursor: 'pointer', background: justPlaced ? '#fffdf5' : '#fff', border: justPlaced ? '1px solid #e0a92e' : '1px solid #eef0f5', transition: 'all .2s' }}
                 onMouseEnter={e => { if (!justPlaced) (e.currentTarget as HTMLElement).style.background = '#f7f8fc' }}
                 onMouseLeave={e => { if (!justPlaced) (e.currentTarget as HTMLElement).style.background = '#fff' }}>
@@ -671,7 +671,7 @@ function StorySim({ students, packets, subs, tree, onClose }: { students?: any[]
           })}
         </div>
 
-        {/* ORTA: cari təhsil alan */}
+        {/* ORTA: cari təhsilalan */}
         <div style={{ overflowY: 'auto', padding: '18px 22px', display: 'flex', flexDirection: 'column', gap: 16 }}>
           {cur ? (
             <div style={{ background: '#fff', borderRadius: 16, padding: 18, border: '1px solid #e7eaf0', boxShadow: '0 10px 40px #1a1f3c12' }}>
@@ -711,7 +711,7 @@ function StorySim({ students, packets, subs, tree, onClose }: { students?: any[]
           ) : (
             <div style={{ textAlign: 'center', color: '#8a909c', marginTop: 60 }}>
               <div style={{ fontSize: 40, marginBottom: 12 }}>🎬</div>
-              <div style={{ fontSize: 16, fontWeight: 700, color: '#2b2f3a' }}>{total} təhsil alan bala görə sıralandı</div>
+              <div style={{ fontSize: 16, fontWeight: 700, color: '#2b2f3a' }}>{total} təhsilalan bala görə sıralandı</div>
               <div style={{ fontSize: 13, marginTop: 6 }}>Addım-addım izləmək üçün “Növbəti addım”, ardıcıl izləmək üçün “Avtomatik” istifadə edin.</div>
             </div>
           )}
@@ -721,7 +721,7 @@ function StorySim({ students, packets, subs, tree, onClose }: { students?: any[]
             <div style={{ background: '#fff7e6', border: '1px solid #ffd591', borderRadius: 10, padding: '12px 16px', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
               <span style={{ fontSize: 18 }}>⚖️</span>
               <div style={{ fontSize: 13, color: '#8a6d1b', lineHeight: 1.55 }}>
-                <b style={{ color: '#5a4a12' }}>Bərabər bal toqquşması:</b> “{data.leafName[cur.tieRivals[0].id]}” üçün <b style={{ color: '#5a4a12' }}>{cur.tieRivals[0].rival}</b> ilə hər ikisinin balı <b style={{ color: '#5a4a12' }}>{cur.tieRivals[0].score.toFixed(2)}</b> idi. Son yer bir nəfərə qalır — <b style={{ color: '#5a4a12' }}>üstünlük meyarı (fənn balları)</b> {cur.tieRivals[0].rival}-ı öndə tutdu, bu təhsil alan həmin ixtisasa yerləşdirilmədi.
+                <b style={{ color: '#5a4a12' }}>Bərabər bal toqquşması:</b> “{data.leafName[cur.tieRivals[0].id]}” üçün <b style={{ color: '#5a4a12' }}>{cur.tieRivals[0].rival}</b> ilə hər ikisinin balı <b style={{ color: '#5a4a12' }}>{cur.tieRivals[0].score.toFixed(2)}</b> idi. Son yer bir nəfərə qalır — <b style={{ color: '#5a4a12' }}>üstünlük meyarı (fənn balları)</b> {cur.tieRivals[0].rival}-ı öndə tutdu, bu təhsilalan həmin ixtisasa yerləşdirilmədi.
               </div>
             </div>
           )}
@@ -737,7 +737,7 @@ function StorySim({ students, packets, subs, tree, onClose }: { students?: any[]
           {data.multiPacket && curMeta && (
             <div style={{ background: '#fffdf5', borderRadius: 10, padding: '12px', border: '1px solid #e0a92e' }}>
               <div style={{ fontSize: 10, fontWeight: 800, color: '#9a7b1e', textTransform: 'uppercase', letterSpacing: .5, marginBottom: 8 }}>📦 Cari paket {curPk}/{data.pkMeta.length}</div>
-              <div style={{ fontSize: 11, color: '#8a909c', marginBottom: 8 }}>Bal: {curMeta.minScore.toFixed(1)} – {curMeta.maxScore.toFixed(1)} · {pkTotal} təhsil alan · {pkQuota} kvota</div>
+              <div style={{ fontSize: 11, color: '#8a909c', marginBottom: 8 }}>Bal: {curMeta.minScore.toFixed(1)} – {curMeta.maxScore.toFixed(1)} · {pkTotal} təhsilalan · {pkQuota} kvota</div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, color: '#5a6070', marginBottom: 4 }}>
                 <span>İşlənən</span><b>{pkProcessed} / {pkTotal}</b>
               </div>
@@ -751,7 +751,7 @@ function StorySim({ students, packets, subs, tree, onClose }: { students?: any[]
                 <div style={{ width: `${pkQuota ? (pkPlaced / pkQuota) * 100 : 0}%`, height: '100%', background: '#52c41a', transition: 'width .25s' }} />
               </div>
               {pkProcessed >= pkTotal && pkTotal > 0 && <div style={{ fontSize: 11, fontWeight: 700, color: '#237804', marginTop: 8 }}>✅ Bu paket tamamlandı</div>}
-              {/* Paketin təhsil alanları (adı ilə, status) */}
+              {/* Paketin təhsilalanları (adı ilə, status) */}
               <div style={{ marginTop: 10, borderTop: '1px solid #f1ead4', paddingTop: 8, maxHeight: 260, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 3 }}>
                 {pkSteps.map(({ s, i }) => {
                   const now = i === idx, done = i <= idx
@@ -798,7 +798,7 @@ function StorySim({ students, packets, subs, tree, onClose }: { students?: any[]
             <div style={{ background: '#fffdf5', borderRadius: 10, padding: '12px', border: '1px solid #e0a92e' }}>
               <div style={{ fontSize: 12, fontWeight: 800, color: '#9a7b1e' }}>⚖️ Tarazlama mərhələsi</div>
               <div style={{ fontSize: 11, color: '#8a6d1b', marginTop: 4, lineHeight: 1.5 }}>
-                İlkin yerləşdirmədən sonra boş yerlər qalmışdı. Bal sıralaması pozulmadan <b>{data.rebalanced.length} təhsil alan</b> köçürülərək boş yerlər dolduruldu və yer çatmayanlara yer açıldı:
+                İlkin yerləşdirmədən sonra boş yerlər qalmışdı. Bal sıralaması pozulmadan <b>{data.rebalanced.length} təhsilalan</b> köçürülərək boş yerlər dolduruldu və yer çatmayanlara yer açıldı:
               </div>
               <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 3, maxHeight: 140, overflowY: 'auto' }}>
                 {data.rebalanced.map((r, k) => (
@@ -813,7 +813,7 @@ function StorySim({ students, packets, subs, tree, onClose }: { students?: any[]
             <div style={{ background: '#f6ffed', borderRadius: 10, padding: '12px', border: '1px solid #b7eb8f' }}>
               <div style={{ fontSize: 12, fontWeight: 800, color: '#237804' }}>✅ Simulyasiya bitdi</div>
               <div style={{ fontSize: 11.5, color: '#3a7a2e', marginTop: 4 }}>
-                {data.finalPlaced} təhsil alan yerləşdirildi{data.finalPlaced !== data.greedyPlaced ? ` (ilkin: ${data.greedyPlaced} + tarazlama: ${data.finalPlaced - data.greedyPlaced})` : ''}. Bazaya yazmaq üçün bağlayıb “📋 Yerləşdir → Bazaya Yaz” seçin.
+                {data.finalPlaced} təhsilalan yerləşdirildi{data.finalPlaced !== data.greedyPlaced ? ` (ilkin: ${data.greedyPlaced} + tarazlama: ${data.finalPlaced - data.greedyPlaced})` : ''}. Bazaya yazmaq üçün bağlayıb “📋 Yerləşdir → Bazaya Yaz” seçin.
               </div>
             </div>
           )}
@@ -960,7 +960,7 @@ export default function Distribution() {
   const treeKey = JSON.stringify(tree?.nodes || [])
   const sels = sel ? (submissionDb.getBySelection(sel.id) as any[]) : []
 
-  // Bütün müəssisə təhsil alanları (seçim etmiş-etməmiş)
+  // Bütün müəssisə təhsilalanları (seçim etmiş-etməmiş)
   const allInstUsers   = (users as any[]).filter((u: any) => u.institution === instId)
   const submittedUsers = allInstUsers.filter(u => sels.find((s: any) => s.userId === u.id))
 
@@ -1025,15 +1025,15 @@ export default function Distribution() {
     const leaves = getLeavesWithPath(tree?.nodes || [])
     const P = packetCount
 
-    // ── Addım 1: təhsil alan sayını hesabla (dəyişməz qayda) ─────────────────
+    // ── Addım 1: təhsilalan sayını hesabla (dəyişməz qayda) ─────────────────
     const total   = allInstUsers.length
     const stuBase = Math.floor(total / P)
     const stuRem  = total % P
     const stuCount = Array.from({ length: P }, (_, i) => i < stuRem ? stuBase + 1 : stuBase)
-    // stuCount = [34, 33, 33] (100 təhsil alan, 3 paket üçün)
+    // stuCount = [34, 33, 33] (100 təhsilalan, 3 paket üçün)
 
     // ── Addım 2: deficit-filling alqoritmi ilə kvota bölgüsü ─────────────
-    // Zəmanət: hər paketin toplam kvotası = stuCount[i] → heç bir təhsil alan boşda qalmır
+    // Zəmanət: hər paketin toplam kvotası = stuCount[i] → heç bir təhsilalan boşda qalmır
     // Hər ixtisasın kvotası bütün paketlərə bölünür, hər paket öz payı üzrə mübarizə aparır
     const perPacketSpecs: Array<Array<{ id: string; name: string; path: any[]; quota: number; origQuota: number }>> =
       Array.from({ length: P }, () => [])
@@ -1103,7 +1103,7 @@ export default function Distribution() {
       }
     }
 
-    // ── Addım 3: təhsil alanları bala görə sırala, stuCount-a görə böl ──────
+    // ── Addım 3: təhsilalanları bala görə sırala, stuCount-a görə böl ──────
     const sorted = [...allInstUsers].sort((a: any, b: any) => (b.score || 0) - (a.score || 0))
 
     const result = []
@@ -1144,7 +1144,7 @@ export default function Distribution() {
       const pkAssign = packetPlacements[pIdx]?.assignments || {}
       ;(p.specs || []).forEach((spec: any, sIdx: number) => {
         steps.push({ type: 'open-spec', pIdx, sIdx })
-        // Bu spec-i ranking-ində olan paketin təhsil alanları
+        // Bu spec-i ranking-ində olan paketin təhsilalanları
         const competitors = (p.students || [])
           .filter((u: any) => {
             const sub = sels.find((s: any) => s.userId === u.id)
@@ -1240,7 +1240,7 @@ export default function Distribution() {
   const dramaticRef = useRef<Set<number>>(new Set())
   dramaticRef.current = dramaticSteps
 
-  // ── Bərabər ballı toqquşmalar: bir ixtisas dolanda eyni ballı başqa təhsil alan onu istəyirsə ──
+  // ── Bərabər ballı toqquşmalar: bir ixtisas dolanda eyni ballı başqa təhsilalan onu istəyirsə ──
   const collisionMap = useMemo(() => {
     const map = new Map<number, any>()
     if (!placement || method !== 'simple') return map
@@ -1322,7 +1322,7 @@ export default function Distribution() {
     resetSim()
   }
 
-  // ── Paket mode üçün: neçə təhsil alan işlənib ────────────────────────────────
+  // ── Paket mode üçün: neçə təhsilalan işlənib ────────────────────────────────
   function getPacketProcessed(pIndex: number, step: number): number {
     let offset = 0
     for (let i = 0; i < pIndex; i++) offset += packets[i].count
@@ -1364,7 +1364,7 @@ export default function Distribution() {
 
   function handleConfirm() {
     if (!placement) return
-    // Bu yerləşdirmədən təsirlənən bütün təhsil alanlar: seçim edənlər + əvvəl bu seçimə yerləşənlər
+    // Bu yerləşdirmədən təsirlənən bütün təhsilalanlar: seçim edənlər + əvvəl bu seçimə yerləşənlər
     const submittedIds = new Set((sels as any[]).map((s: any) => s.userId))
     const affected = (allInstUsers as any[]).filter((u: any) =>
       submittedIds.has(u.id) || u.placedSelectionId === sel!.id || placement.assignments[u.id])
@@ -1397,7 +1397,7 @@ export default function Distribution() {
       }
     })
     refreshUsers(); setSaved(true); setShowConf(false)
-    addLog('distribution', 'success', `Yerləşdirmə bazaya yazıldı: ${Object.keys(placement.assignments).length} təhsil alan`,
+    addLog('distribution', 'success', `Yerləşdirmə bazaya yazıldı: ${Object.keys(placement.assignments).length} təhsilalan`,
       `Seçim: ${sel?.name} · Metod: ${method} · Alqoritm: ${algorithm}${tree?.sourceProportional ? ' · Proporsional bölgü' : ''}`)
   }
 
@@ -1424,7 +1424,7 @@ export default function Distribution() {
 
   function exportExcel() {
     const data = studentRows.map((r, i) => ({
-      '#': i + 1, 'Təhsil alan': r.user.name, 'FİN': r.user.fin || '—',
+      '#': i + 1, 'Təhsilalan': r.user.name, 'FİN': r.user.fin || '—',
       'Bal': Number(r.user.score).toFixed(2),
       'Status': r.assignment ? 'Yerləşdirilib' : 'Yerləşdirilməyib',
       'Yerləşdiyi ixtisas': r.path.map((n: any) => n.name).join(' → ') || '—',
@@ -1448,7 +1448,7 @@ export default function Distribution() {
               <div style={{ fontSize: 13, fontWeight: 700, opacity: .9, letterSpacing: .5 }}>⏸ SİMULYASİYA DAYANDIRILDI</div>
               <div style={{ fontSize: 19, fontWeight: 900, marginTop: 4 }}>⚠️ Bərabər ballı toqquşma</div>
               <div style={{ fontSize: 12.5, opacity: .95, marginTop: 6, lineHeight: 1.5 }}>
-                Addım {collisionPause.step} — eyni <b>{collisionPause.score}</b> ballı təhsil alanlar
+                Addım {collisionPause.step} — eyni <b>{collisionPause.score}</b> ballı təhsilalanlar
                 «<b>{collisionPause.specName}</b>» ixtisası üçün rəqabət apardı. Yer məhdud olduğu üçün biri yerləşdi, digər(lər)i ala bilmədi. Aşağıda hər kəsin Riyaziyyat balı göstərilir.
               </div>
             </div>
@@ -1466,7 +1466,7 @@ export default function Distribution() {
               </div>
               {/* Uduzanlar */}
               <div style={{ fontSize: 11, fontWeight: 700, color: '#9090a8', textTransform: 'uppercase', letterSpacing: .5, margin: '4px 0 8px' }}>
-                Bu ixtisası ala bilməyən eyni ballı təhsil alan{collisionPause.losers.length > 1 ? 'lar' : ''} ({collisionPause.losers.length})
+                Bu ixtisası ala bilməyən eyni ballı təhsilalan{collisionPause.losers.length > 1 ? 'lar' : ''} ({collisionPause.losers.length})
               </div>
               {collisionPause.losers.map((l: any, i: number) => (
                 <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderRadius: 12, background: '#fff7ed', border: '1px solid #fed7aa', marginBottom: 8 }}>
@@ -1503,12 +1503,12 @@ export default function Distribution() {
               <div style={{ fontSize: 38, marginBottom: 10 }}>⚠️</div>
               <div style={{ fontSize: 16, fontWeight: 800, color: '#fff', marginBottom: 6 }}>Nəticələri bazaya yazmaq istəyirsiniz?</div>
               <div style={{ fontSize: 12, color: '#8892b0', lineHeight: 1.6 }}>
-                <span style={{ color: '#f5a623', fontWeight: 700 }}>{placedCount} təhsil alan</span> üçün yerləşdirmə nəticəsi bazaya yazılacaq.
+                <span style={{ color: '#f5a623', fontWeight: 700 }}>{placedCount} təhsilalan</span> üçün yerləşdirmə nəticəsi bazaya yazılacaq.
               </div>
             </div>
             <div style={{ padding: '20px 26px', borderBottom: '1.5px solid #f0f2fa' }}>
               {[
-                { label: 'Ümumi təhsil alan',    val: submittedUsers.length, color: '#c9962a' },
+                { label: 'Ümumi təhsilalan',    val: submittedUsers.length, color: '#c9962a' },
                 { label: 'Yerləşdirilib',    val: placedCount,           color: '#52c41a' },
                 { label: 'Yerləşdirilməyib', val: unplacedCount,         color: '#ff4d4f' },
               ].map(s => (
@@ -1546,7 +1546,7 @@ export default function Distribution() {
                 {[
                   { label:'Seçim',        val: snap.selName,                                       color:'#1a1f3c' },
                   { label:'Tarix',         val: dateStr,                                             color:'#8a909c' },
-                  { label:'Yerləşdirilmiş', val: `${snap.placedCount} təhsil alan`,                    color:'#c9962a' },
+                  { label:'Yerləşdirilmiş', val: `${snap.placedCount} təhsilalan`,                    color:'#c9962a' },
                   { label:'Metod',         val: snap.method === 'packet' ? '📦 Paket' : '📋 Sadə', color:'#8a909c' },
                 ].map(s => (
                   <div key={s.label} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
@@ -1555,7 +1555,7 @@ export default function Distribution() {
                   </div>
                 ))}
                 <div style={{ marginTop:10, padding:'9px 12px', borderRadius:9, background:'#fff8e6', border:'1.5px solid #ffd591', fontSize:12, color:'#d46b08', fontWeight:600 }}>
-                  ⚠️ Bu əməliyyat {snap.placedCount} təhsil alanın yerləşdirmə nəticəsini silir. Geri alına bilməz.
+                  ⚠️ Bu əməliyyat {snap.placedCount} təhsilalanın yerləşdirmə nəticəsini silir. Geri alına bilməz.
                 </div>
               </div>
               <div style={{ padding:'16px 26px', display:'flex', gap:10 }}>
@@ -1636,7 +1636,7 @@ export default function Distribution() {
                   <div style={{ fontSize: 11, color: '#ffffff77', fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>Paket {p.num}</div>
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: 18 }}>
                     <div style={{ fontSize: 20, fontWeight: 900, color: '#fff' }}>
-                      👥 {p.count} təhsil alan
+                      👥 {p.count} təhsilalan
                     </div>
                     <div style={{ fontSize: 14, fontWeight: 700, color: '#ffffffbb' }}>
                       📚 {p.totalQuota} kvota · 🎓 {p.specs?.length} ixtisas
@@ -1666,7 +1666,7 @@ export default function Distribution() {
               {/* ── Tab seçici ── */}
               <div style={{ display: 'flex', borderBottom: '2px solid #f0f2fa', background: '#fff', flexShrink: 0 }}>
                 {([
-                  { key: 'students', label: '👥 Təhsil Alanlar', count: p.count },
+                  { key: 'students', label: '👥 Təhsilalanlar', count: p.count },
                   { key: 'specs',    label: '🎓 İxtisaslar', count: p.specs?.length },
                 ] as const).map(tab => (
                   <button
@@ -1697,7 +1697,7 @@ export default function Distribution() {
               {/* ── Tab məzmunu ── */}
               <div style={{ flex: 1, overflowY: 'auto' }}>
 
-                {/* Təhsil Alanlar */}
+                {/* Təhsilalanlar */}
                 {modalTab === 'students' && p.students.map((u: any, idx: number) => (
                   <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 24px', borderBottom: '1px solid #f4f6fc', background: idx % 2 === 0 ? '#fff' : '#fafbff' }}>
                     <span style={{ fontSize: 12, color: '#ccc', fontWeight: 700, width: 26, textAlign: 'right', flexShrink: 0 }}>{idx + 1}</span>
@@ -1814,9 +1814,9 @@ export default function Distribution() {
         const checks = [
           { ok: leaves.length > 0,                   warn: false, label: 'İxtisas ağacı',     detail: leaves.length > 0 ? `${leaves.length} ixtisas` : 'Ağac tapılmadı' },
           { ok: totalQuota > 0 && zeroQuotaCount === 0, warn: totalQuota > 0 && zeroQuotaCount > 0, label: 'Kvotalar',         detail: zeroQuotaCount > 0 ? `${zeroQuotaCount} ixtisasın kvotası sıfırdır` : `Ümumi: ${totalQuota}` },
-          { ok: submittedUsers.length > 0,            warn: false, label: 'Seçimlər',          detail: `${submittedUsers.length} / ${allInstUsers.length} təhsil alan` },
+          { ok: submittedUsers.length > 0,            warn: false, label: 'Seçimlər',          detail: `${submittedUsers.length} / ${allInstUsers.length} təhsilalan` },
           ...(submRatio < 0.5 && submittedUsers.length > 0 ? [{ ok: false, warn: true, label: 'Aşağı iştirak', detail: `Yalnız ${Math.round(submRatio*100)}% seçim etdi` }] : []),
-          ...(totalQuota < submittedUsers.length ? [{ ok: true, warn: true, label: 'Kvota çatışmır', detail: `${submittedUsers.length - totalQuota} təhsil alan yerləşdirilə bilməyə bilər` }] : []),
+          ...(totalQuota < submittedUsers.length ? [{ ok: true, warn: true, label: 'Kvota çatışmır', detail: `${submittedUsers.length - totalQuota} təhsilalan yerləşdirilə bilməyə bilər` }] : []),
         ]
         const hasBlock = checks.some(c => !c.ok && !c.warn)
         return (
@@ -1850,7 +1850,7 @@ export default function Distribution() {
           </div>
           <div style={{ color: '#8a909c', fontSize: 13, marginBottom: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
             <InstIcon icon={activeInst?.icon} size={14} />
-            {activeInst?.label} · {submittedUsers.length} təhsil alan seçim etdi
+            {activeInst?.label} · {submittedUsers.length} təhsilalan seçim etdi
           </div>
 
           <div style={{ display: 'flex', gap: 20, justifyContent: 'center', flexWrap: 'wrap' }}>
@@ -1868,7 +1868,7 @@ export default function Distribution() {
               <div style={{ fontSize: 40, marginBottom: 14 }}>📋</div>
               <div style={{ fontWeight: 800, fontSize: 15, color: '#2b2f3a', marginBottom: 8 }}>Sadə üsul</div>
               <div style={{ fontSize: 12, color: '#8a909c', lineHeight: 1.6 }}>
-                Bütün təhsil alanlar eyni anda bala görə ixtisaslara yerləşdirilir
+                Bütün təhsilalanlar eyni anda bala görə ixtisaslara yerləşdirilir
               </div>
               <div style={{ marginTop: 18, display: 'inline-block', padding: '8px 20px', borderRadius: 8, background: '#c9962a', color: '#fff', fontWeight: 700, fontSize: 12 }}>
                 Seç →
@@ -1889,7 +1889,7 @@ export default function Distribution() {
               <div style={{ fontSize: 40, marginBottom: 14 }}>📦</div>
               <div style={{ fontWeight: 800, fontSize: 15, color: '#2b2f3a', marginBottom: 8 }}>Paket üsulu</div>
               <div style={{ fontSize: 12, color: '#8a909c', lineHeight: 1.6 }}>
-                Təhsil Alanlar bala görə paketlərə bölünür, hər paket ayrıca idarə edilir
+                Təhsilalanlar bala görə paketlərə bölünür, hər paket ayrıca idarə edilir
               </div>
               <div style={{ marginTop: 18, display: 'inline-block', padding: '8px 20px', borderRadius: 8, background: '#f5a623', color: '#fff', fontWeight: 700, fontSize: 12 }}>
                 Seç →
@@ -1941,7 +1941,7 @@ export default function Distribution() {
 
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
               <div style={{ fontSize: 13, color: '#8892b0', display:'flex', alignItems:'center', gap:8 }}>
-                <span>{submittedUsers.length} təhsil alan</span>
+                <span>{submittedUsers.length} təhsilalan</span>
                 {mode === 'sim'        && <span style={{ color: '#f5a623', fontWeight: 600 }}>— Simulyasiya</span>}
                 {mode === 'distribute' && !saved && <span style={{ color: '#52c41a', fontWeight: 600 }}>— Yerləşdirmə hazır</span>}
                 {saved && <span style={{ color: '#52c41a', fontWeight: 700 }}>✅ Bazaya yazıldı</span>}
@@ -2021,7 +2021,7 @@ export default function Distribution() {
                 fontSize: 13, color: '#cf1322',
               }}>
                 <span style={{ fontSize: 16 }}>⚠️</span>
-                <span>Təhsil Alanlar hələ seçim etməyib — <strong>simulyasiya mümkün deyil</strong>. Paketlərə bölmək olar, lakin simulyasiya başlatmaq olmaz.</span>
+                <span>Təhsilalanlar hələ seçim etməyib — <strong>simulyasiya mümkün deyil</strong>. Paketlərə bölmək olar, lakin simulyasiya başlatmaq olmaz.</span>
               </div>
             )}
 
@@ -2031,7 +2031,7 @@ export default function Distribution() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
                   <div style={{ color: '#8892b0', fontSize: 13 }}>
                     <span style={{ color: '#fff', fontWeight: 700 }}>{allInstUsers.length}</span>
-                    <span style={{ color: '#8892b0' }}> təhsil alan · Neçə paketə bölünsün?</span>
+                    <span style={{ color: '#8892b0' }}> təhsilalan · Neçə paketə bölünsün?</span>
                   </div>
                   <input
                     type="number" min={2} max={maxPackets}
@@ -2076,7 +2076,7 @@ export default function Distribution() {
             {packetsReady && (
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
                 <div style={{ fontSize: 13, color: '#8892b0' }}>
-                  {packets.length} paket · {submittedUsers.length} təhsil alan
+                  {packets.length} paket · {submittedUsers.length} təhsilalan
                   {mode === 'sim'       && <span style={{ marginLeft: 10, color: '#f5a623', fontWeight: 600 }}>— Simulyasiya</span>}
                   {mode === 'distribute' && !saved && <span style={{ marginLeft: 10, color: '#52c41a', fontWeight: 600 }}>— Yerləşdirmə hazır</span>}
                   {saved && <span style={{ marginLeft: 10, color: '#52c41a', fontWeight: 700 }}>✅ Bazaya yazıldı</span>}
@@ -2139,7 +2139,7 @@ export default function Distribution() {
                       </div>
                       <div style={{ fontSize: 26, fontWeight: 900, color: '#fff', marginTop: 6 }}>
                         {p.count}
-                        <span style={{ fontSize: 13, fontWeight: 500, marginLeft: 6, opacity: 0.8 }}>təhsil alan</span>
+                        <span style={{ fontSize: 13, fontWeight: 500, marginLeft: 6, opacity: 0.8 }}>təhsilalan</span>
                       </div>
                     </div>
                     {/* Kart gövdəsi */}
@@ -2526,7 +2526,7 @@ function PlacementResult({ mode, saved, placement, submittedUsers, studentRows,
             <thead>
               <tr>
                 <th style={{ width: 44 }}>#</th>
-                <th>TƏHSİL ALAN</th>
+                <th>TƏHSİLALAN</th>
                 <th style={{ width: 90 }}>BAL</th>
                 <th style={{ width: 140 }}>STATUS</th>
                 <th>YERLƏŞDİYİ İXTİSAS</th>

@@ -38,6 +38,42 @@ const SEED_TEST_INSTITUTIONS: boolean = false
   localStorage.setItem('mmu_purge_test_v2', '1')
 })()
 
+// Bir dəfəlik: Test Müəssisə + 100 kvotalıq ixtisas strukturu (sonradan UI-dan silinə bilər)
+;(() => {
+  if (localStorage.getItem('mmu_testinst_v1')) return
+  const insts = JSON.parse(localStorage.getItem('mmu_institutions') || '[]')
+  if (!insts.find((i: any) => i.id === 'tmtest')) {
+    insts.push({ id: 'tmtest', label: 'Test Müəssisə', icon: '🧪', year: '2025-2026' })
+    localStorage.setItem('mmu_institutions', JSON.stringify(insts))
+  }
+  const trees = JSON.parse(localStorage.getItem('mmu_specialty_trees') || '[]')
+  if (!trees.find((t: any) => t.institution === 'tmtest')) {
+    trees.push({
+      id: 'tree_tmtest', name: 'Test Müəssisə', institution: 'tmtest', year: '2025-2026',
+      levelNames: ['Qoşun növü', 'Sahə', 'İxtisas'],
+      createdAt: new Date().toISOString(),
+      nodes: [
+        { id: 'tm_q1', name: 'Quru Qoşunları', children: [
+          { id: 'tm_s1', name: 'Mühəndis-istehkam', children: [
+            { id: 'tm_i1', name: 'İnşaat mühəndisi',     quota: 25, children: [] },
+            { id: 'tm_i2', name: 'Körpü-yol mühəndisi',  quota: 25, children: [] },
+          ] },
+          { id: 'tm_s2', name: 'Rabitə', children: [
+            { id: 'tm_i3', name: 'Telekommunikasiya',    quota: 25, children: [] },
+          ] },
+        ] },
+        { id: 'tm_q2', name: 'Hava Qüvvələri', children: [
+          { id: 'tm_s3', name: 'Aviasiya', children: [
+            { id: 'tm_i4', name: 'Təyyarəçi-mühəndis',   quota: 25, children: [] },
+          ] },
+        ] },
+      ],
+    })
+    localStorage.setItem('mmu_specialty_trees', JSON.stringify(trees))
+  }
+  localStorage.setItem('mmu_testinst_v1', '1')
+})()
+
 // ── Bütün köhnə məlumatları bir dəfəlik sil ──────────────────────────────────
 ;(() => {
   if (localStorage.getItem('mmu_clean_v3')) return
@@ -169,9 +205,9 @@ export const userDb = {
 // ── Admins ────────────────────────────────────────────────────────────────────
 
 
-// ── BHK müəssisəsi + təhsil alanlar (TEST.xlsx, bir dəfəlik) ─────────────────────
+// ── BHK müəssisəsi + təhsilalanlar (TEST.xlsx, bir dəfəlik) ─────────────────────
 ;(() => {
-  // self-healing: BHK təhsil alanlari catismirsa berpa olunur
+  // self-healing: BHK təhsilalanlari catismirsa berpa olunur
   const instList = JSON.parse(localStorage.getItem('mmu_institutions') || '[]')
   if (!instList.find((i) => i.id === 'bhk')) {
     instList.push({ id: 'bhk', label: 'BHK', icon: '🎖️' })
@@ -205,7 +241,7 @@ export const userDb = {
 })()
 
 
-// ── BHK seçimi + submission-lar (təhsil alan seçimləri.XLSX, bir dəfəlik) ────────
+// ── BHK seçimi + submission-lar (təhsilalan seçimləri.XLSX, bir dəfəlik) ────────
 ;(() => {
   const _selsAll = JSON.parse(localStorage.getItem('mmu_selections') || '[]')
   const _bhkSel = _selsAll.find((s) => s.institution === 'bhk')
@@ -255,7 +291,7 @@ export const userDb = {
     instList.push({ id: 'test50', label: 'Test Müəssisə', icon: '🧪' })
     localStorage.setItem('mmu_institutions', JSON.stringify(instList))
   }
-  // 2. Təhsil Alanlar
+  // 2. Təhsilalanlar
   const users = JSON.parse(localStorage.getItem('mmu_users') || '[]')
   if (!localStorage.getItem('mmu_test50_seeded_v1') && !users.some((u) => u.institution === 'test50')) {
     localStorage.setItem('mmu_users', JSON.stringify([...users, ...[{"id": "std_test50_1", "institution": "test50", "name": "Nicat Babayev", "parentName": "Kamil", "workNumber": "5001", "fin": "TST0001", "score": 75.5, "group": null, "source": null, "packet": 1, "status": "pending", "printStatus": "not_printed", "placedSpecialty": null, "subjects": {"Riyaziyyat": 31.0, "İngilis Dili": 14.0, "Azərbaycan Dili": 15.0}}, {"id": "std_test50_2", "institution": "test50", "name": "Anar Məmmədov", "parentName": "Tofiq", "workNumber": "5002", "fin": "TST0002", "score": 72.2, "group": null, "source": null, "packet": 1, "status": "pending", "printStatus": "not_printed", "placedSpecialty": null, "subjects": {"Riyaziyyat": 24.0, "İngilis Dili": 2.0, "Azərbaycan Dili": 3.0}}, {"id": "std_test50_3", "institution": "test50", "name": "Nihad İsmayılov", "parentName": "Səfər", "workNumber": "5003", "fin": "TST0003", "score": 65.6, "group": null, "source": null, "packet": 1, "status": "pending", "printStatus": "not_printed", "placedSpecialty": null, "subjects": {"Riyaziyyat": 2.0, "İngilis Dili": 17.0, "Azərbaycan Dili": 20.0}}, {"id": "std_test50_4", "institution": "test50", "name": "Zaur Rəhimov", "parentName": "Vüsal", "workNumber": "5004", "fin": "TST0004", "score": 114.1, "group": null, "source": null, "packet": 1, "status": "pending", "printStatus": "not_printed", "placedSpecialty": null, "subjects": {"Riyaziyyat": 34.0, "İngilis Dili": 14.0, "Azərbaycan Dili": 16.0}}, {"id": "std_test50_5", "institution": "test50", "name": "Nərmin Nağıyev", "parentName": "İlqar", "workNumber": "5005", "fin": "TST0005", "score": 50.4, "group": null, "source": null, "packet": 1, "status": "pending", "printStatus": "not_printed", "placedSpecialty": null, "subjects": {"Riyaziyyat": 12.0, "İngilis Dili": 16.0, "Azərbaycan Dili": 9.0}}, {"id": "std_test50_6", "institution": "test50", "name": "Nihad Quliyev", "parentName": "Fuad", "workNumber": "5006", "fin": "TST0006", "score": 69.0, "group": null, "source": null, "packet": 1, "status": "pending", "printStatus": "not_printed", "placedSpecialty": null, "subjects": {"Riyaziyyat": 24.0, "İngilis Dili": 9.0, "Azərbaycan Dili": 5.0}}, {"id": "std_test50_7", "institution": "test50", "name": "Orxan Abbasov", "parentName": "Bəxtiyar", "workNumber": "5007", "fin": "TST0007", "score": 58.6, "group": null, "source": null, "packet": 1, "status": "pending", "printStatus": "not_printed", "placedSpecialty": null, "subjects": {"Riyaziyyat": 24.0, "İngilis Dili": 18.0, "Azərbaycan Dili": 19.0}}, {"id": "std_test50_8", "institution": "test50", "name": "Nihad Babayev", "parentName": "Tofiq", "workNumber": "5008", "fin": "TST0008", "score": 84.7, "group": null, "source": null, "packet": 1, "status": "pending", "printStatus": "not_printed", "placedSpecialty": null, "subjects": {"Riyaziyyat": 31.0, "İngilis Dili": 16.0, "Azərbaycan Dili": 16.0}}, {"id": "std_test50_9", "institution": "test50", "name": "Kamran Cəfərov", "parentName": "Bəxtiyar", "workNumber": "5009", "fin": "TST0009", "score": 107.9, "group": null, "source": null, "packet": 1, "status": "pending", "printStatus": "not_printed", "placedSpecialty": null, "subjects": {"Riyaziyyat": 11.0, "İngilis Dili": 17.0, "Azərbaycan Dili": 15.0}}, {"id": "std_test50_10", "institution": "test50", "name": "Kamran Əliyev", "parentName": "Səfər", "workNumber": "5010", "fin": "TST0010", "score": 50.6, "group": null, "source": null, "packet": 1, "status": "pending", "printStatus": "not_printed", "placedSpecialty": null, "subjects": {"Riyaziyyat": 21.0, "İngilis Dili": 8.0, "Azərbaycan Dili": 20.0}}, {"id": "std_test50_11", "institution": "test50", "name": "Ləman Babayev", "parentName": "Tofiq", "workNumber": "5011", "fin": "TST0011", "score": 106.2, "group": null, "source": null, "packet": 1, "status": "pending", "printStatus": "not_printed", "placedSpecialty": null, "subjects": {"Riyaziyyat": 8.0, "İngilis Dili": 15.0, "Azərbaycan Dili": 2.0}}, {"id": "std_test50_12", "institution": "test50", "name": "Kamran Həsənov", "parentName": "İlqar", "workNumber": "5012", "fin": "TST0012", "score": 106.7, "group": null, "source": null, "packet": 1, "status": "pending", "printStatus": "not_printed", "placedSpecialty": null, "subjects": {"Riyaziyyat": 12.0, "İngilis Dili": 13.0, "Azərbaycan Dili": 1.0}}, {"id": "std_test50_13", "institution": "test50", "name": "Tural Nağıyev", "parentName": "Natiq", "workNumber": "5013", "fin": "TST0013", "score": 97.8, "group": null, "source": null, "packet": 1, "status": "pending", "printStatus": "not_printed", "placedSpecialty": null, "subjects": {"Riyaziyyat": 9.0, "İngilis Dili": 8.0, "Azərbaycan Dili": 12.0}}, {"id": "std_test50_14", "institution": "test50", "name": "Aytac Babayev", "parentName": "İlqar", "workNumber": "5014", "fin": "TST0014", "score": 82.9, "group": null, "source": null, "packet": 1, "status": "pending", "printStatus": "not_printed", "placedSpecialty": null, "subjects": {"Riyaziyyat": 14.0, "İngilis Dili": 7.0, "Azərbaycan Dili": 16.0}}, {"id": "std_test50_15", "institution": "test50", "name": "Elvin Məmmədov", "parentName": "Fuad", "workNumber": "5015", "fin": "TST0015", "score": 96.8, "group": null, "source": null, "packet": 1, "status": "pending", "printStatus": "not_printed", "placedSpecialty": null, "subjects": {"Riyaziyyat": 20.0, "İngilis Dili": 6.0, "Azərbaycan Dili": 17.0}}, {"id": "std_test50_16", "institution": "test50", "name": "Ələkbər Nağıyev", "parentName": "Tofiq", "workNumber": "5016", "fin": "TST0016", "score": 112.4, "group": null, "source": null, "packet": 1, "status": "pending", "printStatus": "not_printed", "placedSpecialty": null, "subjects": {"Riyaziyyat": 3.0, "İngilis Dili": 3.0, "Azərbaycan Dili": 4.0}}, {"id": "std_test50_17", "institution": "test50", "name": "Nihad Nağıyev", "parentName": "Vüsal", "workNumber": "5017", "fin": "TST0017", "score": 50.8, "group": null, "source": null, "packet": 1, "status": "pending", "printStatus": "not_printed", "placedSpecialty": null, "subjects": {"Riyaziyyat": 5.0, "İngilis Dili": 20.0, "Azərbaycan Dili": 1.0}}, {"id": "std_test50_18", "institution": "test50", "name": "Aysel Süleymanov", "parentName": "Səfər", "workNumber": "5018", "fin": "TST0018", "score": 51.1, "group": null, "source": null, "packet": 1, "status": "pending", "printStatus": "not_printed", "placedSpecialty": null, "subjects": {"Riyaziyyat": 18.0, "İngilis Dili": 5.0, "Azərbaycan Dili": 18.0}}, {"id": "std_test50_19", "institution": "test50", "name": "Səbuhi Süleymanov", "parentName": "Bəxtiyar", "workNumber": "5019", "fin": "TST0019", "score": 51.9, "group": null, "source": null, "packet": 1, "status": "pending", "printStatus": "not_printed", "placedSpecialty": null, "subjects": {"Riyaziyyat": 17.0, "İngilis Dili": 9.0, "Azərbaycan Dili": 11.0}}, {"id": "std_test50_20", "institution": "test50", "name": "Vüqar Babayev", "parentName": "Elşən", "workNumber": "5020", "fin": "TST0020", "score": 86.6, "group": null, "source": null, "packet": 1, "status": "pending", "printStatus": "not_printed", "placedSpecialty": null, "subjects": {"Riyaziyyat": 10.0, "İngilis Dili": 13.0, "Azərbaycan Dili": 18.0}}, {"id": "std_test50_21", "institution": "test50", "name": "Anar Əliyev", "parentName": "Rauf", "workNumber": "5021", "fin": "TST0021", "score": 87.3, "group": null, "source": null, "packet": 1, "status": "pending", "printStatus": "not_printed", "placedSpecialty": null, "subjects": {"Riyaziyyat": 29.0, "İngilis Dili": 10.0, "Azərbaycan Dili": 3.0}}, {"id": "std_test50_22", "institution": "test50", "name": "Nihad İsmayılov", "parentName": "İlqar", "workNumber": "5022", "fin": "TST0022", "score": 99.8, "group": null, "source": null, "packet": 1, "status": "pending", "printStatus": "not_printed", "placedSpecialty": null, "subjects": {"Riyaziyyat": 9.0, "İngilis Dili": 10.0, "Azərbaycan Dili": 2.0}}, {"id": "std_test50_23", "institution": "test50", "name": "Ələkbər Məmmədov", "parentName": "Elşən", "workNumber": "5023", "fin": "TST0023", "score": 57.5, "group": null, "source": null, "packet": 1, "status": "pending", "printStatus": "not_printed", "placedSpecialty": null, "subjects": {"Riyaziyyat": 22.0, "İngilis Dili": 17.0, "Azərbaycan Dili": 5.0}}, {"id": "std_test50_24", "institution": "test50", "name": "Aysel Vəliyev", "parentName": "Natiq", "workNumber": "5024", "fin": "TST0024", "score": 119.1, "group": null, "source": null, "packet": 1, "status": "pending", "printStatus": "not_printed", "placedSpecialty": null, "subjects": {"Riyaziyyat": 9.0, "İngilis Dili": 4.0, "Azərbaycan Dili": 13.0}}, {"id": "std_test50_25", "institution": "test50", "name": "Orxan Quliyev", "parentName": "Kamil", "workNumber": "5025", "fin": "TST0025", "score": 118.4, "group": null, "source": null, "packet": 1, "status": "pending", "printStatus": "not_printed", "placedSpecialty": null, "subjects": {"Riyaziyyat": 2.0, "İngilis Dili": 11.0, "Azərbaycan Dili": 4.0}}, {"id": "std_test50_26", "institution": "test50", "name": "Nihad Süleymanov", "parentName": "Kamil", "workNumber": "5026", "fin": "TST0026", "score": 100.7, "group": null, "source": null, "packet": 1, "status": "pending", "printStatus": "not_printed", "placedSpecialty": null, "subjects": {"Riyaziyyat": 27.0, "İngilis Dili": 15.0, "Azərbaycan Dili": 11.0}}, {"id": "std_test50_27", "institution": "test50", "name": "Nihad Kərimov", "parentName": "Rauf", "workNumber": "5027", "fin": "TST0027", "score": 96.7, "group": null, "source": null, "packet": 1, "status": "pending", "printStatus": "not_printed", "placedSpecialty": null, "subjects": {"Riyaziyyat": 34.0, "İngilis Dili": 10.0, "Azərbaycan Dili": 15.0}}, {"id": "std_test50_28", "institution": "test50", "name": "Murad Abbasov", "parentName": "Kamil", "workNumber": "5028", "fin": "TST0028", "score": 84.6, "group": null, "source": null, "packet": 1, "status": "pending", "printStatus": "not_printed", "placedSpecialty": null, "subjects": {"Riyaziyyat": 6.0, "İngilis Dili": 19.0, "Azərbaycan Dili": 7.0}}, {"id": "std_test50_29", "institution": "test50", "name": "Orxan Əliyev", "parentName": "Natiq", "workNumber": "5029", "fin": "TST0029", "score": 63.5, "group": null, "source": null, "packet": 1, "status": "pending", "printStatus": "not_printed", "placedSpecialty": null, "subjects": {"Riyaziyyat": 17.0, "İngilis Dili": 14.0, "Azərbaycan Dili": 9.0}}, {"id": "std_test50_30", "institution": "test50", "name": "Ləman Abbasov", "parentName": "Tofiq", "workNumber": "5030", "fin": "TST0030", "score": 116.6, "group": null, "source": null, "packet": 1, "status": "pending", "printStatus": "not_printed", "placedSpecialty": null, "subjects": {"Riyaziyyat": 8.0, "İngilis Dili": 1.0, "Azərbaycan Dili": 1.0}}, {"id": "std_test50_31", "institution": "test50", "name": "Orxan Babayev", "parentName": "Vüsal", "workNumber": "5031", "fin": "TST0031", "score": 65.7, "group": null, "source": null, "packet": 1, "status": "pending", "printStatus": "not_printed", "placedSpecialty": null, "subjects": {"Riyaziyyat": 4.0, "İngilis Dili": 16.0, "Azərbaycan Dili": 2.0}}, {"id": "std_test50_32", "institution": "test50", "name": "Günel Cəfərov", "parentName": "Natiq", "workNumber": "5032", "fin": "TST0032", "score": 62.0, "group": null, "source": null, "packet": 1, "status": "pending", "printStatus": "not_printed", "placedSpecialty": null, "subjects": {"Riyaziyyat": 29.0, "İngilis Dili": 12.0, "Azərbaycan Dili": 2.0}}, {"id": "std_test50_33", "institution": "test50", "name": "Tural Mirzəyev", "parentName": "Səfər", "workNumber": "5033", "fin": "TST0033", "score": 78.4, "group": null, "source": null, "packet": 1, "status": "pending", "printStatus": "not_printed", "placedSpecialty": null, "subjects": {"Riyaziyyat": 30.0, "İngilis Dili": 1.0, "Azərbaycan Dili": 10.0}}, {"id": "std_test50_34", "institution": "test50", "name": "Anar Rəhimov", "parentName": "Vüsal", "workNumber": "5034", "fin": "TST0034", "score": 86.8, "group": null, "source": null, "packet": 1, "status": "pending", "printStatus": "not_printed", "placedSpecialty": null, "subjects": {"Riyaziyyat": 16.0, "İngilis Dili": 9.0, "Azərbaycan Dili": 19.0}}, {"id": "std_test50_35", "institution": "test50", "name": "Ələkbər Abbasov", "parentName": "Vüsal", "workNumber": "5035", "fin": "TST0035", "score": 105.4, "group": null, "source": null, "packet": 1, "status": "pending", "printStatus": "not_printed", "placedSpecialty": null, "subjects": {"Riyaziyyat": 4.0, "İngilis Dili": 20.0, "Azərbaycan Dili": 13.0}}, {"id": "std_test50_36", "institution": "test50", "name": "Ələkbər Əliyev", "parentName": "Fuad", "workNumber": "5036", "fin": "TST0036", "score": 70.3, "group": null, "source": null, "packet": 1, "status": "pending", "printStatus": "not_printed", "placedSpecialty": null, "subjects": {"Riyaziyyat": 33.0, "İngilis Dili": 11.0, "Azərbaycan Dili": 11.0}}, {"id": "std_test50_37", "institution": "test50", "name": "Günel Abbasov", "parentName": "Bəxtiyar", "workNumber": "5037", "fin": "TST0037", "score": 76.4, "group": null, "source": null, "packet": 1, "status": "pending", "printStatus": "not_printed", "placedSpecialty": null, "subjects": {"Riyaziyyat": 5.0, "İngilis Dili": 3.0, "Azərbaycan Dili": 11.0}}, {"id": "std_test50_38", "institution": "test50", "name": "Fərid Rəhimov", "parentName": "Kamil", "workNumber": "5038", "fin": "TST0038", "score": 73.6, "group": null, "source": null, "packet": 1, "status": "pending", "printStatus": "not_printed", "placedSpecialty": null, "subjects": {"Riyaziyyat": 13.0, "İngilis Dili": 6.0, "Azərbaycan Dili": 6.0}}, {"id": "std_test50_39", "institution": "test50", "name": "Nicat Babayev", "parentName": "Rauf", "workNumber": "5039", "fin": "TST0039", "score": 110.3, "group": null, "source": null, "packet": 1, "status": "pending", "printStatus": "not_printed", "placedSpecialty": null, "subjects": {"Riyaziyyat": 2.0, "İngilis Dili": 15.0, "Azərbaycan Dili": 11.0}}, {"id": "std_test50_40", "institution": "test50", "name": "Ələkbər İsmayılov", "parentName": "Tofiq", "workNumber": "5040", "fin": "TST0040", "score": 112.3, "group": null, "source": null, "packet": 1, "status": "pending", "printStatus": "not_printed", "placedSpecialty": null, "subjects": {"Riyaziyyat": 15.0, "İngilis Dili": 9.0, "Azərbaycan Dili": 0.0}}, {"id": "std_test50_41", "institution": "test50", "name": "Orxan Hüseynov", "parentName": "Bəxtiyar", "workNumber": "5041", "fin": "TST0041", "score": 103.4, "group": null, "source": null, "packet": 1, "status": "pending", "printStatus": "not_printed", "placedSpecialty": null, "subjects": {"Riyaziyyat": 11.0, "İngilis Dili": 16.0, "Azərbaycan Dili": 13.0}}, {"id": "std_test50_42", "institution": "test50", "name": "Murad İsmayılov", "parentName": "Natiq", "workNumber": "5042", "fin": "TST0042", "score": 61.1, "group": null, "source": null, "packet": 1, "status": "pending", "printStatus": "not_printed", "placedSpecialty": null, "subjects": {"Riyaziyyat": 9.0, "İngilis Dili": 7.0, "Azərbaycan Dili": 16.0}}, {"id": "std_test50_43", "institution": "test50", "name": "Elçin Quliyev", "parentName": "Vüsal", "workNumber": "5043", "fin": "TST0043", "score": 113.9, "group": null, "source": null, "packet": 1, "status": "pending", "printStatus": "not_printed", "placedSpecialty": null, "subjects": {"Riyaziyyat": 18.0, "İngilis Dili": 15.0, "Azərbaycan Dili": 9.0}}, {"id": "std_test50_44", "institution": "test50", "name": "Pərviz Mirzəyev", "parentName": "Bəxtiyar", "workNumber": "5044", "fin": "TST0044", "score": 119.9, "group": null, "source": null, "packet": 1, "status": "pending", "printStatus": "not_printed", "placedSpecialty": null, "subjects": {"Riyaziyyat": 16.0, "İngilis Dili": 9.0, "Azərbaycan Dili": 13.0}}, {"id": "std_test50_45", "institution": "test50", "name": "Orxan Babayev", "parentName": "Rauf", "workNumber": "5045", "fin": "TST0045", "score": 89.5, "group": null, "source": null, "packet": 1, "status": "pending", "printStatus": "not_printed", "placedSpecialty": null, "subjects": {"Riyaziyyat": 31.0, "İngilis Dili": 17.0, "Azərbaycan Dili": 8.0}}, {"id": "std_test50_46", "institution": "test50", "name": "Toğrul Mirzəyev", "parentName": "Səfər", "workNumber": "5046", "fin": "TST0046", "score": 69.5, "group": null, "source": null, "packet": 1, "status": "pending", "printStatus": "not_printed", "placedSpecialty": null, "subjects": {"Riyaziyyat": 32.0, "İngilis Dili": 17.0, "Azərbaycan Dili": 9.0}}, {"id": "std_test50_47", "institution": "test50", "name": "Murad Rəhimov", "parentName": "Səfər", "workNumber": "5047", "fin": "TST0047", "score": 97.2, "group": null, "source": null, "packet": 1, "status": "pending", "printStatus": "not_printed", "placedSpecialty": null, "subjects": {"Riyaziyyat": 3.0, "İngilis Dili": 11.0, "Azərbaycan Dili": 12.0}}, {"id": "std_test50_48", "institution": "test50", "name": "Günel Nağıyev", "parentName": "Fuad", "workNumber": "5048", "fin": "TST0048", "score": 54.2, "group": null, "source": null, "packet": 1, "status": "pending", "printStatus": "not_printed", "placedSpecialty": null, "subjects": {"Riyaziyyat": 22.0, "İngilis Dili": 10.0, "Azərbaycan Dili": 5.0}}, {"id": "std_test50_49", "institution": "test50", "name": "Nicat Babayev", "parentName": "Kamil", "workNumber": "5049", "fin": "TST0049", "score": 118.5, "group": null, "source": null, "packet": 1, "status": "pending", "printStatus": "not_printed", "placedSpecialty": null, "subjects": {"Riyaziyyat": 1.0, "İngilis Dili": 6.0, "Azərbaycan Dili": 12.0}}, {"id": "std_test50_50", "institution": "test50", "name": "Aysel İsmayılov", "parentName": "Vüsal", "workNumber": "5050", "fin": "TST0050", "score": 100.7, "group": null, "source": null, "packet": 1, "status": "pending", "printStatus": "not_printed", "placedSpecialty": null, "subjects": {"Riyaziyyat": 27.0, "İngilis Dili": 17.0, "Azərbaycan Dili": 7.0}}]]))
@@ -285,7 +321,7 @@ export const userDb = {
   localStorage.setItem('mmu_test50_v1', '1')
 })()
 
-// -- TEST: 50 təhsil alan ucun submission (secim siralamasi, bir defelik) --
+// -- TEST: 50 təhsilalan ucun submission (secim siralamasi, bir defelik) --
 ;(() => {
   if (!SEED_TEST_INSTITUTIONS) return
   if (localStorage.getItem('mmu_test50_subs_v1')) return
@@ -392,7 +428,7 @@ export const userDb = {
   }
 })()
 
-// -- HƏHİ muessisesi: 100 təhsil alan (30 lisey + 70 mulki), self-healing ----------
+// -- HƏHİ muessisesi: 100 təhsilalan (30 lisey + 70 mulki), self-healing ----------
 ;(() => {
   if (!SEED_TEST_INSTITUTIONS) return
   const instList = JSON.parse(localStorage.getItem('mmu_institutions') || '[]')
@@ -466,7 +502,7 @@ export const userDb = {
     })
     localStorage.setItem('mmu_selections', JSON.stringify(sels))
   }
-  // Təhsil Alanların seçimləri (hər biri 7 ixtisası fərqli sıra ilə)
+  // Təhsilalanların seçimləri (hər biri 7 ixtisası fərqli sıra ilə)
   const allSub = JSON.parse(localStorage.getItem('mmu_submissions') || '[]')
   if (allSub.filter((s) => s.selectionId === 'sel_hehi').length < 100) {
     const leaves = ['H_A1a', 'H_A1b', 'H_A1c', 'H_A2a', 'H_A2b', 'H_B1a', 'H_B1b']
@@ -794,7 +830,7 @@ export const systemSettingsDb = {
   },
 }
 
-// Təhsil alan sahə sütunları
+// Təhsilalan sahə sütunları
 export const STUDENT_COLUMNS = [
   { key: 'fin',        label: 'FİN Kodu' },
   { key: 'workNumber', label: 'İş Nömrəsi' },
@@ -804,7 +840,7 @@ export const STUDENT_COLUMNS = [
   { key: 'group',      label: 'Qrup' },
 ]
 
-// Təhsil alan sütununun dəyərini al — Ad/Soyad `name`-dən ayrılır (qeyddə yalnız tam ad saxlanılır)
+// Təhsilalan sütununun dəyərini al — Ad/Soyad `name`-dən ayrılır (qeyddə yalnız tam ad saxlanılır)
 export function studentColValue(u: any, key: string): string {
   if (key === 'firstName') return String(u?.name ?? '').trim().split(/\s+/)[0] || ''
   if (key === 'lastName')  return String(u?.name ?? '').trim().split(/\s+/).slice(1).join(' ')

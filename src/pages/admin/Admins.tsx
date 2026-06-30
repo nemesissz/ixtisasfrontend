@@ -283,7 +283,7 @@ export default function Admins() {
     );
   }
 
-  // ── Yalnız bu müəssisənin təhsil alan datasında mövcud olan sütunlar ──
+  // ── Yalnız bu müəssisənin təhsilalan datasında mövcud olan sütunlar ──
   const instCadets = (userDb.getAll() as any[]).filter(
     (u: any) => u.institution === selInst,
   );
@@ -292,7 +292,7 @@ export default function Admins() {
       (u: any) => studentColValue(u, c.key).trim() !== "",
     ),
   );
-  const availColumns = availColumns0.length ? availColumns0 : STUDENT_COLUMNS; // təhsil alan yoxdursa hamısını göstər
+  const availColumns = availColumns0.length ? availColumns0 : STUDENT_COLUMNS; // təhsilalan yoxdursa hamısını göstər
   const colOptions = (selectedKey: string) =>
     availColumns.some((c) => c.key === selectedKey)
       ? availColumns
@@ -963,7 +963,7 @@ export default function Admins() {
                   marginBottom: 3,
                 }}
               >
-                ⚙️ Təhsil alan Giriş Parametrləri
+                ⚙️ Təhsilalan Giriş Parametrləri
               </div>
               <div style={{ fontSize: 12, color: "#ffffffcc" }}>
                 Müəssisəyə görə giriş sahələrini təyin edin
@@ -1149,7 +1149,7 @@ export default function Admins() {
                           marginBottom: 6,
                         }}
                       >
-                        Təhsil alan cədvəlindəki sütun
+                        Təhsilalan cədvəlindəki sütun
                       </label>
                       <select
                         className="form-select"
@@ -1354,7 +1354,7 @@ export default function Admins() {
                     Seçimdən sonra login-ə qayıtma
                   </div>
                   <div style={{ fontSize: 11.5, color: "#8892b0" }}>
-                    Təhsil alan seçimini tamamlayandan sonra bu müddət keçəndə
+                    Təhsilalan seçimini tamamlayandan sonra bu müddət keçəndə
                     avtomatik login səhifəsinə qayıdır
                   </div>
                 </div>
