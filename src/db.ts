@@ -560,6 +560,21 @@ export const userDb = {
   }
 })()
 
+// ── Xüsusi rollar (admin tərəfindən əlavə olunan, sistemdə saxlanılır) ──
+export const customRoleDb = {
+  getAll: (): string[] => { try { return JSON.parse(localStorage.getItem('mmu_custom_roles') || '[]') } catch { return [] } },
+  add: (name: string): string => {
+    const n = name.trim()
+    if (!n) return n
+    const list = customRoleDb.getAll()
+    if (!list.includes(n)) { list.push(n); localStorage.setItem('mmu_custom_roles', JSON.stringify(list)) }
+    return n
+  },
+  remove: (name: string) => {
+    localStorage.setItem('mmu_custom_roles', JSON.stringify(customRoleDb.getAll().filter((r) => r !== name)))
+  },
+}
+
 export const adminDb = {
   getAll: ()     => raw.get(KEYS.admins),
   create: (data: any) => {

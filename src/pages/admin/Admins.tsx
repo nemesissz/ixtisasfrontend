@@ -9,6 +9,7 @@ import {
   InstLoginConfig,
   STUDENT_COLUMNS,
   studentColValue,
+  customRoleDb,
 } from "../../db";
 import { AppDialog, useDialog } from "../../components/AppDialog";
 import { PERM_GROUPS, ALL_PERMS } from "../../permissions";
@@ -61,7 +62,7 @@ const ROLE_BADGE: Record<string, string> = {
 const EMPTY_FORM = {
   name: "",
   email: "",
-  role: "admin",
+  role: "",
   username: "",
   password: "",
   permissions: [] as string[],
@@ -233,6 +234,12 @@ export default function Admins() {
   const [modal, setModal] = useState(false);
   const [form, setForm] = useState({ ...EMPTY_FORM });
   const [showPw, setShowPw] = useState(false);
+  const [customRoles, setCustomRoles] = useState<string[]>(() => customRoleDb.getAll());
+  const [addingRole, setAddingRole] = useState(false);
+  const [newRole, setNewRole] = useState("");
+  const [roleToDelete, setRoleToDelete] = useState<string | null>(null);
+  const [rolePw, setRolePw] = useState("");
+  const [rolePwError, setRolePwError] = useState("");
   const { dialog, showConfirm, showInfo, closeDialog } = useDialog();
 
   // Şifrə dəyişmə state
@@ -344,7 +351,7 @@ export default function Admins() {
     adminDb.update(pwTarget.id, { password: pwNew });
     // Öz şifrəsini dəyişirsə sessionı yenilə
     if (pwTarget?.id === session?.id) {
-      sessionStorage.setItem("admin_session", JSON.stringify({ ...session }));
+      sessionStorage.setItem("admin_session", JSON.stringify({ ...session, password: pwNew }));
     }
     refresh();
     setPwModal(false);
@@ -366,13 +373,36 @@ export default function Admins() {
   }
 
   const isOperator = form.role === "operator";
-  const needsPerms =
-    form.role === "admin" ||
-    form.role === "moderator" ||
-    form.role === "operator";
+  const needsPerms = !!form.role && form.role !== "superadmin";
+
+  function addCustomRole() {
+    const n = newRole.trim();
+    if (!n) return;
+    customRoleDb.add(n);
+    setCustomRoles(customRoleDb.getAll());
+    setForm((f) => ({ ...f, role: n }));
+    setAddingRole(false);
+    setNewRole("");
+  }
+
+  function confirmRoleDelete() {
+    const superadmin = (adminDb.getAll() as any[]).find((a: any) => a.role === "superadmin");
+    if (!superadmin || rolePw !== superadmin.password) {
+      setRolePwError("Superadmin şifrəsi yanlışdır");
+      return;
+    }
+    const r = roleToDelete!;
+    customRoleDb.remove(r);
+    setCustomRoles(customRoleDb.getAll());
+    setForm((f) => (f.role === r ? { ...f, role: "" } : f));
+    setRoleToDelete(null);
+    setRolePw("");
+    setRolePwError("");
+    addLog("admin", "warning", `Rol silindi: "${r}"`, "Superadmin şifrəsi ilə təsdiqləndi");
+  }
 
   function handleAdd() {
-    if (!form.name || !form.username || !form.password) return;
+    if (!form.name || !form.username || !form.password || !form.role) return;
     adminDb.create({
       name: form.name,
       email: isOperator ? "" : form.email,
@@ -448,6 +478,42 @@ export default function Admins() {
   return (
     <>
       {dialog && <AppDialog cfg={dialog} onClose={closeDialog} />}
+
+      {/* ── Rol silmə təsdiqi (superadmin şifrəsi) ── */}
+      {roleToDelete && (
+        <div className="modal-overlay open" style={{ zIndex: 3000 }} onClick={() => { setRoleToDelete(null); setRolePw(""); setRolePwError(""); }}>
+          <div className="modal" style={{ maxWidth: 400 }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-head" style={{ borderBottom: "none", paddingBottom: 0 }}>
+              <span style={{ fontSize: 20 }}>🗑️</span>
+              <button className="modal-close" onClick={() => { setRoleToDelete(null); setRolePw(""); setRolePwError(""); }}>✕</button>
+            </div>
+            <div className="modal-body" style={{ paddingTop: 8 }}>
+              <div style={{ fontSize: 15, fontWeight: 700, color: "var(--text)", marginBottom: 8 }}>
+                Rolu silmək istəyirsiniz?
+              </div>
+              <div style={{ fontSize: 13, color: "var(--muted)", marginBottom: 16, lineHeight: 1.5 }}>
+                <b>«{roleToDelete}»</b> rolu sistemdən silinəcək. Təsdiq üçün <b>Superadmin şifrəsini</b> daxil edin.
+              </div>
+              <div style={{ marginBottom: 8 }}>
+                <label className="form-label">Superadmin şifrəsi *</label>
+                <input
+                  className="form-input"
+                  type="password"
+                  value={rolePw}
+                  autoFocus
+                  onChange={(e) => { setRolePw(e.target.value); setRolePwError(""); }}
+                  onKeyDown={(e) => { if (e.key === "Enter") confirmRoleDelete(); }}
+                />
+                {rolePwError && <div style={{ fontSize: 12, color: "#cf1322", marginTop: 6 }}>{rolePwError}</div>}
+              </div>
+              <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 14 }}>
+                <button className="btn btn-outline" onClick={() => { setRoleToDelete(null); setRolePw(""); setRolePwError(""); }}>Ləğv</button>
+                <button className="btn btn-danger" disabled={!rolePw} onClick={confirmRoleDelete}>Sil</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Şifrə dəyişmə modalı ── */}
       {pwModal && pwTarget && (
@@ -662,15 +728,47 @@ export default function Admins() {
                     <label className="form-label">Rol *</label>
                     <select
                       className="form-select"
-                      value={form.role}
-                      onChange={(e) =>
-                        setForm((f) => ({ ...f, role: e.target.value }))
-                      }
+                      value={addingRole ? "__new__" : form.role}
+                      onChange={(e) => {
+                        if (e.target.value === "__new__") { setAddingRole(true); setNewRole(""); }
+                        else { setAddingRole(false); setForm((f) => ({ ...f, role: e.target.value })); }
+                      }}
                     >
-                      <option value="admin">Admin</option>
-                      <option value="moderator">Moderator</option>
-                      <option value="operator">Operator</option>
+                      <option value="" disabled>Rol seçin…</option>
+                      {customRoles.map((r) => (
+                        <option key={r} value={r}>{ROLES[r] || r}</option>
+                      ))}
+                      <option value="__new__">➕ Yeni rol əlavə et…</option>
                     </select>
+                    {addingRole && (
+                      <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                        <input
+                          className="form-input"
+                          placeholder="Yeni rol adı (məs: Nəzarətçi)"
+                          value={newRole}
+                          autoFocus
+                          onChange={(e) => setNewRole(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addCustomRole(); } }}
+                        />
+                        <button type="button" className="btn btn-primary btn-sm" disabled={!newRole.trim()} onClick={addCustomRole}>
+                          Əlavə et
+                        </button>
+                        <button type="button" className="btn btn-outline btn-sm" onClick={() => { setAddingRole(false); setNewRole(""); }}>
+                          Ləğv
+                        </button>
+                      </div>
+                    )}
+                    {customRoles.length > 0 && !addingRole && (
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
+                        {customRoles.map((r) => (
+                          <span key={r} style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 6px 3px 10px", borderRadius: 20, background: "#f4f7ff", border: "1.5px solid #c5d0ff", fontSize: 11, fontWeight: 700, color: "#3a4cad" }}>
+                            {r}
+                            <button type="button" title="Rolu sil" onClick={() => { setRoleToDelete(r); setRolePw(""); setRolePwError(""); }}
+                              style={{ background: "#ffd6d6", border: "none", color: "#cf1322", cursor: "pointer", fontSize: 10, lineHeight: 1, padding: "2px 5px", borderRadius: "50%", fontWeight: 900 }}>✕</button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   {/* Ad Soyad */}

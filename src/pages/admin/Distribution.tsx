@@ -505,13 +505,13 @@ function StorySim({ students, packets, subs, tree, onClose }: { students?: any[]
       const avail = { ...quota }
       const femP: Record<string, number> = {}, malP: Record<string, number> = {}
       const assignments: Record<string, { specId: string; choiceNum: number }> = {}
-      const lastInLeaf: Record<string, { name: string; score: number }> = {}
+      const lastInLeaf: Record<string, { name: string; score: number; user: any }> = {}
       const stepStart = steps.length
       for (const u of sorted) {
         const ranking = (subs.find((s: any) => s.userId === u.id)?.ranking || []).filter((id: string) => quota[id] !== undefined)
         const attempts: { id: string; full: boolean; tie?: boolean; rival?: string; blocked?: 'gender' | 'cap' }[] = []
         let placed: string | null = null
-        const tieRivals: { id: string; rival: string; score: number }[] = []
+        const tieRivals: { id: string; rival: string; score: number; subject?: string; rivalSubjScore?: number; mySubjScore?: number }[] = []
         const sc = u.score || 0, g = u.gender
         for (const sid of ranking) {
           const leaf = leafById[sid]
@@ -519,14 +519,24 @@ function StorySim({ students, packets, subs, tree, onClose }: { students?: any[]
           if (avail[sid] > 0 && !genderCapReached(leaf, g, femP[sid] || 0, malP[sid] || 0)) {
             avail[sid]--; placed = sid
             if (g === 'qadın') femP[sid] = (femP[sid] || 0) + 1; else if (g === 'kişi') malP[sid] = (malP[sid] || 0) + 1
-            attempts.push({ id: sid, full: false }); lastInLeaf[sid] = { name: u.name, score: sc }; break
+            attempts.push({ id: sid, full: false }); lastInLeaf[sid] = { name: u.name, score: sc, user: u }; break
           } else if (avail[sid] > 0) {
             attempts.push({ id: sid, full: true, blocked: 'cap' })
           } else {
             const last = lastInLeaf[sid]
             const tie = !!last && Math.abs((last.score || 0) - sc) < 1e-9
             attempts.push({ id: sid, full: true, tie, rival: tie ? last!.name : undefined })
-            if (tie) tieRivals.push({ id: sid, rival: last!.name, score: sc })
+            if (tie) {
+              // Bərabərliyi hansı prioritet fənn həll etdi — rəqib (öndə olan) ilə müqayisə
+              const tbs = getTiebreakerSubjects(sid, u.group, pathMap)
+              let dec: { subject?: string; rivalSubjScore?: number; mySubjScore?: number } = {}
+              for (const subj of tbs) {
+                const w = subj === UMUMI_KEY ? (last!.user.score || 0) : (last!.user.subjects?.[subj] ?? -1)
+                const l = subj === UMUMI_KEY ? (u.score || 0)          : (u.subjects?.[subj] ?? -1)
+                if (w !== l) { dec = { subject: subj === UMUMI_KEY ? 'Ümumi bal' : subj, rivalSubjScore: w, mySubjScore: l }; break }
+              }
+              tieRivals.push({ id: sid, rival: last!.name, score: sc, ...dec })
+            }
           }
         }
         if (placed) assignments[u.id] = { specId: placed, choiceNum: ranking.indexOf(placed) + 1 }
@@ -597,8 +607,12 @@ function StorySim({ students, packets, subs, tree, onClose }: { students?: any[]
     const nm = cur.u.name, sc = Number(cur.u.score).toFixed(1)
     if (!cur.placed) return `${nm} (${sc} bal): bütün seçdiyi ixtisaslar dolu olduğu üçün bu təhsilalan yerləşdirilmədi (əl ilə baxılmalıdır).`
     const fulls = cur.attempts.filter(a => a.full)
+    const tr0 = cur.tieRivals[0]
+    const tieDecide = tr0 && tr0.subject
+      ? ` Üstünlük meyarı “${tr0.subject}” fənni oldu: ${tr0.rival}-ın balı ${Number(tr0.rivalSubjScore).toFixed(1)}, bu təhsilalanınkı ${Number(tr0.mySubjScore).toFixed(1)} — ${tr0.rival} öndə olduğu üçün oraya yerləşdirildi.`
+      : tr0 ? ` Üstünlük meyarına (fənn balları) görə ${tr0.rival} öndə tutuldu.` : ''
     const tieNote = cur.tieRivals.length
-      ? ` ⚖️ Bərabər bal: “${data.leafName[cur.tieRivals[0].id]}” üçün ${cur.tieRivals[0].rival} ilə ${sc} bal eyni idi — üstünlük meyarı (fənn balları) ${cur.tieRivals[0].rival}-ı öndə tutdu, ona görə bu təhsilalan oraya yerləşdirilmədi.`
+      ? ` ⚖️ Bərabər bal: “${data.leafName[tr0.id]}” üçün ${tr0.rival} ilə ${sc} bal eyni idi.${tieDecide} Ona görə bu təhsilalan oraya yerləşdirilmədi.`
       : ''
     if (fulls.length === 0) return `${nm} (${sc} bal): 1-ci seçimi “${data.leafName[cur.placed]}”-də boş yer olduğu üçün birbaşa oraya yerləşdirildi.`
     return `${nm} (${sc} bal): ${fulls.map((a, i) => `${i + 1}-ci seçim “${data.leafName[a.id]}” dolu`).join(', ')} → ${cur.choiceNum}-ci seçim “${data.leafName[cur.placed]}”-ə yerləşdirildi.${tieNote}`
@@ -721,7 +735,9 @@ function StorySim({ students, packets, subs, tree, onClose }: { students?: any[]
             <div style={{ background: '#fff7e6', border: '1px solid #ffd591', borderRadius: 10, padding: '12px 16px', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
               <span style={{ fontSize: 18 }}>⚖️</span>
               <div style={{ fontSize: 13, color: '#8a6d1b', lineHeight: 1.55 }}>
-                <b style={{ color: '#5a4a12' }}>Bərabər bal toqquşması:</b> “{data.leafName[cur.tieRivals[0].id]}” üçün <b style={{ color: '#5a4a12' }}>{cur.tieRivals[0].rival}</b> ilə hər ikisinin balı <b style={{ color: '#5a4a12' }}>{cur.tieRivals[0].score.toFixed(2)}</b> idi. Son yer bir nəfərə qalır — <b style={{ color: '#5a4a12' }}>üstünlük meyarı (fənn balları)</b> {cur.tieRivals[0].rival}-ı öndə tutdu, bu təhsilalan həmin ixtisasa yerləşdirilmədi.
+                <b style={{ color: '#5a4a12' }}>Bərabər bal toqquşması:</b> “{data.leafName[cur.tieRivals[0].id]}” üçün <b style={{ color: '#5a4a12' }}>{cur.tieRivals[0].rival}</b> ilə hər ikisinin ümumi balı <b style={{ color: '#5a4a12' }}>{cur.tieRivals[0].score.toFixed(2)}</b> idi. Son yer bir nəfərə qalır — {cur.tieRivals[0].subject ? (<>
+                  üstünlük meyarı <b style={{ color: '#5a4a12' }}>“{cur.tieRivals[0].subject}”</b> fənni oldu: <b style={{ color: '#5a4a12' }}>{cur.tieRivals[0].rival}</b> = <b style={{ color: '#237804' }}>{Number(cur.tieRivals[0].rivalSubjScore).toFixed(1)}</b>, bu təhsilalan = <b style={{ color: '#cf1322' }}>{Number(cur.tieRivals[0].mySubjScore).toFixed(1)}</b> — {cur.tieRivals[0].rival} öndə olduğu üçün bu təhsilalan həmin ixtisasa yerləşdirilmədi.
+                </>) : (<><b style={{ color: '#5a4a12' }}>üstünlük meyarı (fənn balları)</b> {cur.tieRivals[0].rival}-ı öndə tutdu, bu təhsilalan həmin ixtisasa yerləşdirilmədi.</>)}
               </div>
             </div>
           )}
