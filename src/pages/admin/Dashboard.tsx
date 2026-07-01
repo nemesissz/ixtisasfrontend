@@ -72,7 +72,6 @@ function Card({ title, icon, children, span }: { title: string; icon?: string; c
   )
 }
 
-const SCORE_BUCKETS = [[0, 50], [50, 60], [60, 70], [70, 80], [80, 90], [90, 101]]
 
 export default function Dashboard() {
   const insts = institutionDb.getAll() as any[]
@@ -108,6 +107,7 @@ export default function Dashboard() {
         quota: leaf.quota || 0, placed: us.length,
         avg: scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : 0,
         min: scores.length ? Math.min(...scores) : 0,
+        max: scores.length ? Math.max(...scores) : 0,
         demand: firstChoice[leaf.id] || 0,
       }
     })
@@ -116,8 +116,19 @@ export default function Dashboard() {
     const choiceDist: Record<number, number> = {}
     for (const u of placedUsers) { const c = u.choiceNum || 0; if (c > 0) choiceDist[c] = (choiceDist[c] || 0) + 1 }
 
-    // bal paylanması
-    const hist = SCORE_BUCKETS.map(([lo, hi]) => instUsers.filter(u => (u.score || 0) >= lo && (u.score || 0) < hi).length)
+    // bal paylanması — dinamik: ən aşağı baldan ən yüksəyə qədər bərabər hissələrə bölünür
+    const allScores = instUsers.map(u => u.score || 0)
+    const sMin = allScores.length ? Math.min(...allScores) : 0
+    const sMax = allScores.length ? Math.max(...allScores) : 0
+    const N_BINS = 5
+    const bLo = Math.floor(sMin), bHi = Math.ceil(sMax)
+    const bStep = Math.max(1, Math.ceil((bHi - bLo) / N_BINS))
+    const scoreBuckets: number[][] = []
+    for (let lo = bLo; lo < bHi || scoreBuckets.length === 0; lo += bStep) scoreBuckets.push([lo, lo + bStep])
+    const hist = scoreBuckets.map(([lo, hi], idx) => instUsers.filter(u => {
+      const s = u.score || 0
+      return s >= lo && (idx === scoreBuckets.length - 1 ? s <= hi : s < hi)
+    }).length)
 
     // demoqrafiya
     const fem = instUsers.filter(u => u.gender === 'qadın').length
@@ -174,7 +185,7 @@ export default function Dashboard() {
     const leastDemanded = [...ranked].sort((a, b) => a.comp - b.comp).slice(0, 5)
 
     return {
-      sel, tree, instUsers, leaves, byLeaf, choiceDist, hist, totalQuota, avgScore,
+      sel, tree, instUsers, leaves, byLeaf, choiceDist, hist, scoreBuckets, totalQuota, avgScore,
       placed: placedUsers.length, submittedCount, pendingCount, unplacedSubmitted,
       fem, mal, hasGender, mulki, lisey, hasSource,
       minScore, maxScore, branchStats, subjectAvg, mostCompetitive, leastDemanded, levelStats,
@@ -200,7 +211,7 @@ export default function Dashboard() {
     ...A.levelStats.map((l: any, i: number) => ({ label: l.name, value: l.count, icon: LEVEL_ICONS[i] || '🎓', accent: '#13c2c2' })),
     { label: 'Ümumi kvota', value: A.totalQuota, icon: '🎯', accent: '#fa8c16' },
     { label: 'Yerləşmə', value: `${pct(A.placed, A.instUsers.length)}%`, icon: '✅', accent: '#52c41a', sub: `${A.placed}/${A.instUsers.length}` },
-    { label: 'İştirak', value: `${pct(A.submittedCount, A.instUsers.length)}%`, icon: '🗳️', accent: '#eb2f96', sub: `${A.submittedCount}/${A.instUsers.length}` },
+    { label: 'Seçim etdi', value: `${pct(A.submittedCount, A.instUsers.length)}%`, icon: '🗳️', accent: '#eb2f96', sub: `${A.submittedCount}/${A.instUsers.length}` },
   ]
 
   return (
@@ -253,7 +264,7 @@ export default function Dashboard() {
                 <div style={{ flex: 1, minWidth: 160, display: 'flex', flexDirection: 'column', gap: 10 }}>
                   {[
                     { c: '#52c41a', l: 'Yerləşdi', v: A.placed },
-                    { c: '#faad14', l: 'Seçdi, yerləşmədi', v: A.unplacedSubmitted },
+                    { c: '#faad14', l: 'Seçim etdi, yerləşdirilmədi', v: A.unplacedSubmitted },
                     { c: '#d9d9d9', l: 'Seçim etmədi', v: A.pendingCount },
                   ].map(x => (
                     <div key={x.l} style={{ display: 'flex', alignItems: 'center', gap: 9, fontSize: 13 }}>
@@ -278,15 +289,15 @@ export default function Dashboard() {
             </Card>
 
             <Card title="Bal paylanması" icon="📈">
-              <Bars data={SCORE_BUCKETS.map(([lo, hi], i) => ({
-                label: hi >= 101 ? `${lo}+` : `${lo}–${hi}`, value: A.hist[i], color: '#c9962a',
+              <Bars data={A.scoreBuckets.map(([lo, hi], i) => ({
+                label: `${lo}–${hi}`, value: A.hist[i], color: '#c9962a',
               }))} />
             </Card>
           </div>
 
-          {/* Sıra 2: seçim məmnuniyyəti + demoqrafiya */}
+          {/* Sıra 2: seçimlər üzrə qəbul statistikası + demoqrafiya */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 14 }}>
-            <Card title="Seçim məmnuniyyəti" icon="🏆">
+            <Card title="Seçimlər üzrə qəbul statistikası" icon="📊">
               {Object.keys(A.choiceDist).length === 0 ? (
                 <div style={{ color: 'var(--muted)', fontSize: 13, padding: '14px 0' }}>Hələ yerləşdirmə aparılmayıb.</div>
               ) : (
@@ -369,12 +380,14 @@ export default function Dashboard() {
                   <thead>
                     <tr style={{ background: '#f8f9fd', color: 'var(--muted)', textAlign: 'left' }}>
                       <th style={{ padding: '9px 12px', fontWeight: 700 }}>İxtisas</th>
-                      {([['quota', 'Kvota'], ['fill', 'Yerləşən / Doluluq'], ['avg', 'Orta bal']] as const).map(([k, lbl]) => (
+                      {([['quota', 'Kvota'], ['fill', 'Yerləşən / Doluluq']] as const).map(([k, lbl]) => (
                         <th key={k} onClick={() => setSortBy(k as any)} style={{ padding: '9px 12px', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', color: sortBy === k ? '#c9962a' : undefined, textAlign: 'center' }}>
                           {lbl} {sortBy === k ? '▾' : ''}
                         </th>
                       ))}
                       <th style={{ padding: '9px 12px', fontWeight: 700, textAlign: 'center' }}>Ən aşağı bal</th>
+                      <th onClick={() => setSortBy('avg')} style={{ padding: '9px 12px', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', color: sortBy === 'avg' ? '#c9962a' : undefined, textAlign: 'center' }}>Orta bal {sortBy === 'avg' ? '▾' : ''}</th>
+                      <th style={{ padding: '9px 12px', fontWeight: 700, textAlign: 'center' }}>Ən yüksək bal</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -395,8 +408,9 @@ export default function Dashboard() {
                               <span style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>{l.placed}/{l.quota}</span>
                             </div>
                           </td>
-                          <td style={{ padding: '9px 12px', textAlign: 'center', fontWeight: 700, color: '#c9962a' }}>{l.avg ? l.avg.toFixed(1) : '—'}</td>
                           <td style={{ padding: '9px 12px', textAlign: 'center', fontWeight: 700, color: l.min ? '#722ed1' : 'var(--muted)' }}>{l.min ? l.min.toFixed(1) : '—'}</td>
+                          <td style={{ padding: '9px 12px', textAlign: 'center', fontWeight: 700, color: '#c9962a' }}>{l.avg ? l.avg.toFixed(1) : '—'}</td>
+                          <td style={{ padding: '9px 12px', textAlign: 'center', fontWeight: 700, color: l.max ? '#52c41a' : 'var(--muted)' }}>{l.max ? l.max.toFixed(1) : '—'}</td>
                         </tr>
                       )
                     })}
