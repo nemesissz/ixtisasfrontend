@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import * as XLSX from 'xlsx'
 import { userDb, submissionDb, institutionDb, userArchiveDb, selectionDb, treeDb, adminDb, buildNameMap, useLocalState, addLog } from '../../db'
 import InstIcon, { isImageIcon } from '../../components/InstIcon'
+import InstTabs from '../../components/InstTabs'
 import { AppDialog, useDialog } from '../../components/AppDialog'
 import { can } from '../../permissions'
 
@@ -2333,59 +2334,26 @@ export default function Users() {
       {/* ── Səhifə flex konteyneri: yalnız cədvəl daxilən scroll olur ── */}
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
       {/* ── Tab sətiri ── */}
-      <div style={{ display: 'flex', gap: 6, marginBottom: 16, alignItems: 'center', flexWrap: 'wrap', flexShrink: 0 }}>
-        {insts.map((inst: any) => {
-          const isActive = tab === inst.id
-          return (
-            <div key={inst.id} style={{ position: 'relative', display: 'inline-flex' }}>
-              <button
-                onClick={() => switchTab(inst.id)}
-                style={{
-                  padding: '10px 40px 10px 22px', borderRadius: 10,
-                  border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 14,
-                  transition: 'all .15s',
-                  background: isActive ? 'var(--blue)' : '#f0f2fa',
-                  color:      isActive ? '#fff'        : 'var(--muted)',
-                  boxShadow:  isActive ? '0 2px 10px #c9962a33' : 'none',
-                }}
-              >
-                <InstIcon icon={inst.icon} size={16} style={{ marginRight: 6 }} />{inst.label}
-              </button>
-              {/* Redaktə düyməsi */}
-              {can('inst.edit') && (
-              <button
-                onClick={e => { e.stopPropagation(); setEditInst(inst) }}
-                title="Redaktə et"
-                style={{
-                  position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)',
-                  width: 24, height: 24, borderRadius: 6, border: 'none',
-                  background: isActive ? 'rgba(255,255,255,0.25)' : '#e4e8f5',
-                  color: isActive ? '#fff' : '#7a88cc',
-                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 11, flexShrink: 0,
-                }}
-              >✏️</button>
-              )}
-            </div>
-          )
-        })}
-
-        {/* Yeni müəssisə */}
-        {can('inst.create') && (
-        <button
-          onClick={() => setShowNewInst(true)}
-          style={{
-            padding: '10px 18px', borderRadius: 10, border: '1.5px dashed #c5d0ff',
-            background: '#f8f9ff', color: 'var(--blue)', fontWeight: 700, fontSize: 13,
-            cursor: 'pointer', transition: 'all .15s',
-          }}
-          onMouseEnter={e => { (e.currentTarget.style.background = '#eef1ff'); (e.currentTarget.style.borderColor = 'var(--blue)') }}
-          onMouseLeave={e => { (e.currentTarget.style.background = '#f8f9ff'); (e.currentTarget.style.borderColor = '#c5d0ff') }}
-        >
-          + Yeni Müəssisə
-        </button>
-        )}
-      </div>
+      <InstTabs
+        insts={insts}
+        activeId={tab}
+        onSelect={switchTab}
+        onEdit={can('inst.edit') ? (inst) => setEditInst(inst) : undefined}
+        trailing={can('inst.create') ? (
+          <button
+            onClick={() => setShowNewInst(true)}
+            style={{
+              padding: '10px 18px', borderRadius: 10, border: '1.5px dashed #c5d0ff', height: 42,
+              background: '#f8f9ff', color: 'var(--blue)', fontWeight: 700, fontSize: 13,
+              cursor: 'pointer', transition: 'all .15s',
+            }}
+            onMouseEnter={e => { (e.currentTarget.style.background = '#eef1ff'); (e.currentTarget.style.borderColor = 'var(--blue)') }}
+            onMouseLeave={e => { (e.currentTarget.style.background = '#f8f9ff'); (e.currentTarget.style.borderColor = '#c5d0ff') }}
+          >
+            + Yeni Müəssisə
+          </button>
+        ) : undefined}
+      />
 
       {/* ── Cədvəl ── */}
       {activeInst

@@ -1,9 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { selectionDb, institutionDb, useLocalState, addLog } from '../../db'
 import { AppDialog, useDialog } from '../../components/AppDialog'
-import InstIcon from '../../components/InstIcon'
-import { useTopbar } from '../../contexts/TopbarContext'
+import InstTabs from '../../components/InstTabs'
 
 const STATUS_BADGE: Record<string, string> = {
   draft:     'badge badge-gray',
@@ -28,43 +27,10 @@ export default function Selections() {
   // resolve active tab (default to first institution)
   const { dialog, showConfirm, closeDialog } = useDialog()
 
-  const { setSlot, clearSlot } = useTopbar()
-
   const insts: any[] = institutions
   const activeTab = tab || insts[0]?.id || ''
 
   const byInstitution = list.filter((s: any) => s.institution === activeTab)
-
-  // ── Müəssisə tablarını topbara inject et ──
-  useEffect(() => {
-    const token = setSlot(
-      insts.length === 0
-        ? <></>
-        : (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-            {insts.map((inst: any) => (
-              <button
-                key={inst.id}
-                onClick={() => { setTab(inst.id); setFilter('all') }}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 6,
-                  padding: '6px 14px', borderRadius: 8,
-                  border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 13,
-                  transition: 'all .15s',
-                  background: activeTab === inst.id ? 'var(--blue)' : '#f0f2fa',
-                  color:      activeTab === inst.id ? '#fff'        : 'var(--muted)',
-                  boxShadow:  activeTab === inst.id ? '0 2px 8px #c9962a33' : 'none',
-                }}
-              >
-                <InstIcon icon={inst.icon} size={14} />
-                {inst.label}
-              </button>
-            ))}
-          </div>
-        )
-    )
-    return () => clearSlot(token)
-  }, [insts, activeTab])
 
   const filtered = filter === 'all'
     ? byInstitution.filter((s: any) => s.status !== 'archived')
@@ -106,6 +72,9 @@ export default function Selections() {
   return (
     <>
       {dialog && <AppDialog cfg={dialog} onClose={closeDialog} />}
+
+      {/* Müəssisə tabları */}
+      <InstTabs insts={insts} activeId={activeTab} onSelect={(id) => { setTab(id); setFilter('all') }} />
 
       {/* Status filter + New button row */}
       <div className="flex-row" style={{ marginBottom: 16, justifyContent: 'space-between' }}>

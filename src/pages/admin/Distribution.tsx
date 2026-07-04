@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, useRef } from 'react'
 import * as XLSX from 'xlsx'
 import { userDb, submissionDb, selectionDb, treeDb, institutionDb, useLocalState, addLog } from '../../db'
 import InstIcon from '../../components/InstIcon'
+import InstTabs from '../../components/InstTabs'
 import { can } from '../../permissions'
 
 // ── Tiebreaker: təhsilalanı sıralamaq üçün bal massivi ──────────────────────────
@@ -922,6 +923,8 @@ export default function Distribution() {
   const [mode,     setMode]     = useState<Mode>(null)
   const [saved,    setSaved]    = useState(false)
   const [running,  setRunning]  = useState(false)
+  const [runStep,  setRunStep]  = useState(0)
+  const [runDur,   setRunDur]   = useState(3000)
   const [showConf, setShowConf] = useState(false)
   const [algorithm, setAlgorithm] = useState<'greedy' | 'gale-shapley'>('greedy')
   const [animEnabled]  = useState(true)    // animasiya həmişə aktiv
@@ -1370,12 +1373,19 @@ export default function Distribution() {
   // ── Yerləşdir ──────────────────────────────────────────────────────────────
   function handleDistribute() {
     if (running) return
-    setRunning(true)
+    // Dinamik müddət: hər 100 nəfərə 1.5 saniyə (minimum 3s)
+    const total = Math.max(3000, Math.round(submittedUsers.length / 100 * 1500))
+    // Paket üsulunda hər paket ayrı mərhələ, sadə üsulda 3 mərhələ
+    const stageCount = (method === 'packet' && (packets as any[]).length > 0) ? (packets as any[]).length : 3
+    setRunDur(total); setRunning(true); setRunStep(0)
+    for (let i = 1; i < stageCount; i++) {
+      setTimeout(() => setRunStep(i), (total * i) / stageCount)
+    }
     setTimeout(() => {
       setSaved(false); setMode('distribute'); resetSim()
       addLog('distribution', 'info', `Yerləşdirmə hesablandı`, `Seçim: ${sel?.name} · Metod: ${method} · Alqoritm: ${algorithm}`)
-      setRunning(false)
-    }, 800)
+      setRunStep(stageCount) // uğur mesajı — istifadəçi "Bağla" basana qədər qalır
+    }, total)
   }
 
   function handleConfirm() {
@@ -1769,36 +1779,27 @@ export default function Distribution() {
         )
       })()}
 
-      {/* ── Snapshot düyməsi ── */}
-      {snapshots.length > 0 && can('dist.rollback') && (
+      {/* ── Snapshot düyməsi (gizlədilib) ── */}
+      {false && snapshots.length > 0 && can('dist.rollback') && (
         <div style={{ display:'flex', marginBottom:10 }}>
           <button onClick={() => setShowRollback(true)} style={{ padding:'6px 14px', borderRadius:8, border:'1.5px solid #ff4d4f55', background:'#fff0f0', color:'#cf1322', fontWeight:700, fontSize:11, cursor:'pointer', display:'flex', alignItems:'center', gap:6 }}>
             🕓 Snapshots ({snapshots.length})
           </button>
         </div>
       )}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
-        {institutions.map((inst: any) => (
-          <button key={inst.id} onClick={() => changeInst(inst.id)}
-            style={{
-              padding: '9px 20px', borderRadius: 10, border: 'none', cursor: 'pointer',
-              fontWeight: 700, fontSize: 13, transition: 'all .15s',
-              background: instId === inst.id ? 'var(--blue)' : '#f0f2fa',
-              color:      instId === inst.id ? '#fff'        : 'var(--muted)',
-              boxShadow:  instId === inst.id ? '0 2px 10px #c9962a33' : 'none',
-            }}>
-            <InstIcon icon={inst.icon} size={16} style={{ marginRight: 4 }} />
-            {inst.label}
-          </button>
-        ))}
-        {instSelections.length > 1 && (
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
+      <InstTabs
+        insts={institutions}
+        activeId={instId}
+        onSelect={changeInst}
+        trailing={instSelections.length > 1 ? (
           <>
             <div style={{ width: 1, height: 28, background: 'var(--border)', margin: '0 4px' }} />
             <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', marginRight: 4 }}>Seçim:</span>
             {instSelections.map((s: any) => (
               <button key={s.id} onClick={() => changeSelection(s.id)}
                 style={{
-                  padding: '9px 18px', borderRadius: 10, cursor: 'pointer', fontWeight: 700, fontSize: 13, transition: 'all .15s',
+                  padding: '9px 18px', borderRadius: 10, cursor: 'pointer', fontWeight: 700, fontSize: 13, transition: 'all .15s', height: 42,
                   border: '1.5px solid ' + (sel?.id === s.id ? '#f5a623' : 'var(--border)'),
                   background: sel?.id === s.id ? '#fff8e6' : '#fff',
                   color: sel?.id === s.id ? '#d46b08' : 'var(--muted)',
@@ -1807,19 +1808,86 @@ export default function Distribution() {
               </button>
             ))}
           </>
-        )}
-      </div>
+        ) : undefined}
+      />
 
       {/* ── Yerləşdirmə yükləmə animasiyası ── */}
-      {running && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(43,47,58,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000 }}>
-          <div style={{ background: '#fff', borderRadius: 14, padding: '22px 32px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, boxShadow: '0 12px 40px rgba(0,0,0,.25)' }}>
-            <div style={{ width: 38, height: 38, border: '4px solid #f0e3bd', borderTopColor: '#e0a92e', borderRadius: '50%', animation: 'distrib-spin 0.8s linear infinite' }} />
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#2b2f3a' }}>Yerləşdirilir…</div>
+      {running && (() => {
+        const runLeaves = getLeavesWithPath(tree?.nodes || [])
+        const runQuota  = runLeaves.reduce((s: number, { leaf }: any) => s + (leaf.quota || 0), 0)
+        // Yarpaq (son) səviyyənin adı — strukturdan dinamik
+        const leafLvl = (() => {
+          const lv: string[] = tree?.levelNames || []
+          let depth = 0
+          const walk = (nodes: any[], cur: number) => { for (const n of nodes || []) { depth = Math.max(depth, cur + 1); if (n.children?.length) walk(n.children, cur + 1) } }
+          walk(tree?.nodes || [], 0)
+          return lv[Math.max(depth, lv.length) - 1] || 'İxtisas'
+        })()
+        const isPacket = method === 'packet' && (packets as any[]).length > 0
+        const stages = isPacket
+          ? (packets as any[]).map((p: any, i: number) => `Paket ${i + 1}/${(packets as any[]).length} — ${(p.students || []).length} təhsilalan yerləşdirilir…`)
+          : [
+            `${submittedUsers.length} təhsilalan bala görə sıralanır…`,
+            `${runLeaves.length} ${leafLvl} üzrə kvotalar yoxlanılır…`,
+            `Seçim sıralarına əsasən yerləşdirmə aparılır…`,
+          ]
+        const done = runStep >= stages.length
+        return (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(43,47,58,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000 }}>
+          <div style={{ background: '#fff', borderRadius: 16, width: 420, maxWidth: '92vw', overflow: 'hidden', boxShadow: '0 16px 50px rgba(0,0,0,.3)' }}>
+            {/* Başlıq */}
+            <div style={{ background: done ? 'linear-gradient(135deg,#389e0d,#52c41a)' : 'linear-gradient(135deg,#b8860b,#e0a92e)', padding: '16px 22px', display: 'flex', alignItems: 'center', gap: 12, transition: 'background .4s' }}>
+              {done
+                ? <div style={{ width: 30, height: 30, borderRadius: '50%', background: '#ffffff2e', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 17, flexShrink: 0 }}>✅</div>
+                : <div style={{ width: 30, height: 30, border: '3px solid #ffffff55', borderTopColor: '#fff', borderRadius: '50%', animation: 'distrib-spin 0.8s linear infinite', flexShrink: 0 }} />}
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 800, color: '#fff' }}>{done ? 'Yerləşdirmə uğurla tamamlandı' : 'Yerləşdirmə aparılır'}</div>
+                <div style={{ fontSize: 11, color: '#ffffffcc', marginTop: 2 }}>{sel?.name || ''}</div>
+              </div>
+            </div>
+            {/* Say kartları */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, padding: '16px 22px 6px' }}>
+              {[
+                { icon: '👥', val: submittedUsers.length, lbl: 'Təhsilalan' },
+                { icon: '🎓', val: runLeaves.length,      lbl: leafLvl },
+                { icon: '🎯', val: runQuota,              lbl: 'Kvota' },
+              ].map(k => (
+                <div key={k.lbl} style={{ background: '#f8f9fd', border: '1.5px solid #eef0f8', borderRadius: 10, padding: '10px 8px', textAlign: 'center' }}>
+                  <div style={{ fontSize: 16 }}>{k.icon}</div>
+                  <div style={{ fontSize: 18, fontWeight: 900, color: '#2b2f3a', lineHeight: 1.2 }}>{k.val}</div>
+                  <div style={{ fontSize: 10, color: '#8a909c', fontWeight: 700 }}>{k.lbl}</div>
+                </div>
+              ))}
+            </div>
+            {/* Mərhələlər */}
+            <div style={{ padding: '10px 22px 4px', display: 'flex', flexDirection: 'column', gap: 7 }}>
+              {stages.map((s, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: i < runStep ? '#237804' : i === runStep ? '#2b2f3a' : '#c0c4d0', fontWeight: i === runStep ? 700 : 500, transition: 'color .3s' }}>
+                  <span style={{ width: 16, textAlign: 'center' }}>{i < runStep ? '✅' : i === runStep ? '⏳' : '○'}</span>
+                  {s}
+                </div>
+              ))}
+            </div>
+            {/* Progress bar */}
+            <div style={{ padding: '12px 22px 18px' }}>
+              <div style={{ height: 8, background: '#f0e3bd', borderRadius: 5, overflow: 'hidden' }}>
+                <div style={{ height: '100%', background: done ? 'linear-gradient(90deg,#389e0d,#52c41a)' : 'linear-gradient(90deg,#b8860b,#e0a92e)', borderRadius: 5, animationName: 'distrib-fill', animationDuration: `${runDur}ms`, animationTimingFunction: 'linear', animationFillMode: 'forwards', transition: 'background .4s' }} />
+              </div>
+            </div>
+            {/* Bağla düyməsi — yalnız uğur mesajından sonra */}
+            {done && (
+              <div style={{ padding: '0 22px 20px' }}>
+                <button onClick={() => setRunning(false)}
+                  style={{ width: '100%', padding: '11px 16px', borderRadius: 10, border: 'none', background: '#52c41a', color: '#fff', fontWeight: 800, fontSize: 14, cursor: 'pointer', boxShadow: '0 4px 14px #52c41a44' }}>
+                  ✓ Bağla və nəticəyə bax
+                </button>
+              </div>
+            )}
           </div>
-          <style>{`@keyframes distrib-spin { to { transform: rotate(360deg) } }`}</style>
+          <style>{`@keyframes distrib-spin { to { transform: rotate(360deg) } } @keyframes distrib-fill { from { width: 0% } to { width: 100% } }`}</style>
         </div>
-      )}
+        )
+      })()}
 
       {/* ── Metod seçimi (method === null) ── */}
       {!method && sel && tree && (() => {
@@ -1935,9 +2003,9 @@ export default function Distribution() {
           ════════════════════════════════════════ */}
       {method === 'simple' && (
         <>
-          <div style={{ background: '#ffffff', border: '1.5px solid #e7eaf0', borderRadius: 16, padding: '22px 26px', marginBottom: 20 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <div style={{ color: '#2b2f3a', fontWeight: 800, fontSize: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ background: '#ffffff', border: '1.5px solid #e7eaf0', borderRadius: 14, padding: '12px 18px', marginBottom: 14 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+              <div style={{ color: '#2b2f3a', fontWeight: 800, fontSize: 14, display: 'flex', alignItems: 'center', gap: 10 }}>
                 <span>📋</span> Sadə Üsul
                 <span style={{ fontSize: 13, color: '#8a909c', fontWeight: 500, display:'inline-flex', alignItems:'center', gap:5 }}>— <InstIcon icon={activeInst?.icon} size={14} /> {activeInst?.label}</span>
               </div>
@@ -2008,9 +2076,9 @@ export default function Distribution() {
       {method === 'packet' && (
         <>
           {/* Panel */}
-          <div style={{ background: '#ffffff', border: '1.5px solid #e7eaf0', borderRadius: 16, padding: '22px 26px', marginBottom: 20 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <div style={{ color: '#2b2f3a', fontWeight: 800, fontSize: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ background: '#ffffff', border: '1.5px solid #e7eaf0', borderRadius: 14, padding: '12px 18px', marginBottom: 14 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+              <div style={{ color: '#2b2f3a', fontWeight: 800, fontSize: 14, display: 'flex', alignItems: 'center', gap: 10 }}>
                 <span>📦</span> Paket Üsulu
                 <span style={{ fontSize: 13, color: '#8a909c', fontWeight: 500, display:'inline-flex', alignItems:'center', gap:5 }}>— <InstIcon icon={activeInst?.icon} size={14} /> {activeInst?.label}</span>
               </div>
@@ -2059,8 +2127,8 @@ export default function Distribution() {
                     style={{
                       width: 80, padding: '8px 12px', borderRadius: 9,
                       border: '1.5px solid #f5a623',
-                      background: '#f0f2f8',
-                      color: '#fff',
+                      background: '#fff',
+                      color: '#2b2f3a',
                       fontWeight: 800, fontSize: 18,
                       textAlign: 'center', outline: 'none',
                     }}
@@ -2275,6 +2343,7 @@ export default function Distribution() {
 
         </>
       )}
+      </div>
     </>
   )
 }
@@ -2509,24 +2578,30 @@ function PlacementResult({ mode, saved, placement, submittedUsers, studentRows,
       )}
 
       {/* Cədvəl */}
-      <div className="card">
-        <div className="card-head">
+      <div className="card" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', marginBottom: 0 }}>
+        <div className="card-head" style={{ padding: '10px 18px', flexShrink: 0 }}>
           <div>
-            <div className="card-title">{mode === 'sim' ? '👁 Simulyasiya Nəticəsi' : '📋 Yerləşdirmə Nəticəsi'}</div>
-            <div className="card-sub">{mode === 'sim' ? 'Yalnız önizləmə — bazaya yazılmayıb' : saved ? '✅ Nəticələr bazaya yazıldı' : 'Nəticəni yoxlayın, sonra "Bazaya Yaz" düyməsinə basın'}</div>
+            <div className="card-title" style={{ fontSize: 14 }}>{mode === 'sim' ? '👁 Simulyasiya Nəticəsi' : '📋 Yerləşdirmə Nəticəsi'}</div>
+            <div style={{ fontSize: 11.5, fontWeight: 700, marginTop: 3, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <span style={{ color: '#8a909c' }}>{studentRows.length} nəticə</span>
+              <span style={{ color: '#8a909c' }}>·</span>
+              <span style={{ color: '#237804' }}>{placedCount} yerləşdirilib</span>
+              <span style={{ color: '#8a909c' }}>·</span>
+              <span style={{ color: unplacedCount > 0 ? '#cf1322' : '#8a909c' }}>{unplacedCount} yerləşdirilməyib</span>
+            </div>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             {mode === 'distribute' && !saved && (
-              <button onClick={onSave} style={{ padding: '10px 22px', borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#52c41a,#237804)', color: '#fff', fontWeight: 800, fontSize: 13, boxShadow: '0 4px 16px #52c41a44' }}>
+              <button onClick={onSave} style={{ padding: '7px 16px', borderRadius: 9, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#52c41a,#237804)', color: '#fff', fontWeight: 800, fontSize: 12, boxShadow: '0 3px 12px #52c41a44' }}>
                 💾 Bazaya Yaz
               </button>
             )}
-            {saved && <span style={{ background: '#f0fff4', border: '1.5px solid #52c41a66', borderRadius: 10, padding: '8px 18px', fontSize: 13, color: '#237804', fontWeight: 800 }}>✅ Bazaya yazıldı</span>}
-            <button onClick={onExport} style={{ padding: '9px 16px', borderRadius: 10, border: 'none', background: '#1d6f42', color: '#fff', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>📥 Excel</button>
+            {saved && <span style={{ background: '#f0fff4', border: '1.5px solid #52c41a66', borderRadius: 9, padding: '6px 14px', fontSize: 12, color: '#237804', fontWeight: 800 }}>✅ Bazaya yazıldı</span>}
+            <button onClick={onExport} style={{ padding: '7px 14px', borderRadius: 9, border: 'none', background: '#1d6f42', color: '#fff', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>📥 Excel</button>
           </div>
         </div>
 
-        <div className="search-row">
+        <div className="search-row" style={{ padding: '8px 18px', flexShrink: 0 }}>
           <input className="search-input" placeholder="🔍  Ad və ya FİN..." value={nameQ} onChange={e => setNameQ(e.target.value)} />
           <select className="filter-select" value={statusFlt} onChange={e => setStatusFlt(e.target.value)}>
             <option value="all">Bütün statuslar</option>
@@ -2537,9 +2612,9 @@ function PlacementResult({ mode, saved, placement, submittedUsers, studentRows,
           <input className="search-input" style={{ width: 110 }} placeholder="Maks. bal" type="number" value={scoreMax} onChange={e => setScoreMax(e.target.value)} />
         </div>
 
-        <div className="card-body" style={{ overflowX: 'auto' }}>
+        <div className="card-body" style={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
           <table style={{ minWidth: 820 }}>
-            <thead>
+            <thead style={{ position: 'sticky', top: 0, zIndex: 2, background: '#f8f9fd' }}>
               <tr>
                 <th style={{ width: 44 }}>#</th>
                 <th>TƏHSİLALAN</th>

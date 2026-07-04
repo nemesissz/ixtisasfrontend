@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { userDb, submissionDb, selectionDb, treeDb, institutionDb, useLocalState, addLog } from '../../db'
-import InstIcon from '../../components/InstIcon'
+import InstTabs from '../../components/InstTabs'
 import { AppDialog, useDialog } from '../../components/AppDialog'
 import { can } from '../../permissions'
 
@@ -262,15 +262,7 @@ export default function Redistribute() {
       {dialog && <AppDialog cfg={dialog} onClose={closeDialog} />}
 
       {/* Müəssisə seçimi */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
-        {institutions.map((inst: any) => (
-          <button key={inst.id} onClick={() => changeInst(inst.id)}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 16px', borderRadius: 10, cursor: 'pointer', fontWeight: 700, fontSize: 13,
-              border: `1.5px solid ${instId === inst.id ? '#c9962a' : '#e0e4f0'}`, background: instId === inst.id ? '#c9962a' : '#fff', color: instId === inst.id ? '#fff' : '#777' }}>
-            <InstIcon icon={inst.icon} size={14} /> {inst.label}
-          </button>
-        ))}
-      </div>
+      <InstTabs insts={institutions} activeId={instId} onSelect={changeInst} />
 
       {!sel || !hasPlacement ? (
         <div style={{ background: '#fafbff', border: '1.5px dashed #d8dcf0', borderRadius: 16, padding: '48px 32px', textAlign: 'center' }}>

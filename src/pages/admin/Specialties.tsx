@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { treeDb, userDb, treeArchiveDb, institutionDb, useLocalState, addLog } from '../../db'
 import { AppDialog, useDialog } from '../../components/AppDialog'
 import InstIcon, { isImageIcon } from '../../components/InstIcon'
+import InstTabs from '../../components/InstTabs'
 import { can } from '../../permissions'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -1340,30 +1341,11 @@ export default function Specialties() {
       )}
 
       {/* ── Müəssisə tabları + Yeni struktur düyməsi ── */}
-      {(insts as any[]).length > 0 && (
-        <div style={{ display: 'flex', gap: 6, marginBottom: 16, alignItems: 'center', flexWrap: 'wrap' }}>
-          {(insts as any[]).map((inst: any) => {
-            const activeTab = tab || (insts as any[])[0]?.id || ''
-            const isActive = activeTab === inst.id
-            return (
-              <button
-                key={inst.id}
-                onClick={() => setTab(inst.id)}
-                style={{
-                  padding: '10px 22px', borderRadius: 10,
-                  border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 14,
-                  transition: 'all .15s',
-                  background: isActive ? 'var(--blue)' : '#f0f2fa',
-                  color:      isActive ? '#fff'        : 'var(--muted)',
-                  boxShadow:  isActive ? '0 2px 10px #c9962a33' : 'none',
-                }}
-              >
-                <InstIcon icon={inst.icon} size={16} style={{ marginRight: 4 }} />
-                {inst.label}
-              </button>
-            )
-          })}
-          {can('tree.edit') && (
+      <InstTabs
+        insts={insts as any[]}
+        activeId={tab || (insts as any[])[0]?.id || ''}
+        onSelect={(id) => setTab(id)}
+        trailing={can('tree.edit') ? (
           <button
             onClick={() => {
               const activeId = tab || (insts as any[])[0]?.id || ''
@@ -1371,7 +1353,7 @@ export default function Specialties() {
               setModal({ type: 'createTree', name: '', instId: activeInst?.id || '', instLabel: activeInst?.label || '', year: getInstYear(activeId), icon: '' })
             }}
             style={{
-              padding: '10px 18px', borderRadius: 10, border: '1.5px dashed #c5d0ff',
+              padding: '10px 18px', borderRadius: 10, border: '1.5px dashed #c5d0ff', height: 42,
               background: '#f8f9ff', color: 'var(--blue)', fontWeight: 700, fontSize: 13,
               cursor: 'pointer', transition: 'all .15s',
             }}
@@ -1380,9 +1362,8 @@ export default function Specialties() {
           >
             + Yeni İxtisas Strukturu
           </button>
-          )}
-        </div>
-      )}
+        ) : undefined}
+      />
 
       {/* ── Kart siyahısı ── */}
       {(() => {

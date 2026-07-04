@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import { institutionDb, userDb, treeDb, selectionDb, submissionDb } from '../../db'
 import InstIcon from '../../components/InstIcon'
+import InstTabs from '../../components/InstTabs'
 
 // ── Köməkçilər ────────────────────────────────────────────────────────────────
 function getLeaves(nodes: any[], anc: any[] = []): Array<{ leaf: any; path: any[] }> {
@@ -80,6 +81,7 @@ export default function Dashboard() {
   const allSels = selectionDb.getAll() as any[]
   const [instId, setInstId] = useState<string>(insts[0]?.id || '')
   const [sortBy, setSortBy] = useState<'comp' | 'fill' | 'avg' | 'quota'>('quota')
+  const [showAllChoices, setShowAllChoices] = useState(false)
 
   // ── Qlobal göstəricilər (bütün müəssisələr) ──
   // ── Seçilmiş müəssisə analitikası ──
@@ -181,8 +183,11 @@ export default function Dashboard() {
 
     // rəqabət reytinqi
     const ranked = byLeaf.filter(l => l.quota > 0).map(l => ({ ...l, comp: l.demand / l.quota }))
-    const mostCompetitive = [...ranked].sort((a, b) => b.comp - a.comp).slice(0, 5)
-    const leastDemanded = [...ranked].sort((a, b) => a.comp - b.comp).slice(0, 5)
+    // Bütün ixtisaslar iki yarıya bölünür: rəqabətli yarı + az tələb olunan yarı (dinamik)
+    const byComp = [...ranked].sort((a, b) => b.comp - a.comp)
+    const half = Math.ceil(byComp.length / 2)
+    const mostCompetitive = byComp.slice(0, half)
+    const leastDemanded = byComp.slice(half).reverse()
 
     return {
       sel, tree, instUsers, leaves, byLeaf, choiceDist, hist, scoreBuckets, totalQuota, avgScore,
@@ -203,7 +208,6 @@ export default function Dashboard() {
   }, [A.byLeaf, sortBy])
 
   const activeInst = insts.find(i => i.id === instId)
-  const maxChoice = Math.max(1, ...Object.keys(A.choiceDist).map(Number))
 
   const LEVEL_ICONS = ['⚔️', '🎖️', '🎓', '📘', '📗']
   const INST_KPIS = [
@@ -217,18 +221,7 @@ export default function Dashboard() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
       {/* Müəssisə seçicisi */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-        {insts.map(i => {
-          const active = i.id === instId
-          return (
-            <button key={i.id} onClick={() => setInstId(i.id)}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '8px 16px', borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: 'pointer',
-                background: active ? '#c9962a' : '#fff', color: active ? '#fff' : 'var(--text)', border: `1.5px solid ${active ? '#c9962a' : 'var(--border)'}`, transition: 'all .15s' }}>
-              <InstIcon icon={i.icon} size={15} /> {i.label}
-            </button>
-          )
-        })}
-      </div>
+      <InstTabs insts={insts} activeId={instId} onSelect={setInstId} />
 
       {!activeInst ? (
         <Card title="Məlumat yoxdur">
@@ -301,11 +294,21 @@ export default function Dashboard() {
               {Object.keys(A.choiceDist).length === 0 ? (
                 <div style={{ color: 'var(--muted)', fontSize: 13, padding: '14px 0' }}>Hələ yerləşdirmə aparılmayıb.</div>
               ) : (
-                <Bars data={Array.from({ length: maxChoice }, (_, i) => i + 1).map(c => ({
-                  label: `${c}-ci seçim`, value: A.choiceDist[c] || 0,
-                  color: c === 1 ? '#52c41a' : c <= 3 ? '#c9962a' : '#faad14',
-                  sub: `(${pct(A.choiceDist[c] || 0, A.placed)}%)`,
-                }))} />
+                <>
+                  <Bars data={Array.from({ length: Math.max(A.byLeaf.length, 1) }, (_, i) => i + 1)
+                    .slice(0, showAllChoices ? undefined : 3)
+                    .map(c => ({
+                      label: `${c}-ci seçim`, value: A.choiceDist[c] || 0,
+                      color: c === 1 ? '#52c41a' : c <= 3 ? '#c9962a' : '#faad14',
+                      sub: `(${A.placed > 0 ? ((A.choiceDist[c] || 0) / A.placed * 100).toFixed(2) : '0.00'}%)`,
+                    }))} />
+                  {A.byLeaf.length > 3 && (
+                    <button onClick={() => setShowAllChoices(v => !v)}
+                      style={{ marginTop: 10, width: '100%', padding: '8px 12px', borderRadius: 8, border: '1.5px solid var(--border)', background: '#f8f9fd', color: 'var(--blue)', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>
+                      {showAllChoices ? '▲ Yığ' : `▼ Hamısına bax (${A.byLeaf.length})`}
+                    </button>
+                  )}
+                </>
               )}
             </Card>
 
@@ -424,7 +427,7 @@ export default function Dashboard() {
           {A.byLeaf.length > 0 && (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 14 }}>
               <Card title="Ən rəqabətli ixtisaslar" icon="🔥">
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 9, maxHeight: 340, overflowY: 'auto' }}>
                   {A.mostCompetitive.map((l: any, i: number) => (
                     <div key={l.id} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13 }}>
                       <span style={{ width: 22, height: 22, borderRadius: 7, background: '#fff1f0', color: '#cf1322', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, flexShrink: 0 }}>{i + 1}</span>
@@ -436,7 +439,7 @@ export default function Dashboard() {
                 </div>
               </Card>
               <Card title="Ən az tələb olunan ixtisaslar" icon="❄️">
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 9, maxHeight: 340, overflowY: 'auto' }}>
                   {A.leastDemanded.map((l: any, i: number) => (
                     <div key={l.id} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13 }}>
                       <span style={{ width: 22, height: 22, borderRadius: 7, background: '#f0f5ff', color: '#2f54eb', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, flexShrink: 0 }}>{i + 1}</span>
