@@ -447,7 +447,7 @@ export default function OperatorDashboard() {
           <table style={{ minWidth: 780 }}>
             <thead>
               <tr>
-                <th style={{ width: 44 }}>#</th>
+                <th style={{ width: 44 }}>№</th>
                 <th>TƏHSİLALAN</th>
                 <th>İŞ NÖMRƏSİ</th>
                 <th>FİN</th>

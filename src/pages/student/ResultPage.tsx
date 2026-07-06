@@ -111,7 +111,7 @@ export default function ResultPage() {
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <thead>
                     <tr style={{ background: 'var(--bg)' }}>
-                      <th style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, color: 'var(--muted)', fontWeight: 700, width: 44 }}>#</th>
+                      <th style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, color: 'var(--muted)', fontWeight: 700, width: 44 }}>№</th>
                       <th style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, color: 'var(--muted)', fontWeight: 700 }}>İXTİSAS</th>
                       <th style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, color: 'var(--muted)', fontWeight: 700, width: 100 }}>STATUS</th>
                     </tr>

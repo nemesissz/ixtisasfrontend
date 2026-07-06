@@ -366,7 +366,7 @@ function UserArchiveCard({ arc, idx, expanded, searchQ, onToggle, onSearch, onDe
 
   function exportExcel() {
     const data = rows.map((u, i) => ({
-      '#': i + 1, 'Ad Soyad': u.name, 'Ata adı': u.parentName || '—',
+      '№': i + 1, 'Ad Soyad': u.name, 'Ata adı': u.parentName || '—',
       'İş nömrəsi': u.workNumber || '—', 'FİN': u.fin || '—',
       'Qrup': u.group || '—', 'Bal': Number(u.score).toFixed(2),
       'Yerləşdiyi ixtisas': u.placedSpecialty || 'Yerləşdirilməyib',
@@ -505,7 +505,7 @@ function UserArchiveCard({ arc, idx, expanded, searchQ, onToggle, onSearch, onDe
             <table style={{ minWidth: hasGroups ? 820 : 750 }}>
               <thead>
                 <tr>
-                  <th style={{ width: 40 }}>#</th>
+                  <th style={{ width: 40 }}>№</th>
                   <th>TƏHSİLALAN</th>
                   <th>İŞ NÖMRƏSİ</th>
                   <th>FİN</th>
@@ -595,7 +595,7 @@ function ArchiveCard({ sel, idx, allUsers, expanded, instFlt, searchQ,
 
   function exportExcel() {
     const data = rows.map((u: any, i: number) => ({
-      '#': i + 1, 'Təhsilalan': u.name, 'FİN': u.fin || '—',
+      '№': i + 1, 'Təhsilalan': u.name, 'FİN': u.fin || '—',
       'İş nömrəsi': u.workNumber || '—',
       'Müəssisə': u.institution === 'kollec' ? 'Hərbi Kollec' : 'AHM',
       'Bal': Number(u.score).toFixed(2), 'Qrup': u.group || '—',
@@ -746,7 +746,7 @@ function ArchiveCard({ sel, idx, allUsers, expanded, instFlt, searchQ,
             <table style={{ minWidth: 760 }}>
               <thead>
                 <tr>
-                  <th style={{ width: 40 }}>#</th>
+                  <th style={{ width: 40 }}>№</th>
                   <th>TƏHSİLALAN</th>
                   <th>FİN</th>
                   <th style={{ width: 90 }}>BAL</th>

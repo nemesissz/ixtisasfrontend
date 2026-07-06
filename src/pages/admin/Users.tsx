@@ -161,7 +161,7 @@ function generatePrintHTML(user: any, sel: any, nameMap: Record<string, string>,
 
 // ── Excel export ──────────────────────────────────────────────────────────────
 function exportToExcel(rows: any[], instLabel: string, instId: string, subCountMap: Record<string, number>, included?: Set<string>) {
-  const inc = (c: string) => c === '#' || !included || included.has(c)
+  const inc = (c: string) => c === '№' || !included || included.has(c)
   // ── Təhsilalan seçimlərini hazırla (müəssisənin seçimi üzrə) ──
   const allSels = selectionDb.getAll() as any[]
   const sel = allSels.find((s: any) => s.institution === instId && s.status === 'published')
@@ -200,7 +200,7 @@ function exportToExcel(rows: any[], instLabel: string, instId: string, subCountM
     const nameParts = (u.name || '').trim().split(/\s+/)
     const firstName = nameParts[0] || ''
     const lastName  = nameParts.slice(1).join(' ') || ''
-    const base: any = { '#': i + 1 }
+    const base: any = { '№': i + 1 }
     if (inc('Ad'))               base['Ad'] = firstName
     if (inc('Soyad'))            base['Soyad'] = lastName
     if (inc('Ata adı'))          base['Ata adı'] = u.parentName || '—'
@@ -227,7 +227,7 @@ function exportToExcel(rows: any[], instLabel: string, instId: string, subCountM
     : k === 'Yerləşdiyi ixtisas'   ? { wch: 24 }
     : k === 'Ümumi imtahan nəticəsi' ? { wch: 18 }
     : k === 'Təhsil müəssisəsi' || k === 'Seçim statusu' || k === 'Çap statusu' ? { wch: 15 }
-    : k === '#' ? { wch: 4 }
+    : k === '№' ? { wch: 4 }
     : { wch: 13 }
   )
   const choiceColIdx = colKeys.indexOf('Təhsilalanın seçimləri (prioritetlə)')
@@ -249,7 +249,7 @@ function buildLeveledSheet(
   rows: any[], instLabel: string, instId: string, subCountMap: Record<string, number>,
   included: Set<string> | undefined, selMode: 'levels' | 'flat',
 ) {
-  const inc = (c: string) => c === '#' || !included || included.has(c)
+  const inc = (c: string) => c === '№' || !included || included.has(c)
   const allSels = selectionDb.getAll() as any[]
   const sel = allSels.find((s: any) => s.institution === instId && s.status === 'published')
           || allSels.find((s: any) => s.institution === instId && s.status !== 'draft')
@@ -273,7 +273,7 @@ function buildLeveledSheet(
   const hasGender  = rows.some((u: any) => u.gender)
 
   // Bütün tək sütunlar, sonra seçilənlərə süz
-  const singleAll = ['#', 'Ad', 'Soyad', 'Ata adı', 'İş nömrəsi', 'FİN', 'Təhsil müəssisəsi', 'Tədris ili']
+  const singleAll = ['№', 'Ad', 'Soyad', 'Ata adı', 'İş nömrəsi', 'FİN', 'Təhsil müəssisəsi', 'Tədris ili']
   if (hasGroups)  singleAll.push('Qrup')
   if (hasSources) singleAll.push('Mənbə')
   if (hasGender)  singleAll.push('Cins')
@@ -319,7 +319,7 @@ function buildLeveledSheet(
     const hasSub = subCountMap[u.id] > 0
     const parts = (u.name || '').trim().split(/\s+/)
     const vmap: Record<string, any> = {
-      '#': idx + 1, 'Ad': parts[0] || '', 'Soyad': parts.slice(1).join(' ') || '',
+      '№': idx + 1, 'Ad': parts[0] || '', 'Soyad': parts.slice(1).join(' ') || '',
       'Ata adı': u.parentName || '—', 'İş nömrəsi': u.workNumber || '—', 'FİN': u.fin || '—',
       'Təhsil müəssisəsi': instLabel, 'Tədris ili': u.year || '—',
       'Qrup': u.group || '—', 'Mənbə': u.source || '—',
@@ -358,7 +358,7 @@ function buildLeveledSheet(
   }
   ws['!merges'] = merges
 
-  const cols: any[] = singleCols.map(k => k === '#' ? { wch: 4 } : k === 'Ümumi imtahan nəticəsi' ? { wch: 16 } : { wch: 13 })
+  const cols: any[] = singleCols.map(k => k === '№' ? { wch: 4 } : k === 'Ümumi imtahan nəticəsi' ? { wch: 16 } : { wch: 13 })
   if (showPlaced) for (let i = 0; i < nLv; i++) cols.push({ wch: 26 })
   if (showSel) {
     if (selMode === 'levels') for (let i = 0; i < nLv; i++) cols.push({ wch: 40 })

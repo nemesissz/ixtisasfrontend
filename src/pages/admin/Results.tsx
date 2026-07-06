@@ -86,7 +86,7 @@ export default function Results() {
 
   function exportExcel() {
     const data = rows.map((u, i) => ({
-      '#': i + 1, 'Təhsilalan': u.name, 'FİN': u.fin || '—', 'İş nömrəsi': u.workNumber || '—',
+      '№': i + 1, 'Təhsilalan': u.name, 'FİN': u.fin || '—', 'İş nömrəsi': u.workNumber || '—',
       'Müəssisə': (u.institution && instMap[u.institution]?.label) || '—', 'Bal': Number(u.score).toFixed(2),
       ...(showGroup ? { 'Qrup': u.group || '—' } : {}),
       'Seçim sırası': u.choiceNum ? `${u.choiceNum}-ci` : '—',
@@ -195,7 +195,7 @@ export default function Results() {
           <table style={{ minWidth: 720 }}>
             <thead>
               <tr>
-                <th style={{ width: 40 }}>#</th>
+                <th style={{ width: 40 }}>№</th>
                 <th>TƏHSİLALAN</th>
                 <th>FİN</th>
                 <th style={{ width: 80 }}>BAL</th>

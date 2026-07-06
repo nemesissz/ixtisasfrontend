@@ -1450,7 +1450,7 @@ export default function Distribution() {
 
   function exportExcel() {
     const data = studentRows.map((r, i) => ({
-      '#': i + 1, 'Təhsilalan': r.user.name, 'FİN': r.user.fin || '—',
+      '№': i + 1, 'Təhsilalan': r.user.name, 'FİN': r.user.fin || '—',
       'Bal': Number(r.user.score).toFixed(2),
       'Status': r.assignment ? 'Yerləşdirilib' : 'Yerləşdirilməyib',
       'Yerləşdiyi ixtisas': r.path.map((n: any) => n.name).join(' → ') || '—',
@@ -2489,7 +2489,7 @@ function PlacementResult({ mode, saved, placement, submittedUsers, studentRows,
               background: '#f4f7ff', borderBottom: '2px solid #e8ecff',
               fontSize: 10, fontWeight: 700, color: 'var(--muted)', letterSpacing: 0.5,
             }}>
-              <span>#</span>
+              <span>№</span>
               <span>İXTİSAS</span>
               <span style={{ textAlign: 'center' }}>KVOTA</span>
               <span style={{ textAlign: 'center' }}>DOLU</span>
@@ -2616,7 +2616,7 @@ function PlacementResult({ mode, saved, placement, submittedUsers, studentRows,
           <table style={{ minWidth: 820 }}>
             <thead style={{ position: 'sticky', top: 0, zIndex: 2, background: '#f8f9fd' }}>
               <tr>
-                <th style={{ width: 44 }}>#</th>
+                <th style={{ width: 44 }}>№</th>
                 <th>TƏHSİLALAN</th>
                 <th style={{ width: 90 }}>BAL</th>
                 <th style={{ width: 140 }}>STATUS</th>

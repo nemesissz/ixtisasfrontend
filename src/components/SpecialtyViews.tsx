@@ -133,7 +133,7 @@ export function FlatView({ flat, onChange, submitted = false, levelNames }: {
         background: '#f3e3b8', border: '2px solid #ecd9a0',
         borderRadius: '12px 12px 0 0', overflow: 'hidden',
       }}>
-        {[['#','center'],[lv[0] || 'Səviyyə 1','left'],[lv[1] || 'Səviyyə 2','left'],[lv[2] || 'Səviyyə 3','left'],['','center']].map(([h, align], i) => (
+        {[['№','center'],[lv[0] || 'Səviyyə 1','left'],[lv[1] || 'Səviyyə 2','left'],[lv[2] || 'Səviyyə 3','left'],['','center']].map(([h, align], i) => (
           <div key={i} style={{
             padding: '10px 14px', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5,
             borderRight: i < 4 ? '2px solid #ecd9a0' : 'none', textAlign: align as any,
