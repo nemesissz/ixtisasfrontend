@@ -338,6 +338,15 @@ function countLeaves(nodes: TNode[]): number {
 function totalQuota(nodes: TNode[]): number {
   return nodes.reduce((s, n) => s + (!n.children?.length ? (n.quota || 0) : totalQuota(n.children)), 0)
 }
+// Ağacın faktiki dərinliyi (səviyyə sayı)
+function treeDepth(nodes: TNode[], d = 1): number {
+  let max = 0
+  for (const n of nodes || []) {
+    max = Math.max(max, (n.children?.length ? treeDepth(n.children, d + 1) : d))
+  }
+  return max
+}
+
 
 // ── Icon picker (şəkil yükləmə) ───────────────────────────────────────────────
 function IconPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
@@ -529,8 +538,10 @@ function QuotaModeModal({ node, instUsers, onSave, onClose }: {
                   <div style={{ fontSize: 10, color: '#531dab', opacity: 0.7 }}>{quota > 0 ? Math.round(autoLisey/quota*100) : 0}%</div>
                 </div>
               </div>
-              <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 10, lineHeight: 1.5 }}>
-                Müəssisədə olan təhsilalan nisbətinə görə hər yerləşdirmədə yenidən hesablanır.
+              <div style={{ fontSize: 11, color: hasSrc ? 'var(--muted)' : '#c47f0a', marginTop: 10, lineHeight: 1.5 }}>
+                {hasSrc
+                  ? <>Müəssisə nisbətinə görə (Mülki {Math.round(mülkiTotal/total*100)}% · Lisey {Math.round(liseyTotal/total*100)}%) hər yerləşdirmədə yenidən hesablanır.</>
+                  : <>⚠️ Müəssisədə hələ mənbəli təhsilalan yoxdur — yuxarıdakı dəyərlər müvəqqəti 50/50 bölgüdür. Təhsilalanlar import ediləndən sonra real nisbətə görə hesablanacaq.</>}
               </div>
             </div>
           )}
@@ -1069,8 +1080,11 @@ export default function Specialties() {
     const inst   = (insts as any[]).find((i: any) => i.id === instId)
     const name   = (modal.name || modal.instLabel || inst?.label || t?.name || '').trim()
     if (!name) return
-    treeDb.update(treeId, { ...t, name, year: modal.year?.trim() || '', icon: modal.icon ?? t.icon ?? '', institution: instId || t.institution || '' })
-    addLog('admin', 'info', `İxtisas strukturu yeniləndi: "${name}"`, `id: ${treeId}`)
+    const cleanedLevels = Array.isArray(modal.levelNames) && modal.levelNames.length
+      ? modal.levelNames.map((v: string, i: number) => (v || '').trim() || DEFAULT_LEVEL_NAMES[i] || `Səviyyə ${i + 1}`)
+      : (t?.levelNames || [...DEFAULT_LEVEL_NAMES])
+    treeDb.update(treeId, { ...t, name, year: modal.year?.trim() || '', icon: modal.icon ?? t.icon ?? '', institution: instId || t.institution || '', levelNames: cleanedLevels })
+    addLog('admin', 'info', `İxtisas strukturu yeniləndi: "${name}"`, `Səviyyələr: ${cleanedLevels.join(' › ')}`)
     refreshTrees(); setModal(null)
   }
 
@@ -1323,6 +1337,27 @@ export default function Specialties() {
             </>
           )}
 
+          {/* Struktur modalı: səviyyə adları (yalnız redaktədə) */}
+          {modal.type === 'renameTree' && Array.isArray(modal.levelNames) && (
+            <div className="form-group">
+              <label className="form-label">🏷️ Səviyyə adları</label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {modal.levelNames.map((v: string, i: number) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: '#8890b0', width: 66, flexShrink: 0 }}>Səviyyə {i + 1}</span>
+                    <input className="form-input" style={{ flex: 1 }}
+                      value={v}
+                      placeholder={DEFAULT_LEVEL_NAMES[i] || `Səviyyə ${i + 1}`}
+                      onChange={e => setModal((m: any) => ({ ...m, levelNames: m.levelNames.map((x: string, j: number) => j === i ? e.target.value : x) }))} />
+                  </div>
+                ))}
+              </div>
+              <div style={{ fontSize: 11, marginTop: 6, color: 'var(--muted)' }}>
+                Bu adlar cədvəl başlıqlarında, çap vərəqlərində və statistikalarda istifadə olunur.
+              </div>
+            </div>
+          )}
+
           {/* Node modalı: kvota (ixtisas üçün) */}
           {(modal.type === 'addNode' || modal.type === 'editNode') && (
             <div className="form-group">
@@ -1539,7 +1574,11 @@ export default function Specialties() {
                     <button className="btn btn-outline btn-sm"
                       onClick={() => {
                         const inst = (insts as any[]).find((i: any) => i.id === t.institution)
-                        setModal({ type: 'renameTree', treeId: t.id, name: t.name, instId: t.institution || '', instLabel: inst?.label || t.name, year: t.year || '', icon: t.icon || '' })
+                        const depth = Math.max(treeDepth(t.nodes || []), (t.levelNames?.length || 0), DEFAULT_LEVEL_NAMES.length)
+                        const levelNames = Array.from({ length: depth }, (_, i) => t.levelNames?.[i] ?? DEFAULT_LEVEL_NAMES[i] ?? `Səviyyə ${i + 1}`)
+                        // Tədris ili: ağacda yoxdursa təhsilalanların/müəssisənin ilinə görə dinamik götür
+                        const syncedYear = t.year || getInstYear(t.institution || '')
+                        setModal({ type: 'renameTree', treeId: t.id, name: t.name, instId: t.institution || '', instLabel: inst?.label || t.name, year: syncedYear, icon: t.icon || '', levelNames })
                       }}>
                       ✏️ Düzəlt
                     </button>

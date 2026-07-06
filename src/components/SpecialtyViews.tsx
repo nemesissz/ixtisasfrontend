@@ -129,13 +129,14 @@ export function FlatView({ flat, onChange, submitted = false, levelNames }: {
     <>
       {/* Başlıq sətiri */}
       <div style={{
-        display: 'grid', gridTemplateColumns: '40px 1fr 1fr 1fr 44px',
+        display: 'grid', gridTemplateColumns: '40px minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) 44px',
         background: '#f3e3b8', border: '2px solid #ecd9a0',
         borderRadius: '12px 12px 0 0', overflow: 'hidden',
       }}>
         {[['№','center'],[lv[0] || 'Səviyyə 1','left'],[lv[1] || 'Səviyyə 2','left'],[lv[2] || 'Səviyyə 3','left'],['','center']].map(([h, align], i) => (
           <div key={i} style={{
             padding: '10px 14px', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5,
+            minWidth: 0, overflowWrap: 'anywhere', wordBreak: 'break-word',
             borderRight: i < 4 ? '2px solid #ecd9a0' : 'none', textAlign: align as any,
             background: i === 2 ? '#f7eccf' : i === 3 ? '#fff4ef' : '#f3e3b8',
             color:      i === 2 ? '#6a4a12' : i === 3 ? '#8c3a1f' : '#5a4a12',
@@ -158,7 +159,7 @@ export function FlatView({ flat, onChange, submitted = false, levelNames }: {
               onDragOver={e => onDragOver(e, i)}
               onDragEnd={onDragEnd}
               style={{
-                display: 'grid', gridTemplateColumns: '40px 1fr 1fr 1fr 44px',
+                display: 'grid', gridTemplateColumns: '40px minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) 44px',
                 alignItems: 'stretch',
                 borderBottom: i < flat.length - 1 ? '1.5px solid #eef0f8' : 'none',
                 background: isFlash ? '#fffbe6' : isDrag ? 'rgba(79,124,255,.05)' : '#fff',
@@ -176,15 +177,15 @@ export function FlatView({ flat, onChange, submitted = false, levelNames }: {
                 {i + 1}
               </div>
               {/* Ana Qrup */}
-              <div style={{ padding: '9px 12px', display: 'flex', alignItems: 'center', fontSize: 12, fontWeight: 500, color: '#5a4a12', background: '#f8f9ff', borderRight: '2px solid #dde2f5' }}>
+              <div style={{ padding: '9px 12px', display: 'flex', alignItems: 'center', minWidth: 0, overflowWrap: 'anywhere', wordBreak: 'break-word', fontSize: 12, fontWeight: 500, color: '#5a4a12', background: '#f8f9ff', borderRight: '2px solid #dde2f5' }}>
                 {row.groupName}
               </div>
               {/* Alt Qrup */}
-              <div style={{ padding: '9px 12px', display: 'flex', alignItems: 'center', fontSize: 12, fontWeight: 500, color: '#5a4a12', background: '#faf8ff', borderRight: '1.5px solid #ece8ff' }}>
+              <div style={{ padding: '9px 12px', display: 'flex', alignItems: 'center', minWidth: 0, overflowWrap: 'anywhere', wordBreak: 'break-word', fontSize: 12, fontWeight: 500, color: '#5a4a12', background: '#faf8ff', borderRight: '1.5px solid #ece8ff' }}>
                 {row.subName}
               </div>
               {/* İxtisas */}
-              <div style={{ padding: '9px 12px', display: 'flex', alignItems: 'center', fontSize: 12, fontWeight: 500, color: '#5a4a12' }}>
+              <div style={{ padding: '9px 12px', display: 'flex', alignItems: 'center', minWidth: 0, overflowWrap: 'anywhere', wordBreak: 'break-word', fontSize: 12, fontWeight: 500, color: '#5a4a12' }}>
                 {row.specName}
               </div>
               {/* Sürükləmə tutacağı */}

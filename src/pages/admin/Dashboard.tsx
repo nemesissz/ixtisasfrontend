@@ -96,7 +96,12 @@ export default function Dashboard() {
     for (const s of subs) { const f = s.ranking?.[0]; if (f) firstChoice[f] = (firstChoice[f] || 0) + 1 }
 
     const placedUsers = instUsers.filter(u => u.placedSpecialtyId)
-    const submittedCount = instUsers.filter(u => u.status === 'submitted').length
+    // "Seçim etdi" — status sahəsi etibarsız ola bilər; faktiki göndərilmiş seçimə (submission),
+    // status-a və yerləşdirmə faktına görə birləşdirilmiş şəkildə hesablanır
+    const submittedIds = new Set(subs.map(s => s.userId))
+    const didSubmit = (u: any) => submittedIds.has(u.id) || u.status === 'submitted' || !!u.placedSpecialtyId
+    const submittedUsers = instUsers.filter(didSubmit)
+    const submittedCount = submittedUsers.length
     const pendingCount = instUsers.length - submittedCount
     const unplacedSubmitted = submittedCount - placedUsers.length
 
@@ -174,6 +179,30 @@ export default function Dashboard() {
       }
     }).filter((b: any) => b.quota > 0 || b.specs > 0)
 
+    // qrup (1-k, 1-f, 2, 3-t …) üzrə bölgü — qrup məlumatı varsa
+    const groupMap: Record<string, any[]> = {}
+    for (const u of instUsers) {
+      const g = (u.group ?? '').toString().trim()
+      if (!g) continue
+      ;(groupMap[g] ||= []).push(u)
+    }
+    const groupStats = Object.keys(groupMap).sort((a, b) => a.localeCompare(b, 'az', { numeric: true })).map(g => {
+      const us = groupMap[g]
+      const pl = us.filter(u => u.placedSpecialtyId)
+      const sc = us.map(u => u.score || 0).filter(s => s > 0)
+      return {
+        name: g,
+        count: us.length,
+        placed: pl.length,
+        mulki: us.filter(u => u.source === 'mülki').length,
+        lisey: us.filter(u => u.source === 'lisey').length,
+        fem: us.filter(u => u.gender === 'qadın').length,
+        mal: us.filter(u => u.gender === 'kişi').length,
+        avg: sc.length ? sc.reduce((a, b) => a + b, 0) / sc.length : 0,
+      }
+    })
+    const hasGroups = groupStats.length > 0
+
     // fənn üzrə orta ballar
     const subjKeys = [...new Set(instUsers.flatMap(u => Object.keys(u.subjects || {}).filter(k => u.subjects[k] != null)))]
     const subjectAvg = subjKeys.map(k => {
@@ -194,6 +223,7 @@ export default function Dashboard() {
       placed: placedUsers.length, submittedCount, pendingCount, unplacedSubmitted,
       fem, mal, hasGender, mulki, lisey, hasSource,
       minScore, maxScore, branchStats, subjectAvg, mostCompetitive, leastDemanded, levelStats,
+      groupStats, hasGroups,
       satisfaction: pct(choiceDist[1] || 0, placedUsers.length),
     }
   }, [instId, allUsers, allTrees, allSels])
@@ -372,6 +402,42 @@ export default function Dashboard() {
               )}
             </Card>
           </div>
+
+          {/* Sıra 2.7: qrup üzrə bölgü — yalnız qrup məlumatı varsa */}
+          {A.hasGroups && (
+            <Card title="Qrup üzrə bölgü" icon="🧩">
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5, minWidth: 640 }}>
+                  <thead>
+                    <tr style={{ background: '#f8f9fd', color: 'var(--muted)', textAlign: 'left' }}>
+                      <th style={{ padding: '9px 12px', fontWeight: 700 }}>Qrup</th>
+                      <th style={{ padding: '9px 12px', fontWeight: 700, textAlign: 'center' }}>Təhsilalan</th>
+                      <th style={{ padding: '9px 12px', fontWeight: 700, textAlign: 'center' }}>Yerləşən</th>
+                      {A.hasGender && <th style={{ padding: '9px 12px', fontWeight: 700, textAlign: 'center' }}>Qadın / Kişi</th>}
+                      <th style={{ padding: '9px 12px', fontWeight: 700, textAlign: 'center' }}>Orta bal</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {A.groupStats.map((g: any, i: number) => (
+                      <tr key={g.name} style={{ borderTop: '1px solid #f0f2fa', background: i % 2 ? '#fafbff' : '#fff' }}>
+                        <td style={{ padding: '9px 12px', fontWeight: 800, color: 'var(--text)' }}>{g.name}</td>
+                        <td style={{ padding: '9px 12px', textAlign: 'center', fontWeight: 700 }}>{g.count}</td>
+                        <td style={{ padding: '9px 12px', textAlign: 'center', color: g.placed > 0 ? '#237804' : 'var(--muted)' }}>{g.placed}</td>
+                        {A.hasGender && (
+                          <td style={{ padding: '9px 12px', textAlign: 'center' }}>
+                            <span style={{ color: '#eb2f96', fontWeight: 700 }}>{g.fem}</span>
+                            <span style={{ color: 'var(--muted)' }}> / </span>
+                            <span style={{ color: '#1677ff', fontWeight: 700 }}>{g.mal}</span>
+                          </td>
+                        )}
+                        <td style={{ padding: '9px 12px', textAlign: 'center', fontWeight: 700 }}>{g.avg.toFixed(2)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          )}
 
           {/* Sıra 3: ixtisas performans cədvəli */}
           <Card title="İxtisas üzrə performans" icon="🎓">

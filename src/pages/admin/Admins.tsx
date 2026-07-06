@@ -1,4 +1,5 @@
 import { useState } from "react";
+import InstIcon from "../../components/InstIcon";
 import {
   adminDb,
   systemSettingsDb,
@@ -1132,7 +1133,10 @@ export default function Admins() {
                   marginBottom: -2,
                 }}
               >
-                {inst.icon} {inst.label}
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 7, minWidth: 0, maxWidth: 240 }}>
+                  <InstIcon icon={inst.icon} size={18} />
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{inst.label}</span>
+                </span>
               </button>
             ))}
             {institutions.length === 0 && (

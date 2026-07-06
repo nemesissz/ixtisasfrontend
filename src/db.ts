@@ -519,6 +519,131 @@ export const userDb = {
   }
 })()
 
+// -- HƏHİ: 300 kvotaliq ixtisas strukturu (Quru 150 / Hava 90 / Deniz 60) -------
+//    Muesteqil self-healing seed — yeni muessise YARATMIR, movcud HƏHİ muessisesini
+//    label-a gore tapib strukturu ona baglayir. 300 telebeni exceldan ozunuz import edirsiniz.
+;(() => {
+  // Azerbaycan 'İ' herfi JS-de birlesen noqte verir; NFKD + combining-mark silinmesi ile normalize edirik
+  const norm = (s) => String(s || '').trim().toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '')
+  const instList = JSON.parse(localStorage.getItem('mmu_institutions') || '[]')
+  const hehi = instList.find((i) => norm(i.label) === 'həhi' || norm(i.label) === 'hehi')
+  if (!hehi) return   // HƏHİ muessisesi hele yaradilmayibsa, hecne etme
+  const instId = hehi.id
+  let trees = JSON.parse(localStorage.getItem('mmu_specialty_trees') || '[]')
+  const ex = trees.find((t) => t.id === 'tree_hehi_300')
+  if (!ex || !(ex.nodes && ex.nodes.length) || ex.institution !== instId) {
+    trees = trees.filter((t) => t.id !== 'tree_hehi_300')
+    trees.push({
+      id: 'tree_hehi_300', name: 'HƏHİ İxtisas Strukturu (300)', institution: instId,
+      levelNames: ['Qoşun Növü', 'Sahə', 'İxtisas'],
+      createdAt: new Date().toISOString(),
+      nodes: [
+        // ── Quru Qoşunları — 150 ──────────────────────────────────
+        { id: 'HQ_Q', name: 'Quru Qoşunları', children: [
+          { id: 'HQ_Q1', name: 'Döyüş', children: [
+            { id: 'HQ_Q1a', name: 'Piyada', quota: 40, children: [] },
+            { id: 'HQ_Q1b', name: 'Tankçı', quota: 25, children: [] },
+            { id: 'HQ_Q1c', name: 'Artilleriya', quota: 20, children: [] },
+          ] },
+          { id: 'HQ_Q2', name: 'Texniki təminat', children: [
+            { id: 'HQ_Q2a', name: 'Rabitə', quota: 20, children: [] },
+            { id: 'HQ_Q2b', name: 'Avtomobil texnikası', quota: 15, children: [] },
+          ] },
+          { id: 'HQ_Q3', name: 'Təminat', children: [
+            { id: 'HQ_Q3a', name: 'Logistika', quota: 15, children: [] },
+            { id: 'HQ_Q3b', name: 'Hərbi tibb', quota: 15, children: [] },
+          ] },
+        ] },
+        // ── Hərbi Hava Qüvvələri — 90 ─────────────────────────────
+        { id: 'HQ_H', name: 'Hərbi Hava Qüvvələri', children: [
+          { id: 'HQ_H1', name: 'Aviasiya', children: [
+            { id: 'HQ_H1a', name: 'Qırıcı pilot', quota: 20, children: [] },
+            { id: 'HQ_H1b', name: 'Helikopter pilotu', quota: 15, children: [] },
+            { id: 'HQ_H1c', name: 'Nəqliyyat təyyarəsi pilotu', quota: 10, children: [] },
+          ] },
+          { id: 'HQ_H2', name: 'Texniki təminat', children: [
+            { id: 'HQ_H2a', name: 'Aviasiya mühəndisi', quota: 18, children: [] },
+            { id: 'HQ_H2b', name: 'Təyyarə texniki', quota: 12, children: [] },
+          ] },
+          { id: 'HQ_H3', name: 'Hava müdafiəsi', children: [
+            { id: 'HQ_H3a', name: 'Zenit-raket sistemləri', quota: 15, children: [] },
+          ] },
+        ] },
+        // ── Hərbi Dəniz Qüvvələri — 60 ────────────────────────────
+        { id: 'HQ_D', name: 'Hərbi Dəniz Qüvvələri', children: [
+          { id: 'HQ_D1', name: 'Naviqasiya', children: [
+            { id: 'HQ_D1a', name: 'Naviqasiya', quota: 15, children: [] },
+            { id: 'HQ_D1b', name: 'Gəmi mexanikası', quota: 12, children: [] },
+          ] },
+          { id: 'HQ_D2', name: 'Texniki təminat', children: [
+            { id: 'HQ_D2a', name: 'Radiotexnika', quota: 13, children: [] },
+            { id: 'HQ_D2b', name: 'Elektromexanika', quota: 10, children: [] },
+          ] },
+          { id: 'HQ_D3', name: 'Təminat', children: [
+            { id: 'HQ_D3a', name: 'Dəniz logistikası', quota: 10, children: [] },
+          ] },
+        ] },
+      ],
+    })
+    localStorage.setItem('mmu_specialty_trees', JSON.stringify(trees))
+  }
+})()
+
+// -- Bir defelik miqrasiya: movcud telebelerin 'source' deyerini normalize et -----
+//    Excel importda "Mülki"/"Lisey" boyuk herfle geldiyi ucun kod === 'mülki' ile
+//    uygunlasmirdi. Butun kohne qeydleri kicik-herf standarta getir.
+;(() => {
+  const normSrc = (v) => {
+    const s = String(v ?? '').trim().toLowerCase()
+    if (!s || s === '—' || s === '-') return null
+    if (s.indexOf('mülk') === 0 || s.indexOf('mulk') === 0 || s === 'm') return 'mülki'
+    if (s.indexOf('lise') === 0 || s.indexOf('lyse') === 0 || s === 'l') return 'lisey'
+    return null
+  }
+  const users = JSON.parse(localStorage.getItem('mmu_users') || '[]')
+  let changed = false
+  const fixed = users.map((u) => {
+    if (u.source == null) return u
+    const ns = normSrc(u.source)
+    if (ns !== u.source) { changed = true; return { ...u, source: ns } }
+    return u
+  })
+  if (changed) localStorage.setItem('mmu_users', JSON.stringify(fixed))
+})()
+
+// -- Self-healing temizleme: junk (klaviatura basma) muessiseni ve bagli her seyi sil --
+//    Etiketinde eyni herf 6+ defe ardicil tekrarlanan (mes. "aaaaaa", "aqaaaaaaaaaa")
+//    test/bug muessiseleri. Normal adlarda bele tekrar olmur.
+;(() => {
+  const isJunk = (label) => /(.)\1{5,}/i.test(String(label || '').trim())
+
+  const insts = JSON.parse(localStorage.getItem('mmu_institutions') || '[]')
+  const trees = JSON.parse(localStorage.getItem('mmu_specialty_trees') || '[]')
+  const users = JSON.parse(localStorage.getItem('mmu_users') || '[]')
+  const sels  = JSON.parse(localStorage.getItem('mmu_selections') || '[]')
+  const subs  = JSON.parse(localStorage.getItem('mmu_submissions') || '[]')
+
+  // Junk-i həm müəssisə etiketinə, həm seçim adına, həm ağac adına görə tap
+  const junkInstIds = new Set(insts.filter((i) => isJunk(i.label)).map((i) => i.id))
+  const junkTreeIds = new Set(
+    trees.filter((t) => isJunk(t.name) || junkInstIds.has(t.institution)).map((t) => t.id)
+  )
+  const junkSelIds = new Set(
+    sels.filter((s) => isJunk(s.name) || junkInstIds.has(s.institution) || junkTreeIds.has(s.treeId)).map((s) => s.id)
+  )
+  const junkUserIds = new Set(users.filter((u) => junkInstIds.has(u.institution)).map((u) => u.id))
+
+  if (junkInstIds.size === 0 && junkTreeIds.size === 0 && junkSelIds.size === 0) return
+
+  localStorage.setItem('mmu_institutions', JSON.stringify(insts.filter((i) => !junkInstIds.has(i.id))))
+  localStorage.setItem('mmu_specialty_trees', JSON.stringify(trees.filter((t) => !junkTreeIds.has(t.id))))
+  localStorage.setItem('mmu_users', JSON.stringify(users.filter((u) => !junkInstIds.has(u.institution))))
+  localStorage.setItem('mmu_selections', JSON.stringify(sels.filter((s) => !junkSelIds.has(s.id))))
+  localStorage.setItem('mmu_submissions', JSON.stringify(
+    subs.filter((s) => !junkSelIds.has(s.selectionId) && !junkUserIds.has(s.userId))
+  ))
+})()
+
 // -- NHK muessisesi ucun 50 kvotaliq struktur (label-e gore, self-healing) -----
 ;(() => {
   if (!SEED_TEST_INSTITUTIONS) return
