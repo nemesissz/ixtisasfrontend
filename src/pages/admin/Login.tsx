@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { adminDb, addLog } from '../../db'
 import { pathAllowed } from '../../permissions'
+import { setAdminSession } from '../../api/auth'
 
 export default function AdminLogin() {
   const navigate  = useNavigate()
@@ -11,30 +12,32 @@ export default function AdminLogin() {
   const [error,    setError]    = useState('')
   const [loading,  setLoading]  = useState(false)
 
-  function handleLogin(e: React.FormEvent) {
+  async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
     if (!username.trim() || !password) { setError('İstifadəçi adı və şifrəni daxil edin'); return }
     setLoading(true); setError('')
-    setTimeout(() => {
-      const admin = adminDb.loginAdmin(username, password)
-      setLoading(false)
+    try {
+      const admin = await adminDb.loginAdmin(username, password)
       if (!admin) {
         setError('İstifadəçi adı və ya şifrə yanlışdır')
         addLog('admin', 'warning', `Uğursuz admin girişi`, `İstifadəçi: ${username}`, username)
         return
       }
-      sessionStorage.setItem('admin_session', JSON.stringify({
-        id: admin.id, name: admin.name, username: admin.username, role: admin.role,
+      setAdminSession({
+        token: admin.token, id: admin.id, name: admin.name, username: admin.username, role: admin.role,
         permissions: admin.permissions || [],
-      }))
-      adminDb.update(admin.id, { lastLogin: new Date().toLocaleString('az-AZ') })
+      })
       addLog('admin', 'success', `Admin daxil oldu: ${admin.name}`, `@${admin.username}`, admin.name)
       // İcazəsi olduğu ilk səhifəyə yönləndir
       const firstPage = admin.role === 'superadmin' ? '/admin/dashboard'
         : (['/admin/dashboard','/admin/users','/admin/specialties','/admin/selections','/admin/distribution','/admin/results','/admin/archive','/admin/logs','/admin/admins']
             .find(p => pathAllowed({ role: admin.role, permissions: admin.permissions || [] }, p)) || '/admin/dashboard')
       navigate(firstPage)
-    }, 400)
+    } catch (err: any) {
+      setError(err?.message || 'Serverlə əlaqə qurulmadı. Backend işləyir mi yoxlayın.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (

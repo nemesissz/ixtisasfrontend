@@ -1,5 +1,6 @@
 // ── İcazə (permission) sistemi ────────────────────────────────────────────────
 // Superadmin → həmişə bütün icazələr. Digər hesablar → seçilmiş icazələr.
+import { getAdminSession } from './api/auth'
 
 export interface PermDef { code: string; label: string }
 export interface PermGroup { group: string; icon: string; perms: PermDef[] }
@@ -81,7 +82,7 @@ export const PATH_PERM: Record<string, string> = {
 
 // Cari admin sessiyasını oxu
 export function currentSession(): any {
-  try { return JSON.parse(sessionStorage.getItem('admin_session') || 'null') } catch { return null }
+  return getAdminSession()
 }
 // Cari istifadəçi bu əməliyyatı edə bilərmi?
 export function can(code: string): boolean {

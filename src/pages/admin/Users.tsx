@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import * as XLSX from 'xlsx'
-import { userDb, submissionDb, institutionDb, userArchiveDb, selectionDb, treeDb, adminDb, buildNameMap, useLocalState, addLog } from '../../db'
+import { userDb, submissionDb, institutionDb, userArchiveDb, selectionDb, treeDb, adminDb, buildNameMap, useLocalState, addLog, systemSettingsDb } from '../../db'
 import InstIcon, { isImageIcon } from '../../components/InstIcon'
 import InstTabs from '../../components/InstTabs'
 import { AppDialog, useDialog } from '../../components/AppDialog'
@@ -160,18 +160,18 @@ function generatePrintHTML(user: any, sel: any, nameMap: Record<string, string>,
 }
 
 // ── Excel export ──────────────────────────────────────────────────────────────
-function exportToExcel(rows: any[], instLabel: string, instId: string, subCountMap: Record<string, number>, included?: Set<string>) {
+async function exportToExcel(rows: any[], instLabel: string, instId: string, subCountMap: Record<string, number>, included?: Set<string>) {
   const inc = (c: string) => c === '№' || !included || included.has(c)
   // ── Təhsilalan seçimlərini hazırla (müəssisənin seçimi üzrə) ──
-  const allSels = selectionDb.getAll() as any[]
+  const allSels = await selectionDb.getAll()
   const sel = allSels.find((s: any) => s.institution === instId && s.status === 'published')
           || allSels.find((s: any) => s.institution === instId && s.status !== 'draft')
           || allSels.find((s: any) => s.institution === instId)
-  const tree = sel ? treeDb.get(sel.treeId) : null
+  const tree = sel ? await treeDb.get(sel.treeId) : null
   const pathMap = tree ? buildLeafPaths(tree.nodes || []) : {}
   const subsByUser: Record<string, string[]> = {}
   if (sel) {
-    for (const sub of submissionDb.getBySelection(sel.id) as any[]) {
+    for (const sub of await submissionDb.getBySelection(sel.id)) {
       subsByUser[sub.userId] = sub.ranking || []
     }
   }
@@ -245,23 +245,23 @@ function exportToExcel(rows: any[], instLabel: string, instId: string, subCountM
 }
 
 // ── Versiya 2/3 üçün ortaq köməkçi: birləşmiş başlıqlı vərəq qur ──────────────
-function buildLeveledSheet(
+async function buildLeveledSheet(
   rows: any[], instLabel: string, instId: string, subCountMap: Record<string, number>,
   included: Set<string> | undefined, selMode: 'levels' | 'flat',
 ) {
   const inc = (c: string) => c === '№' || !included || included.has(c)
-  const allSels = selectionDb.getAll() as any[]
+  const allSels = await selectionDb.getAll()
   const sel = allSels.find((s: any) => s.institution === instId && s.status === 'published')
           || allSels.find((s: any) => s.institution === instId && s.status !== 'draft')
           || allSels.find((s: any) => s.institution === instId)
-  const tree = sel ? treeDb.get(sel.treeId) : null
+  const tree = sel ? await treeDb.get(sel.treeId) : null
   const pathMap = tree ? buildLeafPaths(tree.nodes || []) : {}
   const lvDyn = effectiveLevelNames(tree)
   const lv: string[] = lvDyn.length ? lvDyn : ['Qoşun növü', 'Orta ixtisas təhsili üzrə ixtisaslar', 'Hərbi Uçot İxtisası']
   const nLv = lv.length
   const lvName = (i: number) => lv[i] || `Səviyyə ${i + 1}`
   const subsByUser: Record<string, string[]> = {}
-  if (sel) for (const s of submissionDb.getBySelection(sel.id) as any[]) subsByUser[s.userId] = s.ranking || []
+  if (sel) for (const s of await submissionDb.getBySelection(sel.id)) subsByUser[s.userId] = s.ranking || []
 
   const subjectKeys = (() => {
     const ks = new Set<string>()
@@ -381,16 +381,16 @@ function buildLeveledSheet(
 }
 
 // ── Versiya 2: hər ikisi səviyyəli ──
-function exportToExcelV2(rows: any[], instLabel: string, instId: string, subCountMap: Record<string, number>, included?: Set<string>) {
-  const ws = buildLeveledSheet(rows, instLabel, instId, subCountMap, included, 'levels')
+async function exportToExcelV2(rows: any[], instLabel: string, instId: string, subCountMap: Record<string, number>, included?: Set<string>) {
+  const ws = await buildLeveledSheet(rows, instLabel, instId, subCountMap, included, 'levels')
   const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, instLabel)
   const date = new Date().toLocaleDateString('az-AZ').replace(/\./g, '-')
   XLSX.writeFile(wb, `${instLabel}_Təhsilalanlar_v2_${date}.xlsx`)
 }
 
 // ── Versiya 3: yerləşmə səviyyəli, seçimlər düz xətt ──
-function exportToExcelV3(rows: any[], instLabel: string, instId: string, subCountMap: Record<string, number>, included?: Set<string>) {
-  const ws = buildLeveledSheet(rows, instLabel, instId, subCountMap, included, 'flat')
+async function exportToExcelV3(rows: any[], instLabel: string, instId: string, subCountMap: Record<string, number>, included?: Set<string>) {
+  const ws = await buildLeveledSheet(rows, instLabel, instId, subCountMap, included, 'flat')
   const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, instLabel)
   const date = new Date().toLocaleDateString('az-AZ').replace(/\./g, '-')
   XLSX.writeFile(wb, `${instLabel}_Təhsilalanlar_v3_${date}.xlsx`)
@@ -579,7 +579,10 @@ function ImportModal({ instId, instLabel, onClose, onImported }: {
   const customValid  = /^\d{4}[-–]\d{4}$/.test(customYear)
 
   // ── İxtisas strukturundan oxunan səviyyə adları → əlavə şablon sütunları ──
-  const instTreeForCols = (treeDb.getAll() as any[]).find((t: any) => t.institution === instId)
+  const [instTreeForCols, setInstTreeForCols] = useState<any>(null)
+  useEffect(() => {
+    treeDb.getAll().then(list => setInstTreeForCols(list.find((t: any) => t.institution === instId) || null))
+  }, [instId])
   const effLevelNames = effectiveLevelNames(instTreeForCols)
   const levelCols: { label: string; col: string }[] = effLevelNames.map((ln: string) => ({ label: ln, col: ln }))
   const predefCols = [...EXTRA_COLS, ...levelCols]
@@ -595,31 +598,34 @@ function ImportModal({ instId, instLabel, onClose, onImported }: {
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]; if (!f) return
     setLoading(true)
-    const instTree = (treeDb.getAll() as any[]).find((t: any) => t.institution === instId)
+    const trees = await treeDb.getAll()
+    const instTree = trees.find((t: any) => t.institution === instId)
     const { ok, errors: errs } = await parseExcel(f, instId, subjectCols, effectiveLevelNames(instTree))
     setPreview(ok); setErrors(errs); setLoading(false)
   }
 
-  function handleImport() {
+  async function handleImport() {
     const yr = useCustom ? customYear : year
-    const existing = userDb.getAll() as any[]
+    const existing = await userDb.getAll()
     const withYear = preview.map(u => ({ ...u, year: yr || null }))
     if (mode === 'replace') {
-      const others   = existing.filter((u: any) => u.institution !== instId)
+      const existingInInst = existing.filter((u: any) => u.institution === instId)
       const newUsers = withYear.map((u, i) => ({ ...u, id: `imp_${instId}_${Date.now()}_${i}` }))
-      localStorage.setItem('mmu_users', JSON.stringify([...others, ...newUsers]))
+      if (existingInInst.length) await userDb.deleteMany(existingInInst.map((u: any) => u.id))
+      await userDb.bulkCreate(newUsers)
     } else {
       const fins  = new Set(existing.filter((u: any) => u.institution === instId).map((u: any) => u.fin))
       const toAdd = withYear.filter(u => !fins.has(u.fin)).map((u, i) => ({ ...u, id: `imp_${instId}_${Date.now()}_${i}` }))
-      const updated = existing.map((u: any) => {
-        const match = withYear.find(p => p.fin === u.fin && u.institution === instId)
-        return match ? { ...u, ...match } : u
-      })
-      localStorage.setItem('mmu_users', JSON.stringify([...updated, ...toAdd]))
+      const toUpdate = existing
+        .filter((u: any) => u.institution === instId)
+        .map((u: any) => ({ u, match: withYear.find(p => p.fin === u.fin) }))
+        .filter((x: any) => x.match)
+      if (toAdd.length) await userDb.bulkCreate(toAdd)
+      for (const { u, match } of toUpdate) await userDb.update(u.id, { ...u, ...match })
     }
     // Prioritet fənlərini qlobal yadda saxla
     if (subjectCols.length > 0) {
-      localStorage.setItem('mmu_priority_subjects', JSON.stringify(subjectCols))
+      await systemSettingsDb.setPrioritySubjects(subjectCols)
     }
     setDone(true); onImported()
     addLog('user', 'success', `Excel idxal: ${preview.length} təhsilalan (${mode === 'replace' ? 'əvəzlə' : 'əlavə et'})`,
@@ -1060,10 +1066,18 @@ function EditUserModal({ user, instLabel, activeSel, hasSub, onClose, onSaved }:
   )
 
   // ── Ağac səviyyələri — yalnız ŞABLONDA gələn (kursantda mövcud olan) səviyyələr redaktə/əlavə oluna bilər ──
-  const preTree   = activeSel ? treeDb.get(activeSel.treeId) : null
-  const instBranchTree = preTree || (treeDb.getAll() as any[]).find((t: any) => t.institution === user.institution) || null
+  const [instBranchTree, setInstBranchTree] = useState<any>(null)
+  useEffect(() => {
+    (async () => {
+      const preTree = activeSel ? await treeDb.get(activeSel.treeId) : null
+      const tree = preTree || (await treeDb.getAll()).find((t: any) => t.institution === user.institution) || null
+      setInstBranchTree(tree)
+    })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   const branchLevelLabels = effectiveLevelNames(instBranchTree)
   // Şablonda seçilmiş səviyyə sütunları (müəssisə üzrə) + kursantın artıq dəyəri olan səviyyələr
+  // (bu şablon keşi hələ də localStorage-da saxlanılır — UI-only kömək dəyəri, backend-ə köçürülməyib)
   const tmplExtraCols: string[] = (() => {
     try { const c = JSON.parse(localStorage.getItem(`mmu_import_tmpl_${user.institution}`) || '{}'); return Array.isArray(c.extraCols) ? c.extraCols : [] }
     catch { return [] }
@@ -1082,11 +1096,19 @@ function EditUserModal({ user, instLabel, activeSel, hasSub, onClose, onSaved }:
   const [branchMap, setBranchMap] = useState<Record<number, string>>(
     Object.fromEntries(branchLevelIdxs.map(i => [i, user.branchByLevel?.[i] || '']))
   )
+  // Ağac gecikmə ilə yükləndiyi üçün branchMap-i bir dəfə (tree gələndə) yenidən qur
+  const branchMapSeeded = useRef(false)
+  useEffect(() => {
+    if (!instBranchTree || branchMapSeeded.current) return
+    branchMapSeeded.current = true
+    setBranchMap(Object.fromEntries(branchLevelIdxs.map(i => [i, user.branchByLevel?.[i] || ''])))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [instBranchTree])
 
   const set = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }))
   const setSubj = (k: string, v: string) => setSubjects(p => ({ ...p, [k]: v }))
 
-  function handleSave() {
+  async function handleSave() {
     const fullName = [form.firstName.trim(), form.lastName.trim()].filter(Boolean).join(' ')
     const changed: string[] = []
     if (fullName         !== (user.name        || '')) changed.push(`Ad Soyad: "${user.name}" → "${fullName}"`)
@@ -1110,7 +1132,7 @@ function EditUserModal({ user, instLabel, activeSel, hasSub, onClose, onSaved }:
       if (String(user.subjects?.[k] ?? '') !== String(v ?? '')) changed.push(`${k}: ${user.subjects?.[k] ?? '—'} → ${v || '—'}`)
     }
 
-    userDb.update(user.id, {
+    await userDb.update(user.id, {
       name:            fullName,
       parentName:      form.parentName,
       workNumber:      form.workNumber,
@@ -1133,22 +1155,20 @@ function EditUserModal({ user, instLabel, activeSel, hasSub, onClose, onSaved }:
     // ── Seçim statusu dəyişibsə submission yarat/sil ──
     if (selStatus !== (hasSub ? 'submitted' : 'pending')) {
       if (selStatus === 'pending') {
-        // Təhsilalanın BÜTÜN seçimlərini sil (tam sıfırla) + yerləşdirməni təmizlə
-        const all = submissionDb.getAll() as any[]
-        const filtered = all.filter((s: any) => s.userId !== user.id)
-        localStorage.setItem('mmu_submissions', JSON.stringify(filtered))
-        userDb.update(user.id, {
+        // Təhsilalanın bu seçimdəki sıralamasını sil (tam sıfırla) + yerləşdirməni təmizlə
+        if (activeSel) await submissionDb.deleteByUser(user.id, activeSel.id)
+        await userDb.update(user.id, {
           status: 'pending',
           placedSpecialty: null, choiceNum: null, placedSpecialtyId: null, placedSelectionId: null,
         })
         changed.push('Seçim statusu: Seçim etdi → Seçim etmədi (sıfırlandı)')
       } else if (activeSel) {
         // Avtomatik seçim yarat (ağacın yarpaqlarından)
-        const tree = treeDb.get(activeSel.treeId)
+        const tree = await treeDb.get(activeSel.treeId)
         const leafIds = tree ? Object.keys(buildLeafPaths(tree.nodes || [])) : []
         if (leafIds.length) {
-          submissionDb.save({ selectionId: activeSel.id, userId: user.id, userName: fullName, ranking: leafIds })
-          userDb.update(user.id, { status: 'submitted' })
+          await submissionDb.save({ selectionId: activeSel.id, userId: user.id, userName: fullName, ranking: leafIds })
+          await userDb.update(user.id, { status: 'submitted' })
           changed.push('Seçim statusu: Seçim etmədi → Seçim etdi (avtomatik sıralama)')
         }
       }
@@ -1332,10 +1352,10 @@ function NewInstModal({ onClose, onCreated }: { onClose: () => void; onCreated: 
     reader.readAsDataURL(file)
   }
 
-  function handleCreate() {
+  async function handleCreate() {
     const l = label.trim()
     if (!l) return
-    const inst = institutionDb.create(l, icon)
+    const inst = await institutionDb.create(l, icon)
     addLog('admin', 'success', `Yeni müəssisə yaradıldı: "${l}"`)
     onCreated(inst)
     onClose()
@@ -1487,7 +1507,9 @@ function EditInstModal({ inst, onClose, onSaved }: { inst: any; onClose: () => v
   const [year,       setYear]       = useState(initCustom ? '' : (inst.year || ''))
   const [customYear, setCustomYear] = useState(initCustom ? inst.year : '')
   const [applyAll,   setApplyAll]   = useState(true)
-  const instUserCount = (userDb.getAll() as any[]).filter((u: any) => u.institution === inst.id).length
+  const [instUsers, setInstUsers] = useState<any[]>([])
+  useEffect(() => { userDb.getAll().then(list => setInstUsers(list.filter((u: any) => u.institution === inst.id))) }, [])
+  const instUserCount = instUsers.length
   const effYear = (useCustom ? customYear.trim() : year).trim()
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -1497,14 +1519,12 @@ function EditInstModal({ inst, onClose, onSaved }: { inst: any; onClose: () => v
     reader.readAsDataURL(file)
   }
 
-  function handleSave() {
+  async function handleSave() {
     const l = label.trim(); if (!l) return
-    institutionDb.update(inst.id, { ...inst, label: l, icon, year: effYear || undefined })
+    await institutionDb.update(inst.id, { ...inst, label: l, icon, year: effYear || undefined })
     // Tədris ilini təhsilalanlara tətbiq et (istəyə görə)
     if (effYear && applyAll) {
-      const list = (userDb.getAll() as any[]).map((u: any) =>
-        u.institution === inst.id ? { ...u, year: effYear } : u)
-      localStorage.setItem('mmu_users', JSON.stringify(list))
+      for (const u of instUsers) await userDb.update(u.id, { ...u, year: effYear })
     }
     addLog('admin', 'info', `Müəssisə yeniləndi: "${l}"`,
       effYear ? `Tədris ili: ${effYear}${applyAll ? ` · ${instUserCount} təhsilalana tətbiq edildi` : ''}` : undefined)
@@ -1664,10 +1684,10 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
       title: 'Təhsilalanları arxivlə',
       message: `${instLabel} üçün ${instUsers.length} təhsilalanın siyahısı arxivlənəcək. Arxiv bölməsindən baxıla bilər.`,
       confirmLabel: 'Arxivlə', confirmColor: '#9a7b1e',
-      onConfirm: () => {
-        userArchiveDb.save({ label: instLabel, institution: instId, snapshot: instUsers })
-        userDb.deleteMany(instUsers.map((u: any) => u.id))
-        refreshUsers()
+      onConfirm: async () => {
+        await userArchiveDb.save({ label: instLabel, institution: instId, snapshot: instUsers })
+        await userDb.deleteMany(instUsers.map((u: any) => u.id))
+        await refreshUsers()
         setArchiveDone(true)
         setTimeout(() => setArchiveDone(false), 3000)
         addLog('user', 'warning', `Təhsilalanlar arxivləndi: ${instUsers.length} nəfər`, `Müəssisə: ${instLabel}`)
@@ -1699,12 +1719,24 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
   const [printUser,  setPrintUser]  = useState<any>(null)
   const [nameMap,    setNameMap]    = useState<Record<string, string>>({})
 
-  const allSubs = submissionDb.getAll() as any[]
+  const [allSubs, setAllSubs] = useState<any[]>([])
+  const [instTreeU, setInstTreeU] = useState<any>(null)
+  const [activeSel, setActiveSel] = useState<any>(null)
+  useEffect(() => {
+    let cancelled = false
+    Promise.all([submissionDb.getAll(), treeDb.getAll(), selectionDb.getAll()]).then(([subs, trees, sels]) => {
+      if (cancelled) return
+      setAllSubs(subs)
+      setInstTreeU(trees.find((t: any) => t.institution === instId) || null)
+      setActiveSel(sels.find((s: any) => s.institution === instId && s.status === 'published') || null)
+    })
+    return () => { cancelled = true }
+  }, [instId])
 
   const subCountMap: Record<string, number> = {}
   for (const s of allSubs) subCountMap[s.userId] = (subCountMap[s.userId] || 0) + 1
 
-  const instUsers = (users as any[]).filter((u: any) => u.institution === instId)
+  const instUsers = (users ?? []).filter((u: any) => u.institution === instId)
   const hasGroups = instUsers.some((u: any) => u.group)
   const hasYears  = instUsers.some((u: any) => u.year)
   const allYears  = [...new Set(instUsers.map((u: any) => u.year).filter(Boolean))].sort() as string[]
@@ -1716,7 +1748,6 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
   const hasSources = instUsers.some((u: any) => u.source)
   const hasGender  = instUsers.some((u: any) => u.gender)
   // ── Əvvəlcədən bölgü (branch) sütunları — datada olan səviyyələr ──
-  const instTreeU    = (treeDb.getAll() as any[]).find((t: any) => t.institution === instId)
   const instTreeULevelNames = effectiveLevelNames(instTreeU)
   const branchLevels = [...new Set(instUsers.flatMap((u: any) => Object.keys(u.branchByLevel || {}).map(Number)))].sort((a, b) => a - b)
   const branchLevelName = (i: number) => instTreeULevelNames[i] || `Səviyyə ${i + 1}`
@@ -1766,32 +1797,28 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
   const totalSub  = instUsers.filter((u: any) => subCountMap[u.id] > 0).length
   const totalPend = instUsers.length - totalSub
 
-  const activeSel = (selectionDb.getAll() as any[]).find(
-    (s: any) => s.institution === instId && s.status === 'published'
-  )
-
-  function handlePrint(u: any) {
-    const tree = activeSel ? treeDb.get(activeSel.treeId) : null
+  async function handlePrint(u: any) {
+    const tree = activeSel ? await treeDb.get(activeSel.treeId) : null
     setNameMap(tree ? buildNameMap(tree) : {})
     setPrintUser(u)
   }
 
-  function confirmPrint() {
+  async function confirmPrint() {
     if (!printUser) return
     // Təhsilalanın hər hansı submissionunu tap (active olmasa belə)
-    const allSubs2 = submissionDb.getAll() as any[]
+    const allSubs2 = await submissionDb.getAll()
     const sub = allSubs2.find((s: any) => s.userId === printUser.id) || null
     const ranking: string[] = sub?.ranking || []
     // Submissionun aid olduğu seçimi tap (active deyilsə belə)
-    const allSels = selectionDb.getAll() as any[]
+    const allSels = await selectionDb.getAll()
     const selForPrint = sub
       ? (allSels.find((s: any) => s.id === sub.selectionId) || activeSel)
       : activeSel
     // Həmin seçimin tree-sini yüklə
-    const tree = selForPrint ? treeDb.get(selForPrint.treeId) : null
+    const tree = selForPrint ? await treeDb.get(selForPrint.treeId) : null
     const nm   = tree ? buildNameMap(tree) : nameMap
-    userDb.update(printUser.id, { printStatus: 'printed' })
-    refreshUsers()
+    await userDb.update(printUser.id, { printStatus: 'printed' })
+    await refreshUsers()
     addLog('user', printUser.printStatus === 'printed' ? 'warning' : 'success',
       `${printUser.printStatus === 'printed' ? 'Yenidən çap' : 'Çap'}: ${printUser.name}`,
       `FİN: ${printUser.fin || '—'} · Bal: ${Number(printUser.score || 0).toFixed(2)} · Seçim: ${selForPrint?.name || '—'} · Admin tərəfindən çap edildi`)
@@ -1905,7 +1932,7 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
                 {/* Versiya 1 */}
                 <button
-                  onClick={() => { exportToExcel(sorted, instLabel, instId, subCountMap, includedCols); addLog('user', 'info', `Excel ixrac (Versiya 1): ${sorted.length} təhsilalan`, `Müəssisə: ${instLabel}`); setShowExport(false) }}
+                  onClick={async () => { await exportToExcel(sorted, instLabel, instId, subCountMap, includedCols); addLog('user', 'info', `Excel ixrac (Versiya 1): ${sorted.length} təhsilalan`, `Müəssisə: ${instLabel}`); setShowExport(false) }}
                   style={{ textAlign: 'left', padding: '16px 18px', borderRadius: 14, border: '1.5px solid #b7eb8f', background: '#f6ffed', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 14 }}
                 >
                   <div style={{ width: 42, height: 42, borderRadius: 11, background: '#1d6f42', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>1</div>
@@ -1918,7 +1945,7 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
                 </button>
                 {/* Versiya 2 — səviyyələrə bölünmüş */}
                 <button
-                  onClick={() => { exportToExcelV2(sorted, instLabel, instId, subCountMap, includedCols); addLog('user', 'info', `Excel ixrac (Versiya 2): ${sorted.length} təhsilalan`, `Müəssisə: ${instLabel}`); setShowExport(false) }}
+                  onClick={async () => { await exportToExcelV2(sorted, instLabel, instId, subCountMap, includedCols); addLog('user', 'info', `Excel ixrac (Versiya 2): ${sorted.length} təhsilalan`, `Müəssisə: ${instLabel}`); setShowExport(false) }}
                   style={{ textAlign: 'left', padding: '16px 18px', borderRadius: 14, border: '1.5px solid #ecd9a0', background: '#fbf1d6', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 14 }}
                 >
                   <div style={{ width: 42, height: 42, borderRadius: 11, background: '#c9962a', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>2</div>
@@ -1931,7 +1958,7 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
                 </button>
                 {/* Versiya 3 — yerləşmə səviyyəli + seçimlər düz xətt */}
                 <button
-                  onClick={() => { exportToExcelV3(sorted, instLabel, instId, subCountMap, includedCols); addLog('user', 'info', `Excel ixrac (Versiya 3): ${sorted.length} təhsilalan`, `Müəssisə: ${instLabel}`); setShowExport(false) }}
+                  onClick={async () => { await exportToExcelV3(sorted, instLabel, instId, subCountMap, includedCols); addLog('user', 'info', `Excel ixrac (Versiya 3): ${sorted.length} təhsilalan`, `Müəssisə: ${instLabel}`); setShowExport(false) }}
                   style={{ textAlign: 'left', padding: '16px 18px', borderRadius: 14, border: '1.5px solid #ddd0ff', background: '#f6f2ff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 14 }}
                 >
                   <div style={{ width: 42, height: 42, borderRadius: 11, background: '#b8860b', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>3</div>
@@ -2206,11 +2233,11 @@ export default function Users() {
 
   function switchTab(id: string) { setTab(id); setParams({ inst: id }) }
 
-  function handleResetInst(inst: any) {
-    const users = JSON.parse(localStorage.getItem('mmu_users') || '[]') as any[]
-    const count = users.filter((u: any) => u.institution === inst.id).length
-    localStorage.setItem('mmu_users', JSON.stringify(users.filter((u: any) => u.institution !== inst.id)))
-    addLog('admin', 'warning', `Müəssisə sıfırlandı: "${inst.label}"`, `${count} təhsilalan silindi`)
+  async function handleResetInst(inst: any) {
+    const users = await userDb.getAll()
+    const inInst = users.filter((u: any) => u.institution === inst.id)
+    if (inInst.length) await userDb.deleteMany(inInst.map((u: any) => u.id))
+    addLog('admin', 'warning', `Müəssisə sıfırlandı: "${inst.label}"`, `${inInst.length} təhsilalan silindi`)
     setResetTarget(null)
     // UserTable-i yeniləmək üçün tab-ı yenidən yükləyirik
     const cur = tab
@@ -2218,25 +2245,24 @@ export default function Users() {
     setTimeout(() => setTab(cur), 0)
   }
 
-  function handleDeleteInst(inst: any) {
-    // Superadmin şifrəsini yoxla
-    const superadmin = (adminDb.getAll() as any[]).find((a: any) => a.role === 'superadmin')
-    if (!superadmin || delPassword !== superadmin.password) {
+  async function handleDeleteInst(inst: any) {
+    // Superadmin şifrəsini backend üzərindən yoxla (parol client-də heç vaxt saxlanılmır/açılmır)
+    const admins = await adminDb.getAll()
+    const superadmin = admins.find((a: any) => a.role === 'superadmin')
+    const verified = superadmin ? await adminDb.loginAdmin(superadmin.username, delPassword) : null
+    if (!verified) {
       setDelError('Superadmin şifrəsi yanlışdır')
       addLog('admin', 'warning', `Müəssisə silmə cəhdi (yanlış şifrə): "${inst.label}"`)
       return
     }
-    // Müəssisəni sil
-    const usersInInst = (JSON.parse(localStorage.getItem('mmu_users') || '[]') as any[]).filter((u: any) => u.institution === inst.id)
-    institutionDb.delete(inst.id)
-    // Müəssisənin təhsilalanlarını da sil
-    const users = JSON.parse(localStorage.getItem('mmu_users') || '[]')
-    localStorage.setItem('mmu_users', JSON.stringify(users.filter((u: any) => u.institution !== inst.id)))
+    // Müəssisəni sil (backend FK cascade ilə həmin müəssisənin bütün tələbə/ağac/seçimlərini də silir)
+    const usersInInst = (await userDb.getAll()).filter((u: any) => u.institution === inst.id)
+    await institutionDb.delete(inst.id)
     addLog('admin', 'error', `Müəssisə silindi: "${inst.label}"`, `${usersInInst.length} təhsilalan da silindi · Superadmin şifrəsi ilə təsdiqləndi`)
-    refreshInstitutions()
+    await refreshInstitutions()
     setDeleteTarget(null); setDelPassword(''); setDelError('')
     // Başqa taba keç
-    const remaining = institutionDb.getAll()
+    const remaining = await institutionDb.getAll()
     if (remaining.length > 0) switchTab(remaining[0].id)
     else setTab('')
   }

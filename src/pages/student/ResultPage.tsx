@@ -1,18 +1,39 @@
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { selectionDb, submissionDb, treeDb, buildNameMap } from '../../db'
+import { getStudentSession } from '../../api/auth'
 
 export default function ResultPage() {
   const navigate = useNavigate()
-  const stored   = sessionStorage.getItem('mmu_student')
-  const student  = stored ? JSON.parse(stored) : null
+  const student  = getStudentSession()
 
-  if (!student) {
-    navigate('/student', { replace: true })
-    return null
-  }
+  const [loaded,      setLoaded]      = useState(false)
+  const [selections,  setSelections]  = useState<any[]>([])
+  const [submissions, setSubmissions] = useState<any[]>([])
+  const [nameMaps,    setNameMaps]    = useState<Record<string, Record<string, string>>>({})
 
-  const selections  = selectionDb.getAll().filter((s: any) => s.status !== 'draft')
-  const submissions = submissionDb.getAll().filter((s: any) => s.userId === student.id)
+  useEffect(() => {
+    if (!student) { navigate('/student', { replace: true }); return }
+    (async () => {
+      const [allSels, allSubs] = await Promise.all([selectionDb.getAll(), submissionDb.getAll()])
+      const sels = allSels.filter((s: any) => s.status !== 'draft')
+      const subs = allSubs.filter((s: any) => s.userId === student.id)
+      setSelections(sels)
+      setSubmissions(subs)
+
+      const maps: Record<string, Record<string, string>> = {}
+      for (const sub of subs) {
+        const sel = sels.find((s: any) => s.id === sub.selectionId)
+        const tree = sel ? await treeDb.get(sel.treeId) : null
+        maps[sub.id] = tree ? buildNameMap(tree) : {}
+      }
+      setNameMaps(maps)
+      setLoaded(true)
+    })()
+  }, [])
+
+  if (!student) return null
+  if (!loaded) return null
 
   const instLabel = student.institution === 'kollec' ? '🎓 Hərbi Kollec'
                   : student.institution === 'ahm'    ? '🏛️ AHM'
@@ -92,8 +113,7 @@ export default function ResultPage() {
       ) : (
         submissions.map((sub: any) => {
           const sel     = selections.find((s: any) => s.id === sub.selectionId)
-          const tree    = sel ? treeDb.get(sel.treeId) : null
-          const nameMap = tree ? buildNameMap(tree) : {}
+          const nameMap = nameMaps[sub.id] || {}
 
           return (
             <div key={sub.id} className="card" style={{ padding: 0, overflow: 'hidden' }}>

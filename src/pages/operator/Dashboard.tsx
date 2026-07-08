@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { selectionDb, userDb, submissionDb, institutionDb, treeDb, buildNameMap, useLocalState, addLog } from '../../db'
+import { getOperatorSession } from '../../api/auth'
 
 // ── Qrup rəngləri ─────────────────────────────────────────────────────────────
 const GRP_COLORS: Record<string, { bg: string; color: string }> = {
@@ -157,9 +158,9 @@ export default function OperatorDashboard() {
   const [printUser,  setPrintUser]  = useState<any>(null)   // çap modalı
   const [nameMap,    setNameMap]    = useState<Record<string, string>>({})
 
-  const activeSels  = (selections as any[]).filter((s: any) => s.status === 'published')
-  const _allSubs    = allSubs as any[]
-  const insts       = (institutions as any[])
+  const activeSels  = ((selections ?? []) as any[]).filter((s: any) => s.status === 'published')
+  const _allSubs    = (allSubs ?? []) as any[]
+  const insts       = ((institutions ?? []) as any[])
   const activeInsts = insts.filter((inst: any) =>
     activeSels.some((s: any) => s.institution === inst.id)
   )
@@ -169,7 +170,7 @@ export default function OperatorDashboard() {
   const activeInst = insts.find((i: any) => i.id === activeTab)
   const instLabel  = activeInst ? activeInst.label : ''
 
-  const instUsers   = (users as any[]).filter((u: any) => u.institution === activeTab)
+  const instUsers   = ((users ?? []) as any[]).filter((u: any) => u.institution === activeTab)
   const hasGroups   = instUsers.some((u: any) => u.group)
   const hasYears    = instUsers.some((u: any) => u.year)
   const hasSources  = instUsers.some((u: any) => u.source)
@@ -211,24 +212,23 @@ export default function OperatorDashboard() {
   const pct          = instUsers.length ? Math.round((totalSub / instUsers.length) * 100) : 0
 
   // ── Çap et ──────────────────────────────────────────────────────────────────
-  function handlePrint(u: any) {
-    const tree = activeSel ? treeDb.get(activeSel.treeId) : null
+  async function handlePrint(u: any) {
+    const tree = activeSel ? await treeDb.get(activeSel.treeId) : null
     setNameMap(tree ? buildNameMap(tree) : {})
     setPrintUser(u)
   }
 
-  function confirmPrint() {
+  async function confirmPrint() {
     if (!printUser) return
     // Submission-dan ranking-i al
-    const sub     = submissionDb.getByUser(printUser.id, activeSel?.id || '')
+    const sub     = await submissionDb.getByUser(printUser.id, activeSel?.id || '')
     const ranking: string[] = sub?.ranking || []
     // Çap statusunu yenilə
-    userDb.update(printUser.id, { printStatus: 'printed' })
-    refreshUsers()
-    refreshSubs()
+    await userDb.update(printUser.id, { printStatus: 'printed' })
+    await refreshUsers()
+    await refreshSubs()
     // ── Log yaz ─────────────────────────────────────────────────────────────
-    const opSession = sessionStorage.getItem('operator_session')
-    const opName    = opSession ? JSON.parse(opSession).name : 'Operator'
+    const opName    = getOperatorSession()?.name || 'Operator'
     const wasAlready = printUser.printStatus === 'printed'
     addLog(
       'user',
@@ -242,7 +242,7 @@ export default function OperatorDashboard() {
     // ────────────────────────────────────────────────────────────────────────
     setPrintUser(null)
     // Yeni pəncərədə çap et
-    const treeForPrint = activeSel ? treeDb.get(activeSel.treeId) : null
+    const treeForPrint = activeSel ? await treeDb.get(activeSel.treeId) : null
     const html = generatePrintHTML(printUser, activeSel, nameMap, instLabel, ranking, treeForPrint)
     const win  = window.open('', '_blank', 'width=1000,height=720')
     if (win) { win.document.write(html); win.document.close() }

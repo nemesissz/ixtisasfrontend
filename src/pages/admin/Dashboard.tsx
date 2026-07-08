@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { institutionDb, userDb, treeDb, selectionDb, submissionDb } from '../../db'
 import InstIcon from '../../components/InstIcon'
 import InstTabs from '../../components/InstTabs'
@@ -75,23 +75,51 @@ function Card({ title, icon, children, span }: { title: string; icon?: string; c
 
 
 export default function Dashboard() {
-  const insts = institutionDb.getAll() as any[]
-  const allUsers = userDb.getAll() as any[]
-  const allTrees = treeDb.getAll() as any[]
-  const allSels = selectionDb.getAll() as any[]
-  const [instId, setInstId] = useState<string>(insts[0]?.id || '')
+  const [insts, setInsts] = useState<any[]>([])
+  const [allUsers, setAllUsers] = useState<any[]>([])
+  const [allTrees, setAllTrees] = useState<any[]>([])
+  const [allSels, setAllSels] = useState<any[]>([])
+  const [loaded, setLoaded] = useState(false)
+  const [instId, setInstId] = useState<string>('')
   const [sortBy, setSortBy] = useState<'comp' | 'fill' | 'avg' | 'quota'>('quota')
   const [showAllChoices, setShowAllChoices] = useState(false)
+  const [subs, setSubs] = useState<any[]>([])
+
+  useEffect(() => {
+    let cancelled = false
+    Promise.all([institutionDb.getAll(), userDb.getAll(), treeDb.getAll(), selectionDb.getAll()])
+      .then(([i, u, t, s]) => {
+        if (cancelled) return
+        setInsts(i); setAllUsers(u); setAllTrees(t); setAllSels(s); setLoaded(true)
+      })
+    return () => { cancelled = true }
+  }, [])
+
+  useEffect(() => {
+    if (loaded && !instId && insts[0]?.id) setInstId(insts[0].id)
+  }, [loaded, insts, instId])
+
+  const sel = useMemo(() =>
+    allSels.find((s: any) => s.institution === instId && s.status === 'published')
+      || allSels.find((s: any) => s.institution === instId),
+    [allSels, instId])
+
+  useEffect(() => {
+    let cancelled = false
+    if (sel) {
+      submissionDb.getBySelection(sel.id).then(list => { if (!cancelled) setSubs(list) })
+    } else {
+      setSubs([])
+    }
+    return () => { cancelled = true }
+  }, [sel])
 
   // ── Qlobal göstəricilər (bütün müəssisələr) ──
   // ── Seçilmiş müəssisə analitikası ──
   const A = useMemo(() => {
     const instUsers = allUsers.filter(u => u.institution === instId)
-    const sel = allSels.find(s => s.institution === instId && s.status === 'published')
-            || allSels.find(s => s.institution === instId)
     const tree = (sel && allTrees.find(t => t.id === sel.treeId)) || allTrees.find(t => t.institution === instId)
     const leaves = tree ? getLeaves(tree.nodes || []) : []
-    const subs = sel ? (submissionDb.getBySelection(sel.id) as any[]) : []
     const firstChoice: Record<string, number> = {}
     for (const s of subs) { const f = s.ranking?.[0]; if (f) firstChoice[f] = (firstChoice[f] || 0) + 1 }
 
@@ -196,7 +224,7 @@ export default function Dashboard() {
       minScore, maxScore, branchStats, subjectAvg, mostCompetitive, leastDemanded, levelStats,
       satisfaction: pct(choiceDist[1] || 0, placedUsers.length),
     }
-  }, [instId, allUsers, allTrees, allSels])
+  }, [instId, allUsers, allTrees, sel, subs])
 
   const sortedLeaves = useMemo(() => {
     const arr = [...A.byLeaf]
@@ -209,8 +237,10 @@ export default function Dashboard() {
 
   const activeInst = insts.find(i => i.id === instId)
 
+  if (!loaded) return <div style={{ padding: '40px 0', textAlign: 'center', color: 'var(--muted)' }}>Yüklənir...</div>
+
   const LEVEL_ICONS = ['⚔️', '🎖️', '🎓', '📘', '📗']
-  const INST_KPIS = [
+  const INST_KPIS: { label: string; value: any; icon: string; accent: string; sub?: string }[] = [
     { label: 'Təhsilalan', value: A.instUsers.length, icon: '👥', accent: '#722ed1' },
     ...A.levelStats.map((l: any, i: number) => ({ label: l.name, value: l.count, icon: LEVEL_ICONS[i] || '🎓', accent: '#13c2c2' })),
     { label: 'Ümumi kvota', value: A.totalQuota, icon: '🎯', accent: '#fa8c16' },

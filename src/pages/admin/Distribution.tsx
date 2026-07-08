@@ -912,12 +912,25 @@ export default function Distribution() {
   const [users, refreshUsers]       = useLocalState(userDb.getAll)
   const [allTrees, refreshAllTrees] = useLocalState(treeDb.getAll)
 
-  const institutions  = institutionDb.getAll() as any[]
-  const allSelections = selectionDb.getAll().filter((s: any) => s.status !== 'draft')
+  const [institutions, setInstitutions] = useState<any[]>([])
+  const [allSelections, setAllSelections] = useState<any[]>([])
+  useEffect(() => {
+    Promise.all([institutionDb.getAll(), selectionDb.getAll()]).then(([insts, sels]) => {
+      setInstitutions(insts)
+      setAllSelections(sels.filter((s: any) => s.status !== 'draft'))
+    })
+  }, [])
 
   // ── Əsas state ───────────────────────────────────────────────────────────
-  const [instId,   setInstId]   = useState<string>(institutions[0]?.id || '')
-  const [selId,    setSelId]    = useState<string>(allSelections[0]?.id || '')
+  const [instId,   setInstId]   = useState<string>('')
+  const [selId,    setSelId]    = useState<string>('')
+  // İlk yüklənmədə default institution/selection seç
+  useEffect(() => {
+    if (institutions.length && !instId) setInstId(institutions[0].id)
+  }, [institutions])
+  useEffect(() => {
+    if (allSelections.length && !selId) setSelId(allSelections[0].id)
+  }, [allSelections])
   const [method,   setMethod]   = useState<Method>(null)
   const [storyOpen, setStoryOpen] = useState(false)
   const [mode,     setMode]     = useState<Mode>(null)
@@ -974,13 +987,19 @@ export default function Distribution() {
   const activeInst     = institutions.find((i: any) => i.id === instId) || institutions[0]
   const instSelections = allSelections.filter((s: any) => s.institution === instId)
   const sel  = instSelections.find((s: any) => s.id === selId) || instSelections[0] || null
-  const tree = sel ? ((allTrees as any[]).find((t: any) => t.id === sel.treeId) || null) : null
+  const tree = sel ? ((allTrees ?? []).find((t: any) => t.id === sel.treeId) || null) : null
   // tree məzmunu dəyişəndə memo-lar yenilensin
   const treeKey = JSON.stringify(tree?.nodes || [])
-  const sels = sel ? (submissionDb.getBySelection(sel.id) as any[]) : []
+  const [sels, setSels] = useState<any[]>([])
+  useEffect(() => {
+    if (!sel) { setSels([]); return }
+    let cancelled = false
+    submissionDb.getBySelection(sel.id).then(list => { if (!cancelled) setSels(list) })
+    return () => { cancelled = true }
+  }, [sel?.id])
 
   // Bütün müəssisə təhsilalanları (seçim etmiş-etməmiş)
-  const allInstUsers   = (users as any[]).filter((u: any) => u.institution === instId)
+  const allInstUsers   = (users ?? []).filter((u: any) => u.institution === instId)
   const submittedUsers = allInstUsers.filter(u => sels.find((s: any) => s.userId === u.id))
 
   // ── Ağacın ən az kvotalı yarpağı → maks paket sayı ───────────────────────
@@ -1213,7 +1232,7 @@ export default function Distribution() {
 
     if (algorithm === 'gale-shapley') return runGaleShapley(submittedUsers, sels, tree)
     return runPlacement(submittedUsers, sels, tree, !!(tree?.sourceProportional))
-  }, [mode, method, selId, treeKey, (users as any[]).length, packets, packetPlacements, tree?.sourceProportional, algorithm])
+  }, [mode, method, selId, treeKey, (users ?? []).length, packets, packetPlacements, tree?.sourceProportional, algorithm])
 
   const placedCount   = placement ? Object.keys(placement.assignments).length : 0
   const unplacedCount = submittedUsers.length - placedCount
@@ -1388,10 +1407,10 @@ export default function Distribution() {
     }, total)
   }
 
-  function handleConfirm() {
+  async function handleConfirm() {
     if (!placement) return
     // Bu yerləşdirmədən təsirlənən bütün təhsilalanlar: seçim edənlər + əvvəl bu seçimə yerləşənlər
-    const submittedIds = new Set((sels as any[]).map((s: any) => s.userId))
+    const submittedIds = new Set(sels.map((s: any) => s.userId))
     const affected = (allInstUsers as any[]).filter((u: any) =>
       submittedIds.has(u.id) || u.placedSelectionId === sel!.id || placement.assignments[u.id])
     // Snapshot: təsirlənənlərin tam cari vəziyyəti (rollback üçün — yerləşməyənlər də daxil)
@@ -1406,45 +1425,47 @@ export default function Distribution() {
     localStorage.setItem('dist_snapshots', JSON.stringify(newSnaps))
     setSnapshots(newSnaps)
 
-    // Əvvəlcə köhnə yerləşdirməni təmizlə, sonra yenisini yaz (köhnə nəticələr qalmasın)
-    affected.forEach((u: any) => {
+    // Əvvəlcə köhnə yerləşdirməni təmizlə, sonra yenisini yaz (köhnə nəticələr qalmasın) — bir sorğuda
+    const patches = affected.map((u: any) => {
       const a = placement.assignments[u.id]
       if (a) {
         const path = placement.pathMap[a.specId] || []
-        userDb.update(u.id, {
+        return {
+          id: u.id,
           placedSpecialty:   path.map((n: any) => n.name).join(' → '),
           choiceNum:         a.choiceNum,
           placedSpecialtyId: a.specId,
           placedSelectionId: sel!.id,
-        })
-      } else {
-        // bu yerləşdirmədə yerləşmədi → köhnə yerləşdirməni sil
-        userDb.update(u.id, { placedSpecialty: null, choiceNum: null, placedSpecialtyId: null, placedSelectionId: null })
+        }
       }
+      // bu yerləşdirmədə yerləşmədi → köhnə yerləşdirməni sil
+      return { id: u.id, placedSpecialty: null, choiceNum: null, placedSpecialtyId: null, placedSelectionId: null }
     })
-    refreshUsers(); setSaved(true); setShowConf(false)
+    await userDb.bulkUpdate(patches)
+    await refreshUsers(); setSaved(true); setShowConf(false)
     addLog('distribution', 'success', `Yerləşdirmə bazaya yazıldı: ${Object.keys(placement.assignments).length} təhsilalan`,
       `Seçim: ${sel?.name} · Metod: ${method} · Alqoritm: ${algorithm}${tree?.sourceProportional ? ' · Proporsional bölgü' : ''}`)
   }
 
-  function handleRollback(snap: typeof snapshots[0]) {
-    snap.userStates.forEach(us => {
-      userDb.update(us.id, { placedSpecialty: us.placedSpecialty || null, choiceNum: us.choiceNum || null, placedSpecialtyId: us.placedSpecialtyId || null, placedSelectionId: us.placedSelectionId || null })
-    })
+  async function handleRollback(snap: typeof snapshots[0]) {
+    await userDb.bulkUpdate(snap.userStates.map(us => ({
+      id: us.id, placedSpecialty: us.placedSpecialty || null, choiceNum: us.choiceNum || null,
+      placedSpecialtyId: us.placedSpecialtyId || null, placedSelectionId: us.placedSelectionId || null,
+    })))
     // Kvotaları da bərpa et (snapshot anındakı dəyərlərə)
     if (snap.treeId && snap.quotas) {
-      const t = treeDb.get(snap.treeId)
+      const t = await treeDb.get(snap.treeId)
       if (t) {
         const q = snap.quotas
         const restore = (nodes: any[]): any[] => nodes.map((n: any) =>
           n.children?.length ? { ...n, children: restore(n.children) } : (q[n.id] !== undefined ? { ...n, quota: q[n.id] } : n))
-        treeDb.update(snap.treeId, { ...t, nodes: restore(t.nodes || []) })
+        await treeDb.update(snap.treeId, { ...t, nodes: restore(t.nodes || []) })
       }
     }
     const newSnaps = snapshots.filter(s => s.id !== snap.id)
     localStorage.setItem('dist_snapshots', JSON.stringify(newSnaps))
     setSnapshots(newSnaps)
-    refreshUsers(); setSaved(false); setShowRollback(false)
+    await refreshUsers(); setSaved(false); setShowRollback(false)
     addLog('distribution', 'warning', `Rollback edildi: ${snap.selName}`, `Snapshot: ${new Date(snap.ts).toLocaleString('az-AZ')}`)
   }
 

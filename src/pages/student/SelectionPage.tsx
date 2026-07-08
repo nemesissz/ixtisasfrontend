@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { selectionDb, treeDb, userDb, submissionDb, systemSettingsDb, addLog } from '../../db'
+import { getStudentSession, clearStudentSession } from '../../api/auth'
 import {
   FlatView, NestedView,
   treeToNested, nestedToFlat, flatToNested,
@@ -67,14 +68,14 @@ export default function SelectionPage() {
   const navigate  = useNavigate()
 
   // ── Auth ──────────────────────────────────────────────────────────────────
-  const stored  = sessionStorage.getItem('mmu_student')
-  const student = stored ? JSON.parse(stored) : null
+  const student = getStudentSession()
   useEffect(() => { if (!student) navigate('/student', { replace: true }) }, [])
-  if (!student) return null
 
   // ── Data ──────────────────────────────────────────────────────────────────
-  const selection = selectionDb.get(selId!)
-  const tree      = selection ? treeDb.get(selection.treeId) : null
+  const [loaded,    setLoaded]    = useState(false)
+  const [selection, setSelection] = useState<any>(null)
+  const [tree,      setTree]      = useState<any>(null)
+  const [redirectSeconds, setRedirectSeconds] = useState(10)
   const viewMode: 'list' | 'nested' = selection?.viewMode || 'list'
 
   // ── State ─────────────────────────────────────────────────────────────────
@@ -85,71 +86,85 @@ export default function SelectionPage() {
   const [saving,      setSaving]      = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
   const [justSubmitted, setJustSubmitted] = useState(false)  // təzəcə göndərdi → təsdiq səhifəsi
-  const REDIRECT_SECONDS = systemSettingsDb.getRedirectDelay()  // super admin paneldən
-  const [redirectIn,    setRedirectIn]    = useState(REDIRECT_SECONDS)  // geri sayım (saniyə)
+  const [redirectIn,    setRedirectIn]    = useState(10)  // geri sayım (saniyə)
 
   useEffect(() => {
-    if (!tree) return
-    const branchName = selection?.preAssignLevel != null ? student.branchByLevel?.[selection.preAssignLevel] : null
-    const filteredTree = filterTreeByGender(
-      filterTreeByBranch(filterTreeByGroup(tree, student.group), branchName, selection?.preAssignLevel),
-      student.gender,
-    )
-    const initNested = treeToNested(filteredTree)
-    const initFlat   = nestedToFlat(initNested)
-    const existing   = submissionDb.getByUser(student.id, selId!)
+    (async () => {
+      const sel = await selectionDb.get(selId!)
+      const t   = sel ? await treeDb.get(sel.treeId) : null
+      const delay = await systemSettingsDb.getRedirectDelay()
+      setSelection(sel); setTree(t); setRedirectSeconds(delay); setRedirectIn(delay)
+      setLoaded(true)
+    })()
+  }, [selId])
 
-    if (existing) {
-      const specMap  = new Map(initFlat.map(r => [r.specId, r]))
-      const restored = (existing.ranking as string[])
-        .map(id => specMap.get(id)).filter(Boolean) as FlatRow[]
-      const seen = new Set(existing.ranking as string[])
-      initFlat.forEach(r => { if (!seen.has(r.specId)) restored.push(r) })
-      setFlat(restored)
-      setNested(flatToNested(restored))
-      setSubmitted(true)
-    } else {
-      setFlat(initFlat)
-      setNested(initNested)
-    }
+  useEffect(() => {
+    if (!tree || !student) return
+    (async () => {
+      const branchName = selection?.preAssignLevel != null ? student.branchByLevel?.[selection.preAssignLevel] : null
+      const filteredTree = filterTreeByGender(
+        filterTreeByBranch(filterTreeByGroup(tree, student.group), branchName, selection?.preAssignLevel),
+        student.gender,
+      )
+      const initNested = treeToNested(filteredTree)
+      const initFlat   = nestedToFlat(initNested)
+      const existing   = await submissionDb.getByUser(student.id, selId!)
+
+      if (existing) {
+        const specMap  = new Map(initFlat.map(r => [r.specId, r]))
+        const restored = (existing.ranking as string[])
+          .map(id => specMap.get(id)).filter(Boolean) as FlatRow[]
+        const seen = new Set(existing.ranking as string[])
+        initFlat.forEach(r => { if (!seen.has(r.specId)) restored.push(r) })
+        setFlat(restored)
+        setNested(flatToNested(restored))
+        setSubmitted(true)
+      } else {
+        setFlat(initFlat)
+        setNested(initNested)
+      }
+    })()
   }, [tree?.id])
+
+  if (!student) return null
 
   // ── Handlers ──────────────────────────────────────────────────────────────
   function handleFlatChange(f: FlatRow[])      { setFlat(f);   setNested(flatToNested(f)); setIsDirty(true) }
   function handleNestedChange(n: GroupEntry[]) { setNested(n); setFlat(nestedToFlat(n));   setIsDirty(true) }
 
-  function confirmSubmit() {
+  async function confirmSubmit() {
     setShowConfirm(false)
     setSaving(true)
     const ranking = viewMode === 'list' ? flat.map(r => r.specId) : nestedToFlat(nested).map(r => r.specId)
-    setTimeout(() => {
-      submissionDb.save({ selectionId: selId!, userId: student.id, userName: student.name, ranking })
-      userDb.update(student.id, { status: 'submitted' })
-      addLog('selection', 'success', `Təhsilalan seçimini göndərdi: ${student.name}`,
-        `FİN: ${student.fin || '—'} · ${ranking.length} ixtisas sıralandı`, student.name)
-      setSaving(false)
-      setSubmitted(true)
-      setIsDirty(false)
-      setJustSubmitted(true)
-      // Geri sayım → bitəndə login səhifəsinə qaytar (vaxt super admin paneldən)
-      if (REDIRECT_SECONDS <= 0) {
-        sessionStorage.removeItem('mmu_student')
-        navigate('/student', { replace: true })
-        return
-      }
-      let n = REDIRECT_SECONDS
+    await submissionDb.save({ selectionId: selId!, userId: student!.id, userName: student!.name, ranking })
+    await userDb.update(student!.id, { status: 'submitted' })
+    addLog('selection', 'success', `Təhsilalan seçimini göndərdi: ${student!.name}`,
+      `FİN: ${student!.fin || '—'} · ${ranking.length} ixtisas sıralandı`, student!.name)
+    setSaving(false)
+    setSubmitted(true)
+    setIsDirty(false)
+    setJustSubmitted(true)
+    // Geri sayım → bitəndə login səhifəsinə qaytar (vaxt super admin paneldən)
+    if (redirectSeconds <= 0) {
+      clearStudentSession()
+      navigate('/student', { replace: true })
+      return
+    }
+    let n = redirectSeconds
+    setRedirectIn(n)
+    const iv = setInterval(() => {
+      n -= 1
       setRedirectIn(n)
-      const iv = setInterval(() => {
-        n -= 1
-        setRedirectIn(n)
-        if (n <= 0) {
-          clearInterval(iv)
-          sessionStorage.removeItem('mmu_student')
-          navigate('/student', { replace: true })
-        }
-      }, 1000)
-    }, 500)
+      if (n <= 0) {
+        clearInterval(iv)
+        clearStudentSession()
+        navigate('/student', { replace: true })
+      }
+    }, 1000)
   }
+
+  // ── Yüklənir ──
+  if (!loaded) return null
 
   // ── Not found / institution mismatch ────────────────────────────────────
   if (!selection || !tree) {
@@ -177,7 +192,7 @@ export default function SelectionPage() {
   // ── Mərhələ 3/3: təsdiq səhifəsi ──
   if (justSubmitted) {
     const GOLD = '#e0a92e'
-    const pct = REDIRECT_SECONDS > 0 ? Math.min(100, Math.round((REDIRECT_SECONDS - redirectIn) / REDIRECT_SECONDS * 100)) : 100
+    const pct = redirectSeconds > 0 ? Math.min(100, Math.round((redirectSeconds - redirectIn) / redirectSeconds * 100)) : 100
     return (
       <div style={{
         position: 'fixed', inset: 0, overflowY: 'auto', background: '#eef1f5',

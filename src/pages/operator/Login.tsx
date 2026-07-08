@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { adminDb, addLog } from '../../db'
+import { setOperatorSession } from '../../api/auth'
 
 export default function OperatorLogin() {
   const navigate  = useNavigate()
@@ -10,29 +11,27 @@ export default function OperatorLogin() {
   const [error,    setError]    = useState('')
   const [loading,  setLoading]  = useState(false)
 
-  function handleLogin(e: React.FormEvent) {
+  async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
     if (!username.trim() || !password) { setError('İstifadəçi adı və şifrəni daxil edin'); return }
     setLoading(true)
     setError('')
 
-    setTimeout(() => {
-      const op = adminDb.loginOperator(username, password)
-      setLoading(false)
+    try {
+      const op = await adminDb.loginOperator(username, password)
       if (!op) {
         setError('İstifadəçi adı və ya şifrə yanlışdır')
         addLog('user', 'warning', `Uğursuz operator girişi`, `İstifadəçi adı: ${username}`, username)
         return
       }
-      // Session-a yaz
-      sessionStorage.setItem('operator_session', JSON.stringify({
-        id: op.id, name: op.name, username: op.username, role: op.role,
-      }))
-      // Son girişi yenilə
-      adminDb.update(op.id, { lastLogin: new Date().toLocaleString('az-AZ') })
+      setOperatorSession({ token: op.token, id: op.id, name: op.name, username: op.username, role: op.role })
       addLog('user', 'success', `Operator daxil oldu: ${op.name}`, `@${op.username}`, op.name)
       navigate('/operator/dashboard')
-    }, 400)
+    } catch (err: any) {
+      setError(err?.message || 'Serverlə əlaqə qurulmadı. Backend işləyir mi yoxlayın.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (

@@ -35,11 +35,11 @@ export default function Archive() {
   const { dialog, showConfirm, showInfo, closeDialog } = useDialog()
   const { setSlot, clearSlot } = useTopbar()
 
-  const allUsers = users    as any[]
-  const sels     = selList  as any[]
-  const uarcs    = userArcs as any[]
-  const tarcs    = treeArcs as any[]
-  const insts    = instList as any[]
+  const allUsers = (users    ?? []) as any[]
+  const sels     = (selList  ?? []) as any[]
+  const uarcs    = (userArcs ?? []) as any[]
+  const tarcs    = (treeArcs ?? []) as any[]
+  const insts    = (instList ?? []) as any[]
 
   function handleRestoreSel(id: string) {
     showConfirm({
@@ -47,7 +47,7 @@ export default function Archive() {
       title: 'Seçimi bərpa et',
       message: 'Bu seçimi arxivdən çıxarıb yenidən aktiv etmək istəyirsiniz?',
       confirmLabel: 'Bərpa et', confirmColor: '#52c41a',
-      onConfirm: () => { const s = sels.find((x: any) => x.id === id); selectionDb.restore(id); addLog('selection', 'success', `Seçim arxivdən bərpa edildi: "${s?.name || id}"`); refreshSels() },
+      onConfirm: async () => { const s = sels.find((x: any) => x.id === id); await selectionDb.restore(id); addLog('selection', 'success', `Seçim arxivdən bərpa edildi: "${s?.name || id}"`); await refreshSels() },
     })
   }
   function handleDeleteSel(id: string) {
@@ -56,7 +56,7 @@ export default function Archive() {
       title: 'Seçimi sil',
       message: 'Bu seçim arxivdən tamamilə silinəcək. Əməliyyat geri alına bilməz.',
       confirmLabel: 'Sil', confirmColor: '#ff4d4f',
-      onConfirm: () => { const s = sels.find((x: any) => x.id === id); selectionDb.delete(id); addLog('selection', 'error', `Seçim arxivdən tamamilə silindi: "${s?.name || id}"`); refreshSels() },
+      onConfirm: async () => { const s = sels.find((x: any) => x.id === id); await selectionDb.delete(id); addLog('selection', 'error', `Seçim arxivdən tamamilə silindi: "${s?.name || id}"`); await refreshSels() },
     })
   }
   function handleDeleteUArc(id: string) {
@@ -65,7 +65,7 @@ export default function Archive() {
       title: 'Təhsilalan arxivini sil',
       message: 'Bu təhsilalan arxivi tamamilə silinəcək. Əməliyyat geri qaytarıla bilməz.',
       confirmLabel: 'Sil', confirmColor: '#ff4d4f',
-      onConfirm: () => { const a = uarcs.find((x: any) => x.id === id); userArchiveDb.delete(id); addLog('user', 'error', `Təhsilalan arxivi silindi: "${a?.label || id}"`, `${a?.snapshot?.length ?? 0} təhsilalan qeydi`); refreshUArcs() },
+      onConfirm: async () => { const a = uarcs.find((x: any) => x.id === id); await userArchiveDb.delete(id); addLog('user', 'error', `Təhsilalan arxivi silindi: "${a?.label || id}"`, `${a?.snapshot?.length ?? 0} təhsilalan qeydi`); await refreshUArcs() },
     })
   }
   function handleRestoreUserArc(arc: any) {
@@ -74,15 +74,15 @@ export default function Archive() {
       title: 'Təhsilalanları bərpa et',
       message: `"${arc.label}" arxivindəki ${arc.snapshot?.length ?? 0} təhsilalan aktiv siyahıya əlavə ediləcək.`,
       confirmLabel: 'Bərpa et', confirmColor: '#c9962a',
-      onConfirm: () => {
-        const existing  = userDb.getAll() as any[]
+      onConfirm: async () => {
+        const existing  = await userDb.getAll()
         const existFins = new Set(existing.map((u: any) => u.fin).filter(Boolean))
         const toAdd     = (arc.snapshot || []).filter((u: any) => !existFins.has(u.fin))
-        toAdd.forEach((u: any) => { const { id: _id, ...rest } = u; userDb.create(rest) })
+        await userDb.bulkCreate(toAdd.map((u: any) => { const { id, ...rest } = u; return rest }))
         const skipped = (arc.snapshot?.length ?? 0) - toAdd.length
-        userArchiveDb.delete(arc.id)
+        await userArchiveDb.delete(arc.id)
         addLog('user', 'success', `Təhsilalanlar arxivdən bərpa edildi: "${arc.label}"`, `${toAdd.length} bərpa${skipped ? ` · ${skipped} mövcud idi` : ''}`)
-        refreshUArcs()
+        await refreshUArcs()
         showInfo({
           icon: '✅', iconBg: '#f0fff4', iconColor: '#52c41a',
           title: 'Bərpa tamamlandı',
@@ -98,11 +98,11 @@ export default function Archive() {
       title: 'Strukturu bərpa et',
       message: `"${arc.name}" ixtisas strukturu Müəssisə/İxtisaslar bölməsinə yeni struktur kimi əlavə ediləcək.`,
       confirmLabel: 'Bərpa et', confirmColor: '#c9962a',
-      onConfirm: () => {
-        treeDb.create({ name: arc.name + ' (bərpa)', year: arc.year || '', icon: arc.icon || '', nodes: arc.nodes || [] })
-        treeArchiveDb.delete(arc.id)
+      onConfirm: async () => {
+        await treeDb.create({ name: arc.name + ' (bərpa)', year: arc.year || '', icon: arc.icon || '', nodes: arc.nodes || [] })
+        await treeArchiveDb.delete(arc.id)
         addLog('system', 'success', `İxtisas strukturu arxivdən bərpa edildi: "${arc.name}"`)
-        refreshTArcs()
+        await refreshTArcs()
         showInfo({
           icon: '✅', iconBg: '#f0fff4', iconColor: '#52c41a',
           title: 'Bərpa tamamlandı',
@@ -118,7 +118,7 @@ export default function Archive() {
       title: 'İxtisas arxivini sil',
       message: 'Bu ixtisas strukturu arxivdən tamamilə silinəcək. Əməliyyat geri alına bilməz.',
       confirmLabel: 'Sil', confirmColor: '#ff4d4f',
-      onConfirm: () => { const a = tarcs.find((x: any) => x.id === id); treeArchiveDb.delete(id); addLog('system', 'error', `İxtisas arxivi silindi: "${a?.name || id}"`); refreshTArcs() },
+      onConfirm: async () => { const a = tarcs.find((x: any) => x.id === id); await treeArchiveDb.delete(id); addLog('system', 'error', `İxtisas arxivi silindi: "${a?.name || id}"`); await refreshTArcs() },
     })
   }
 
@@ -568,11 +568,32 @@ function UserArchiveCard({ arc, idx, expanded, searchQ, onToggle, onSearch, onDe
 function ArchiveCard({ sel, idx, allUsers, expanded, instFlt, searchQ,
   onToggle, onInstFlt, onSearch, onRestore, onDelete }: any) {
 
-  const tree     = sel ? treeDb.get(sel.treeId) : null
-  const subs     = sel ? (submissionDb.getBySelection(sel.id) as any[]) : []
+  const [tree,   setTree]   = useState<any>(null)
+  const [subs,   setSubs]   = useState<any[]>([])
+  const [loaded, setLoaded] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    setLoaded(false)
+    if (!sel) { setTree(null); setSubs([]); setLoaded(true); return }
+    Promise.all([treeDb.get(sel.treeId), submissionDb.getBySelection(sel.id)]).then(([t, s]) => {
+      if (!cancelled) { setTree(t); setSubs(s); setLoaded(true) }
+    })
+    return () => { cancelled = true }
+  }, [sel?.id])
+
   const nameMap  = tree ? buildNameMap(tree) : {}
   const leaves   = getLeavesWithPath(tree?.nodes || [])
   const totalQuota = leaves.reduce((s, { leaf }) => s + (leaf.quota || 0), 0)
+
+  if (!loaded) {
+    return (
+      <div style={{
+        background: '#fff', border: '1.5px solid var(--border)',
+        borderRadius: 16, padding: '18px 22px', color: 'var(--muted)', fontSize: 13,
+      }}>Yüklənir...</div>
+    )
+  }
 
   const instUsers = allUsers.filter((u: any) => u.institution === sel.institution)
   const submitted = instUsers.filter((u: any) => subs.find((s: any) => s.userId === u.id))

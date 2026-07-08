@@ -27,6 +27,8 @@ export default function Selections() {
   // resolve active tab (default to first institution)
   const { dialog, showConfirm, closeDialog } = useDialog()
 
+  if (!list || !institutions) return <div className="empty-state">Yüklənir...</div>
+
   const insts: any[] = institutions
   const activeTab = tab || insts[0]?.id || ''
 
@@ -43,7 +45,7 @@ export default function Selections() {
       title: 'Seçimi arxivlə',
       message: 'Bu seçim arxivlənəcək. Arxiv bölməsindən istənilən vaxt bərpa edə bilərsiniz.',
       confirmLabel: 'Arxivlə', confirmColor: '#9a7b1e',
-      onConfirm: () => { selectionDb.archive(id); refresh(); addLog('selection', 'info', `Seçim arxivləndi`, `id: ${id}`) },
+      onConfirm: async () => { await selectionDb.archive(id); await refresh(); addLog('selection', 'info', `Seçim arxivləndi`, `id: ${id}`) },
     })
   }
 
@@ -54,7 +56,7 @@ export default function Selections() {
       title: 'Seçimi yayımla',
       message: `"${s.name}" seçimi yayımlanacaq. Təhsilalanlar öz seçimlərini edə biləcək.`,
       confirmLabel: 'Yayımla', confirmColor: '#52c41a',
-      onConfirm: () => { selectionDb.publish(s.id); refresh(); addLog('selection', 'success', `Seçim yayımlandı: "${s.name}"`, `id: ${s.id}`) },
+      onConfirm: async () => { await selectionDb.publish(s.id); await refresh(); addLog('selection', 'success', `Seçim yayımlandı: "${s.name}"`, `id: ${s.id}`) },
     })
   }
 
@@ -65,7 +67,7 @@ export default function Selections() {
       title: 'Seçimi sil',
       message: 'Bu seçim tamamilə silinəcək. Əməliyyat geri alına bilməz.',
       confirmLabel: 'Sil', confirmColor: '#ff4d4f',
-      onConfirm: () => { selectionDb.delete(id); refresh(); addLog('selection', 'warning', `Seçim silindi`, `id: ${id}`) },
+      onConfirm: async () => { await selectionDb.delete(id); await refresh(); addLog('selection', 'warning', `Seçim silindi`, `id: ${id}`) },
     })
   }
 
@@ -139,7 +141,7 @@ export default function Selections() {
                 </button>
               )}
               {s.status === 'published' && (
-                <button className="btn btn-sm btn-danger" onClick={e => { e.stopPropagation(); selectionDb.close(s.id); refresh(); addLog('selection', 'warning', `Seçim bağlandı: "${s.name}"`, `id: ${s.id}`) }}>
+                <button className="btn btn-sm btn-danger" onClick={async e => { e.stopPropagation(); await selectionDb.close(s.id); await refresh(); addLog('selection', 'warning', `Seçim bağlandı: "${s.name}"`, `id: ${s.id}`) }}>
                   — Seçimi Bitir
                 </button>
               )}

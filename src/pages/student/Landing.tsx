@@ -1,15 +1,23 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { selectionDb, userDb, systemSettingsDb, institutionDb, addLog, studentColValue } from '../../db'
+import { selectionDb, institutionDb, systemSettingsDb, addLog, DEFAULT_INST_CONFIG, type InstLoginConfig } from '../../db'
+import { authDb } from '../../db'
+import { getStudentSession, setStudentSession } from '../../api/auth'
 
 export default function Landing() {
   const navigate     = useNavigate()
-  const allPublished = selectionDb.getAll().filter((s: any) => s.status === 'published')
-  const institutions = institutionDb.getAll() as any[]
+  const [allPublished, setAllPublished] = useState<any[]>([])
+  const [cfg, setCfg] = useState<InstLoginConfig>(DEFAULT_INST_CONFIG)
 
-  // İlk aktiv seçimdən müəssisəni tap, konfiqurasiyanı al
-  const firstInst    = allPublished[0]?.institution || institutions[0]?.id || ''
-  const cfg          = systemSettingsDb.getInstConfig(firstInst)
+  useEffect(() => {
+    (async () => {
+      const [selections, institutions] = await Promise.all([selectionDb.getAll(), institutionDb.getAll()])
+      const published = selections.filter((s: any) => s.status === 'published')
+      setAllPublished(published)
+      const firstInst = published[0]?.institution || institutions[0]?.id || ''
+      if (firstInst) setCfg(await systemSettingsDb.getInstConfig(firstInst))
+    })()
+  }, [])
 
   const [fin,     setFin]     = useState('')
   const [wNum,    setWNum]    = useState('')
@@ -18,18 +26,13 @@ export default function Landing() {
 
   // Artıq session varsa birbaşa müəssisəyə uyğun seçimə yönləndir
   useEffect(() => {
-    const stored = sessionStorage.getItem('mmu_student')
-    if (!stored) return
-    const s = JSON.parse(stored)
-    const mySelection = allPublished.find(
-      (sel: any) => sel.institution === s.institution
-    )
-    if (mySelection) {
-      navigate(`/student/${mySelection.id}`, { replace: true })
-    }
-  }, [])
+    const s = getStudentSession()
+    if (!s || !allPublished.length) return
+    const mySelection = allPublished.find((sel: any) => sel.institution === s.institution)
+    if (mySelection) navigate(`/student/${mySelection.id}`, { replace: true })
+  }, [allPublished])
 
-  function login() {
+  async function login() {
     setError('')
     const finT = fin.trim().replace(/İ/g,'I').replace(/ı/g,'I').toUpperCase()
     const wT   = wNum.trim().replace(/İ/g,'I').replace(/ı/g,'I').toUpperCase()
@@ -43,60 +46,29 @@ export default function Landing() {
     if (wT && wT.length > cfg.field2.max)     { setError(`${cfg.field2.label} maksimum ${cfg.field2.max} simvol ola bilər`); return }
 
     setLoading(true)
-    setTimeout(() => {
-      const users = userDb.getAll() as any[]
-      const norm = (s: string) => s.trim()
-        .replace(/İ/g, 'I').replace(/ı/g, 'I').replace(/i/g, 'I')
-        .toUpperCase()
-
-      const insts = institutionDb.getAll() as any[]
-      let found: any = null
-
-      // Hər müəssisənin konfiqurasiyasına görə yoxla
-      for (const inst of insts) {
-        const ic = systemSettingsDb.getInstConfig(inst.id)
-        const c1 = ic.field1.column
-        const c2 = ic.field2.column
-        const match = users.find((u: any) => {
-          if (u.institution !== inst.id) return false
-          const v1 = norm(studentColValue(u, c1))
-          const v2 = norm(studentColValue(u, c2))
-          return (v1 === norm(finT) && v2 === norm(wT)) ||
-                 (v1 === norm(wT)   && v2 === norm(finT))
-        })
-        if (match) { found = match; break }
-      }
-
-      // Fallback: fin + workNumber ilə yoxla
-      if (!found) {
-        found = users.find((u: any) => {
-          const v1 = norm(String(u.fin || ''))
-          const v2 = norm(String(u.workNumber || ''))
-          return (v1 === norm(finT) && v2 === norm(wT)) ||
-                 (v1 === norm(wT)   && v2 === norm(finT))
-        })
-      }
-
-      setLoading(false)
+    try {
+      const found = await authDb.studentLogin(finT, wT)
       if (!found) {
         setError(`${cfg.field1.label} və ya ${cfg.field2.label} yanlışdır`)
         addLog('user', 'warning', `Uğursuz təhsilalan girişi`, `${cfg.field1.label}: ${finT} · ${cfg.field2.label}: ${wT}`)
         return
       }
 
-      sessionStorage.setItem('mmu_student', JSON.stringify(found))
+      setStudentSession(found)
       addLog('user', 'success', `Təhsilalan daxil oldu: ${found.name}`, `FİN: ${found.fin || '—'}`, found.name)
 
       // Təhsilalanın müəssisəsinə uyğun aktiv seçimi tap
-      const mySelection = allPublished.find(
-        (s: any) => s.institution === found.institution
-      )
+      const mySelection = allPublished.find((s: any) => s.institution === found.institution)
       if (mySelection) {
         navigate(`/student/${mySelection.id}`)
       } else {
         setError('Sizin müəssisəyə aid aktiv seçim tapılmadı')
       }
-    }, 400)
+    } catch (err: any) {
+      setError(err?.message || 'Serverlə əlaqə qurulmadı. Backend işləyir mi yoxlayın.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const GOLD = '#e0a92e'

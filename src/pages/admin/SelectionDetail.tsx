@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { selectionDb, treeDb, institutionDb, userDb, resetAndAutoSeedSubmissions, addLog } from '../../db'
 import { AppDialog, useDialog } from '../../components/AppDialog'
@@ -139,14 +139,34 @@ export default function SelectionDetail() {
   const [resetDone,     setResetDone]     = useState(false)
   const [editing,       setEditing]       = useState(searchParams.get('edit') === 'true')
   const [editForm,      setEditForm]      = useState<{ name: string; treeId: string; viewMode: 'list' | 'nested'; sourceProportional: boolean; status: string } | null>(null)
-  const [, forceRefresh] = useState(0)
-  const refresh = () => forceRefresh(n => n + 1)
   const { dialog, showConfirm, closeDialog } = useDialog()
 
-  const sel   = selectionDb.get(id!)
-  const tree  = sel ? treeDb.get(sel.treeId) : null
-  const insts = institutionDb.getAll()
-  const allTrees = treeDb.getAll() as any[]
+  const [sel, setSel] = useState<any>(null)
+  const [tree, setTree] = useState<any>(null)
+  const [insts, setInsts] = useState<any[]>([])
+  const [allTrees, setAllTrees] = useState<any[]>([])
+  const [instUsers, setInstUsers] = useState<any[]>([])
+  const [loaded, setLoaded] = useState(false)
+
+  const refresh = useCallback(async () => {
+    const s = await selectionDb.get(id!)
+    if (!s) { setSel(null); setLoaded(true); return }
+    const [t, i, at, users] = await Promise.all([
+      treeDb.get(s.treeId),
+      institutionDb.getAll(),
+      treeDb.getAll(),
+      userDb.getAll(),
+    ])
+    setSel(s)
+    setTree(t)
+    setInsts(i)
+    setAllTrees(at as any[])
+    setInstUsers((users as any[]).filter((u: any) => u.institution === s.institution))
+    setLoaded(true)
+  }, [id])
+
+  useEffect(() => { refresh() }, [refresh])
+
   const instObj = insts.find((i: any) => i.id === sel?.institution)
   const instLabel = instObj
     ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><InstIcon icon={instObj.icon} size={16} /> {instObj.label}</span>
@@ -174,13 +194,13 @@ export default function SelectionDetail() {
     setSearchParams({})
   }
 
-  function saveEdit() {
+  async function saveEdit() {
     if (!editForm || !sel) return
     if (!editForm.name.trim() || !editForm.treeId) {
       alert('Ad və struktur məcburidir')
       return
     }
-    selectionDb.update(sel.id, {
+    await selectionDb.update(sel.id, {
       name:               editForm.name.trim(),
       treeId:             editForm.treeId,
       viewMode:           editForm.viewMode,
@@ -191,7 +211,11 @@ export default function SelectionDetail() {
     setEditing(false)
     setEditForm(null)
     setSearchParams({})
-    refresh()
+    await refresh()
+  }
+
+  if (!loaded) {
+    return <div className="empty-state">Yüklənir...</div>
   }
 
   if (!sel) {
@@ -206,18 +230,17 @@ export default function SelectionDetail() {
 
   const totalQuota   = tree ? treeDb.totalQuota(tree) : 0
   const totalSpec    = tree ? treeDb.countSpecialties(tree) : 0
-  const instUsers    = (userDb.getAll() as any[]).filter((u: any) => u.institution === sel.institution)
   const hasSources   = instUsers.some((u: any) => u.source)
   const mülkiCount   = instUsers.filter((u: any) => u.source === 'mülki').length
   const liseyCount   = instUsers.filter((u: any) => u.source === 'lisey').length
   const spActive     = !!(sel.sourceProportional)
 
-  function toggleSourceProp() {
-    selectionDb.update(sel.id, { sourceProportional: !spActive })
+  async function toggleSourceProp() {
+    await selectionDb.update(sel.id, { sourceProportional: !spActive })
     addLog('selection', 'info',
       `Proporsional bölgü ${!spActive ? 'aktivləşdirildi' : 'deaktiv edildi'}: "${sel.name}"`,
       !spActive ? `Mülki ${mülkiCount} · Lisey ${liseyCount}` : undefined)
-    refresh()
+    await refresh()
   }
 
   const STATUS_COLOR: Record<string, string> = {
@@ -233,12 +256,10 @@ export default function SelectionDetail() {
       title: 'Seçimləri sıfırla',
       message: `"${sel!.name}" seçimi üçün ${instUsers.length} təhsilalanın bütün mövcud seçimləri silinəcək. Bu əməliyyat geri alına bilməz.`,
       confirmLabel: 'Sıfırla', confirmColor: '#ff4d4f',
-      onConfirm: () => {
-        const subList = JSON.parse(localStorage.getItem('mmu_submissions') || '[]')
-        const filtered = subList.filter((s: any) => s.selectionId !== sel!.id)
-        localStorage.setItem('mmu_submissions', JSON.stringify(filtered))
-        addLog('selection', 'warning', `Seçimlər sıfırlandı: "${sel!.name}"`, `${subList.length - filtered.length} seçim silindi`)
-        refresh()
+      onConfirm: async () => {
+        const { count } = await resetAndAutoSeedSubmissions(sel!.id)
+        addLog('selection', 'warning', `Seçimlər sıfırlandı: "${sel!.name}"`, `${count} təhsilalan üçün seçim yaradıldı`)
+        await refresh()
       },
     })
   }
@@ -249,12 +270,12 @@ export default function SelectionDetail() {
       title: 'Seçimləri avtomatik doldur',
       message: `"${sel!.name}" seçimi üçün ${instUsers.length} təhsilalana avtomatik seçim yaradılacaq. Mövcud seçimlər silinəcək.`,
       confirmLabel: 'Doldur', confirmColor: '#d46b08',
-      onConfirm: () => {
-        const { count } = resetAndAutoSeedSubmissions(sel!.id)
+      onConfirm: async () => {
+        const { count } = await resetAndAutoSeedSubmissions(sel!.id)
         addLog('selection', 'info', `Seçimlər avtomatik dolduruldu: "${sel!.name}"`, `${count} təhsilalan üçün seçim yaradıldı`)
         setResetDone(true)
         setTimeout(() => setResetDone(false), 4000)
-        refresh()
+        await refresh()
       },
     })
   }
@@ -273,12 +294,12 @@ export default function SelectionDetail() {
           <PreviewOverlay
             sel={previewSel} tree={previewTree}
             onClose={() => { setPreview(false); setPreviewInEdit(false) }}
-            onSaveView={(v) => {
+            onSaveView={async (v) => {
               if (previewInEdit) {
                 setEditForm(f => f ? { ...f, viewMode: v } : f)
               } else {
-                selectionDb.update(sel.id, { viewMode: v })
-                refresh()
+                await selectionDb.update(sel.id, { viewMode: v })
+                await refresh()
                 addLog('selection', 'info', `Təhsilalan görünüşü dəyişdirildi: "${v}" — "${sel.name}"`)
               }
             }}
@@ -308,12 +329,12 @@ export default function SelectionDetail() {
           </button>
 
           {sel.status === 'draft' && (
-            <button className="btn btn-green" onClick={() => { selectionDb.publish(sel.id); refresh(); addLog('selection', 'success', `Seçim yayımlandı: "${sel.name}"`, `id: ${sel.id}`) }}>
+            <button className="btn btn-green" onClick={async () => { await selectionDb.publish(sel.id); await refresh(); addLog('selection', 'success', `Seçim yayımlandı: "${sel.name}"`, `id: ${sel.id}`) }}>
               🚀 Yayımla
             </button>
           )}
           {sel.status === 'published' && (
-            <button className="btn btn-danger" onClick={() => { selectionDb.close(sel.id); refresh(); addLog('selection', 'warning', `Seçim bağlandı: "${sel.name}"`, `id: ${sel.id}`) }}>
+            <button className="btn btn-danger" onClick={async () => { await selectionDb.close(sel.id); await refresh(); addLog('selection', 'warning', `Seçim bağlandı: "${sel.name}"`, `id: ${sel.id}`) }}>
               ⛔ Seçimi Bitir
             </button>
           )}

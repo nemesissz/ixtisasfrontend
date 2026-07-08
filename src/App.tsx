@@ -24,9 +24,10 @@ import ResultPage       from './pages/student/ResultPage'
 import OperatorLayout    from './layouts/OperatorLayout'
 import OperatorDashboard from './pages/operator/Dashboard'
 import OperatorLogin     from './pages/operator/Login'
+import { getAdminSession } from './api/auth'
 
 function AdminGuard({ children }: { children: React.ReactNode }) {
-  const session = sessionStorage.getItem('admin_session')
+  const session = getAdminSession()
   if (!session) return <Navigate to="/admin/login" replace />
   return <>{children}</>
 }

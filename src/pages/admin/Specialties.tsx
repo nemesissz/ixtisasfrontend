@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { treeDb, userDb, treeArchiveDb, institutionDb, useLocalState, addLog } from '../../db'
+import { useState, useEffect } from 'react'
+import { treeDb, userDb, treeArchiveDb, institutionDb, systemSettingsDb, useLocalState, addLog } from '../../db'
 import { AppDialog, useDialog } from '../../components/AppDialog'
 import InstIcon, { isImageIcon } from '../../components/InstIcon'
 import InstTabs from '../../components/InstTabs'
@@ -22,9 +22,6 @@ type TNode = {
 }
 
 const DEFAULT_SUBJECTS    = ['Riyaziyyat', 'Fizika', 'Dil']
-function getStoredSubjects(): string[] {
-  try { const s = localStorage.getItem('mmu_priority_subjects'); return s ? JSON.parse(s) : [] } catch { return [] }
-}
 const DEFAULT_LEVEL_NAMES = ['Qoşun növü', 'Mülki ixtisas', 'Hərbi uçot ixtisası']
 
 // ── Prioritet modalı köməkçi: bir qrupun siyahısı ────────────────────────────
@@ -133,7 +130,6 @@ function PriorityModal({ node, onSave, onClose, groupSubjectsMap, groupScoresMap
   groupScoresMap?: { [g: string]: { [subject: string]: number } }
   allSubjects?: string[]   // müəssisənin təhsilalanlarının faktiki fənləri (cədvəldən)
 }) {
-  const stored   = getStoredSubjects()
   const hasGroups = (node.groups?.length ?? 0) > 0
   const groups    = node.groups ?? []
 
@@ -141,9 +137,18 @@ function PriorityModal({ node, onSave, onClose, groupSubjectsMap, groupScoresMap
   const [flatItems, setFlatItems] = useState<string[]>(
     node.tiebreaker?.length ? node.tiebreaker
     : (allSubjects && allSubjects.length) ? [...allSubjects]
-    : stored.length ? [...stored]
     : [...DEFAULT_SUBJECTS]
   )
+
+  // Nə tiebreaker, nə də avtomatik fənlər varsa — əvvəlcə saxlanmış prioritetləri backend-dən yüklə
+  useEffect(() => {
+    if (!node.tiebreaker?.length && !(allSubjects && allSubjects.length)) {
+      systemSettingsDb.getPrioritySubjects().then(stored => {
+        if (stored.length) setFlatItems(stored)
+      })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Qrupa görə state — əvvəlcə saxlanmış, yoxsa avtomatik aşkar edilmiş fənlər
   const UMUMI_OLD = 'Ümumi imtahan balı'
@@ -249,13 +254,14 @@ function PriorityModal({ node, onSave, onClose, groupSubjectsMap, groupScoresMap
 }
 
 // ── Qrup təyinat modalı ───────────────────────────────────────────────────────
-function GroupModal({ node, onSave, onClose }: {
+function GroupModal({ node, users, onSave, onClose }: {
   node: TNode
+  users: any[]
   onSave: (groups: string[]) => void
   onClose: () => void
 }) {
   const allGroups = [...new Set(
-    (userDb.getAll() as any[]).map((u: any) => u.group).filter(Boolean)
+    users.map((u: any) => u.group).filter(Boolean)
   )].sort() as string[]
 
   const [selected, setSelected] = useState<string[]>(node.groups || [])
@@ -295,7 +301,7 @@ function GroupModal({ node, onSave, onClose }: {
                     style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#52c41a' }} />
                   <span style={{ fontSize: 14, fontWeight: 700 }}>Qrup {g}</span>
                   <span style={{ fontSize: 11, color: 'var(--muted)', marginLeft: 'auto' }}>
-                    {(userDb.getAll() as any[]).filter((u: any) => u.group === g).length} təhsilalan
+                    {users.filter((u: any) => u.group === g).length} təhsilalan
                   </span>
                 </label>
               ))}
@@ -960,6 +966,7 @@ function NodeRow({ node, depth, onAdd, onEdit, onDelete, onPriority, onDeactivat
 export default function Specialties() {
   const [trees, refreshTrees]   = useLocalState(treeDb.getAll)
   const [insts]                 = useLocalState(institutionDb.getAll)
+  const [students]              = useLocalState(userDb.getAll)
   const [tab, setTab]           = useState<string>('')
 
   // Tədris ili seçimləri — cari ildən başlayaraq 5 il
@@ -975,6 +982,10 @@ export default function Specialties() {
   const [priorityNode, setPriorityNode] = useState<{ treeId: string; node: TNode } | null>(null)
   const [groupNode,    setGroupNode]    = useState<{ treeId: string; node: TNode } | null>(null)
 
+  if (!trees || !insts || !students) {
+    return <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted)' }}>Yüklənir...</div>
+  }
+
   function askConfirm(message: string, onConfirm: () => void) {
     setConfirm({ message, onConfirm })
   }
@@ -982,64 +993,64 @@ export default function Specialties() {
   function getTree(id: string) { return (trees as any[]).find((t: any) => t.id === id) }
   function toggle(id: string)  { setOpenTreeId(prev => prev === id ? null : id) }
 
-  function handleSavePriority(data: { tiebreaker?: string[]; groupTiebreakers?: { [g: string]: string[] } }) {
+  async function handleSavePriority(data: { tiebreaker?: string[]; groupTiebreakers?: { [g: string]: string[] } }) {
     if (!priorityNode) return
     const { treeId, node } = priorityNode
     const t = getTree(treeId)
-    saveNodes(treeId, updateNode(t.nodes || [], node.id, {
+    await saveNodes(treeId, updateNode(t.nodes || [], node.id, {
       tiebreaker: data.tiebreaker,
       groupTiebreakers: data.groupTiebreakers,
     }))
-    addLog('admin', 'info', `Prioritet (tiebreaker) təyin edildi: "${node.name}"`,
+    await addLog('admin', 'info', `Prioritet (tiebreaker) təyin edildi: "${node.name}"`,
       data.groupTiebreakers ? `${Object.keys(data.groupTiebreakers).length} qrup üzrə` : (data.tiebreaker?.join(', ') || '—'))
     setPriorityNode(null)
   }
 
-  function handleDeactivatePriority(treeId: string, nodeId: string) {
+  async function handleDeactivatePriority(treeId: string, nodeId: string) {
     const t = getTree(treeId)
-    saveNodes(treeId, updateNode(t.nodes || [], nodeId, { tiebreaker: undefined, groupTiebreakers: undefined }))
-    addLog('admin', 'info', `Prioritet deaktiv edildi`, `Struktur: ${t?.name} · nodeId: ${nodeId}`)
+    await saveNodes(treeId, updateNode(t.nodes || [], nodeId, { tiebreaker: undefined, groupTiebreakers: undefined }))
+    await addLog('admin', 'info', `Prioritet deaktiv edildi`, `Struktur: ${t?.name} · nodeId: ${nodeId}`)
   }
 
-  function handleSaveGroups(groups: string[]) {
+  async function handleSaveGroups(groups: string[]) {
     if (!groupNode) return
     const { treeId, node } = groupNode
     const t = getTree(treeId)
-    saveNodes(treeId, updateNode(t.nodes || [], node.id, { groups: groups.length ? groups : undefined }))
-    addLog('admin', 'info', `Qrup təyinatı yeniləndi: "${node.name}"`, groups.length ? `Qruplar: ${groups.join(', ')}` : 'Qrup silindi')
+    await saveNodes(treeId, updateNode(t.nodes || [], node.id, { groups: groups.length ? groups : undefined }))
+    await addLog('admin', 'info', `Qrup təyinatı yeniləndi: "${node.name}"`, groups.length ? `Qruplar: ${groups.join(', ')}` : 'Qrup silindi')
     setGroupNode(null)
   }
 
-  function handleDeactivateGroup(treeId: string, nodeId: string) {
+  async function handleDeactivateGroup(treeId: string, nodeId: string) {
     const t = getTree(treeId)
-    saveNodes(treeId, updateNode(t.nodes || [], nodeId, { groups: undefined }))
-    addLog('admin', 'info', `Qrup təyinatı silindi`, `Struktur: ${t?.name} · nodeId: ${nodeId}`)
+    await saveNodes(treeId, updateNode(t.nodes || [], nodeId, { groups: undefined }))
+    await addLog('admin', 'info', `Qrup təyinatı silindi`, `Struktur: ${t?.name} · nodeId: ${nodeId}`)
   }
 
-  function handleQuotaMode(treeId: string, nodeId: string, mode: 'auto' | 'manual', mülkiQ?: number, liseyQ?: number) {
+  async function handleQuotaMode(treeId: string, nodeId: string, mode: 'auto' | 'manual', mülkiQ?: number, liseyQ?: number) {
     const t = getTree(treeId)
-    saveNodes(treeId, updateNode(t.nodes || [], nodeId, {
+    await saveNodes(treeId, updateNode(t.nodes || [], nodeId, {
       quotaMode: mode,
       mülkiQuota: mode === 'manual' ? mülkiQ : undefined,
       liseyQuota: mode === 'manual' ? liseyQ : undefined,
     }))
-    addLog('admin', 'info',
+    await addLog('admin', 'info',
       `İxtisas kvota rejimi: ${mode === 'manual' ? 'Manual' : 'Avtomatik'} — ${nodeId}`,
       mode === 'manual' ? `Mülki: ${mülkiQ} · Lisey: ${liseyQ}` : 'Faiz nisbətinə görə')
   }
 
-  function handleGenderConfig(treeId: string, nodeId: string, cfg: { allowFemale: boolean; allowMale: boolean; maxFemale: number | null; maxMale: number | null } | null) {
+  async function handleGenderConfig(treeId: string, nodeId: string, cfg: { allowFemale: boolean; allowMale: boolean; maxFemale: number | null; maxMale: number | null } | null) {
     const t = getTree(treeId)
-    saveNodes(treeId, updateNode(t.nodes || [], nodeId, cfg
+    await saveNodes(treeId, updateNode(t.nodes || [], nodeId, cfg
       ? { allowFemale: cfg.allowFemale, allowMale: cfg.allowMale, maxFemale: cfg.maxFemale, maxMale: cfg.maxMale }
       : { allowFemale: undefined, allowMale: undefined, maxFemale: undefined, maxMale: undefined }))
-    addLog('admin', 'info', `İxtisas cins məhdudiyyəti — ${nodeId}`,
+    await addLog('admin', 'info', `İxtisas cins məhdudiyyəti — ${nodeId}`,
       cfg ? `Qadın: ${cfg.allowFemale ? 'bəli' : 'xeyr'}${cfg.maxFemale != null ? ' (max '+cfg.maxFemale+')' : ''} · Kişi: ${cfg.allowMale ? 'bəli' : 'xeyr'}${cfg.maxMale != null ? ' (max '+cfg.maxMale+')' : ''}` : 'Məhdudiyyət silindi')
   }
 
   // ── Müəssisənin təhsilalanlarından ən çox rast gəlinən tədris ilini tap ──────
   function getInstYear(instId: string): string {
-    const us = (userDb.getAll() as any[]).filter((u: any) => u.institution === instId && u.year)
+    const us = (students as any[]).filter((u: any) => u.institution === instId && u.year)
     if (us.length) {
       const counts: Record<string, number> = {}
       for (const u of us) counts[u.year] = (counts[u.year] || 0) + 1
@@ -1051,49 +1062,48 @@ export default function Specialties() {
   }
 
   // ── Struktur CRUD ─────────────────────────────────────────────────────────
-  function createTree() {
+  async function createTree() {
     const instId = modal.instId || (tab || (insts as any[])[0]?.id || '')
     const inst   = (insts as any[]).find((i: any) => i.id === instId)
     const label  = modal.instLabel || inst?.label || ''
     const extra  = (modal.name || '').trim()
     const name   = [label, extra].filter(Boolean).join(' - ').trim()
     if (!instId || !name) return
-    const created = treeDb.create({ name, year: modal.year?.trim() || '', icon: modal.icon || inst?.icon || '', institution: instId, levelNames: [...DEFAULT_LEVEL_NAMES] })
-    addLog('admin', 'success', `Yeni ixtisas strukturu yaradıldı: "${name}"`, `İl: ${modal.year?.trim() || '—'} · Müəssisə: ${inst?.label || '—'}`)
-    refreshTrees(); setOpenTreeId(created.id); setModal(null)
+    const created = await treeDb.create({ name, year: modal.year?.trim() || '', icon: modal.icon || inst?.icon || '', institution: instId, levelNames: [...DEFAULT_LEVEL_NAMES] })
+    await addLog('admin', 'success', `Yeni ixtisas strukturu yaradıldı: "${name}"`, `İl: ${modal.year?.trim() || '—'} · Müəssisə: ${inst?.label || '—'}`)
+    await refreshTrees(); setOpenTreeId(created.id); setModal(null)
   }
 
-  function renameTree(treeId: string) {
+  async function renameTree(treeId: string) {
     const t = getTree(treeId)
     const instId = modal.instId || t?.institution || ''
     const inst   = (insts as any[]).find((i: any) => i.id === instId)
     const name   = (modal.name || modal.instLabel || inst?.label || t?.name || '').trim()
     if (!name) return
-    treeDb.update(treeId, { ...t, name, year: modal.year?.trim() || '', icon: modal.icon ?? t.icon ?? '', institution: instId || t.institution || '' })
-    addLog('admin', 'info', `İxtisas strukturu yeniləndi: "${name}"`, `id: ${treeId}`)
-    refreshTrees(); setModal(null)
+    await treeDb.update(treeId, { ...t, name, year: modal.year?.trim() || '', icon: modal.icon ?? t.icon ?? '', institution: instId || t.institution || '' })
+    await addLog('admin', 'info', `İxtisas strukturu yeniləndi: "${name}"`, `id: ${treeId}`)
+    await refreshTrees(); setModal(null)
   }
 
   function deleteTree(id: string) {
     const t = getTree(id)
-    askConfirm('Bu struktur və içindəki bütün ixtisaslar silinəcək. Bu əməliyyat geri alına bilməz.', () => {
-      const updated = (trees as any[]).filter((t: any) => t.id !== id)
-      localStorage.setItem('mmu_specialty_trees', JSON.stringify(updated))
+    askConfirm('Bu struktur və içindəki bütün ixtisaslar silinəcək. Bu əməliyyat geri alına bilməz.', async () => {
+      await treeDb.delete(id)
       if (openTreeId === id) setOpenTreeId(null)
-      addLog('admin', 'warning', `İxtisas strukturu silindi: "${t?.name || id}"`, 'Bütün ixtisaslar da silindi')
-      refreshTrees()
+      await addLog('admin', 'warning', `İxtisas strukturu silindi: "${t?.name || id}"`, 'Bütün ixtisaslar da silindi')
+      await refreshTrees()
       setConfirm(null)
     })
   }
 
   // ── Node CRUD (rekursiv) ──────────────────────────────────────────────────
-  function saveNodes(treeId: string, nodes: TNode[]) {
+  async function saveNodes(treeId: string, nodes: TNode[]) {
     const t = getTree(treeId)
-    treeDb.update(treeId, { ...t, nodes })
-    refreshTrees()
+    await treeDb.update(treeId, { ...t, nodes })
+    await refreshTrees()
   }
 
-  function handleAddChild(treeId: string, parentId: string | null) {
+  async function handleAddChild(treeId: string, parentId: string | null) {
     const name = modal.name?.trim(); if (!name) return
     const quota = modal.quota !== '' && modal.quota != null ? Number(modal.quota) : undefined
     const child: TNode = { id: uid('n'), name, quota, children: [] }
@@ -1107,29 +1117,29 @@ export default function Specialties() {
     if (levelName) {
       const existing: string[] = t.levelNames ? [...t.levelNames] : []
       existing[depth] = levelName
-      treeDb.update(treeId, { ...t, nodes: newNodes, levelNames: existing })
-      refreshTrees()
+      await treeDb.update(treeId, { ...t, nodes: newNodes, levelNames: existing })
+      await refreshTrees()
     } else {
-      saveNodes(treeId, newNodes)
+      await saveNodes(treeId, newNodes)
     }
-    addLog('admin', 'success', `Yeni node əlavə edildi: "${name}"`, `Struktur: ${t?.name}${quota !== undefined ? ` · Kvota: ${quota}` : ''}`)
+    await addLog('admin', 'success', `Yeni node əlavə edildi: "${name}"`, `Struktur: ${t?.name}${quota !== undefined ? ` · Kvota: ${quota}` : ''}`)
     setModal(null)
   }
 
-  function handleEditNode(treeId: string, nodeId: string) {
+  async function handleEditNode(treeId: string, nodeId: string) {
     const name = modal.name?.trim(); if (!name) return
     const quota = modal.quota !== '' && modal.quota != null ? Number(modal.quota) : undefined
     const t = getTree(treeId)
-    saveNodes(treeId, updateNode(t.nodes || [], nodeId, { name, quota }))
-    addLog('admin', 'info', `Node yeniləndi: "${name}"`, `Struktur: ${t?.name}${quota !== undefined ? ` · Kvota: ${quota}` : ''}`)
+    await saveNodes(treeId, updateNode(t.nodes || [], nodeId, { name, quota }))
+    await addLog('admin', 'info', `Node yeniləndi: "${name}"`, `Struktur: ${t?.name}${quota !== undefined ? ` · Kvota: ${quota}` : ''}`)
     setModal(null)
   }
 
   function handleDeleteNode(treeId: string, nodeId: string) {
     const t = getTree(treeId)
-    askConfirm('Bu element və bütün alt elementləri silinəcək. Bu əməliyyat geri alına bilməz.', () => {
-      saveNodes(treeId, deleteNode(t.nodes || [], nodeId))
-      addLog('admin', 'warning', `Node silindi`, `Struktur: ${t?.name} · nodeId: ${nodeId}`)
+    askConfirm('Bu element və bütün alt elementləri silinəcək. Bu əməliyyat geri alına bilməz.', async () => {
+      await saveNodes(treeId, deleteNode(t.nodes || [], nodeId))
+      await addLog('admin', 'warning', `Node silindi`, `Struktur: ${t?.name} · nodeId: ${nodeId}`)
       setConfirm(null)
     })
   }
@@ -1163,7 +1173,7 @@ export default function Specialties() {
       {priorityNode && (() => {
         const tree = getTree(priorityNode.treeId)
         const instId = tree?.institution || ''
-        const allUsers = (userDb.getAll() as any[]).filter((u: any) => u.institution === instId)
+        const allUsers = (students as any[]).filter((u: any) => u.institution === instId)
         // Müəssisənin BÜTÜN təhsilalanlarının faktiki fənləri (cədvəldən avtomatik)
         const instSubjSet = new Set<string>()
         allUsers.forEach((u: any) => {
@@ -1215,6 +1225,7 @@ export default function Specialties() {
       {groupNode && (
         <GroupModal
           node={groupNode.node}
+          users={students as any[]}
           onSave={handleSaveGroups}
           onClose={() => setGroupNode(null)}
         />
@@ -1477,11 +1488,11 @@ export default function Specialties() {
 
                     {/* ── Proporsional bölgü toggle ── */}
                     <div
-                      onClick={() => {
+                      onClick={async () => {
                         const next = !t.sourceProportional
-                        treeDb.update(t.id, { sourceProportional: next })
-                        refreshTrees()
-                        addLog('admin', next ? 'success' : 'info',
+                        await treeDb.update(t.id, { sourceProportional: next })
+                        await refreshTrees()
+                        await addLog('admin', next ? 'success' : 'info',
                           `Proporsional bölgü ${next ? 'aktivləşdirildi' : 'deaktivləşdirildi'}: "${t.name}"`)
                       }}
                       title={t.sourceProportional ? 'Proporsional bölgü aktiv' : 'Proporsional bölgü deaktiv'}
@@ -1526,11 +1537,11 @@ export default function Specialties() {
                         title: 'Strukturu arxivlə',
                         message: `"${t.name}" ixtisas strukturunun snapshotunu arxivə göndərmək istəyirsiniz?`,
                         confirmLabel: 'Arxivlə', confirmColor: '#9a7b1e',
-                        onConfirm: () => {
-                          treeArchiveDb.save({ name: t.name, year: t.year || '', icon: t.icon || '', institution: t.institution || '', nodes: t.nodes || [] })
-                          treeDb.delete(t.id)
-                          addLog('admin', 'info', `İxtisas strukturu arxivləndi: "${t.name}"`, `İl: ${t.year || '—'}`)
-                          refreshTrees()
+                        onConfirm: async () => {
+                          await treeArchiveDb.save({ name: t.name, year: t.year || '', icon: t.icon || '', institution: t.institution || '', nodes: t.nodes || [] })
+                          await treeDb.delete(t.id)
+                          await addLog('admin', 'info', `İxtisas strukturu arxivləndi: "${t.name}"`, `İl: ${t.year || '—'}`)
+                          await refreshTrees()
                         },
                       })}
                     >🗄️ Arxivlə</button>
@@ -1584,7 +1595,7 @@ export default function Specialties() {
                       {/* Rekursiv node siyahısı */}
                       {(() => {
                         const tInstId   = t.institution || ''
-                        const allUsers  = userDb.getAll() as any[]
+                        const allUsers  = students as any[]
                         const instUsers = tInstId ? allUsers.filter((u: any) => u.institution === tInstId) : []
                         const hasGender = instUsers.some((u: any) => u.gender)
                         return nodes.map((node: TNode) => (

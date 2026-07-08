@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { logDb, type LogEntry, type LogCategory, type LogType } from '../../db'
 
 // ── Sabit etiketlər ──────────────────────────────────────────────────────────
@@ -66,7 +66,13 @@ function exportCsv(rows: LogEntry[]) {
 }
 
 export default function Logs() {
-  const [logs, setLogs] = useState<LogEntry[]>(() => logDb.getAll())
+  const [logs, setLogs] = useState<LogEntry[]>([])
+
+  useEffect(() => {
+    let cancelled = false
+    logDb.getAll().then(list => { if (!cancelled) setLogs(list) })
+    return () => { cancelled = true }
+  }, [])
   const [catFlt, setCatFlt] = useState<string>('all')
   const [typeFlt, setTypeFlt] = useState<string>('all')
   const [search, setSearch] = useState('')
@@ -112,7 +118,7 @@ export default function Logs() {
   }, [filtered])
 
   const toggleExpand = (id: string) => setExpanded(p => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n })
-  const handleRefresh = () => setLogs(logDb.getAll())
+  const handleRefresh = async () => setLogs(await logDb.getAll())
   const hasFilter = catFlt !== 'all' || typeFlt !== 'all' || !!search || !!dateFrom || !!dateTo
 
 

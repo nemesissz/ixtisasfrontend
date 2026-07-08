@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   adminDb,
   systemSettingsDb,
@@ -7,12 +7,14 @@ import {
   useLocalState,
   addLog,
   InstLoginConfig,
+  DEFAULT_INST_CONFIG,
   STUDENT_COLUMNS,
   studentColValue,
   customRoleDb,
 } from "../../db";
 import { AppDialog, useDialog } from "../../components/AppDialog";
 import { PERM_GROUPS, ALL_PERMS } from "../../permissions";
+import { getAdminSession, setAdminSession } from "../../api/auth";
 
 const EyeIcon = ({ off }: { off: boolean }) =>
   off ? (
@@ -234,7 +236,10 @@ export default function Admins() {
   const [modal, setModal] = useState(false);
   const [form, setForm] = useState({ ...EMPTY_FORM });
   const [showPw, setShowPw] = useState(false);
-  const [customRoles, setCustomRoles] = useState<string[]>(() => customRoleDb.getAll());
+  const [customRoles, setCustomRoles] = useState<string[]>([]);
+  useEffect(() => {
+    customRoleDb.getAll().then(setCustomRoles);
+  }, []);
   const [addingRole, setAddingRole] = useState(false);
   const [newRole, setNewRole] = useState("");
   const [roleToDelete, setRoleToDelete] = useState<string | null>(null);
@@ -252,36 +257,41 @@ export default function Admins() {
   const [pwShowN, setPwShowN] = useState(false);
   const [pwError, setPwError] = useState("");
 
-  const session = (() => {
-    try {
-      return JSON.parse(sessionStorage.getItem("admin_session") || "null");
-    } catch {
-      return null;
-    }
-  })();
+  const session = getAdminSession();
   const isSuperAdmin = session?.role === "superadmin";
 
-  const institutions = institutionDb.getAll() as any[];
-  const [selInst, setSelInst] = useState<string>(institutions[0]?.id || "");
-  const [instCfg, setInstCfg] = useState<InstLoginConfig>(() =>
-    systemSettingsDb.getInstConfig(institutions[0]?.id || ""),
-  );
+  const [institutions, setInstitutions] = useState<any[]>([]);
+  const [selInst, setSelInst] = useState<string>("");
+  const [instCfg, setInstCfg] = useState<InstLoginConfig>(DEFAULT_INST_CONFIG);
   const [settingsSaved, setSettingsSaved] = useState(false);
-  const [redirectDelay, setRedirectDelay] = useState<number>(() =>
-    systemSettingsDb.getRedirectDelay(),
-  );
+  const [redirectDelay, setRedirectDelay] = useState<number>(10);
+
+  useEffect(() => {
+    institutionDb.getAll().then((list: any[]) => {
+      setInstitutions(list);
+      setSelInst((prev) => prev || list[0]?.id || "");
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!selInst) return;
+    systemSettingsDb.getInstConfig(selInst).then(setInstCfg);
+  }, [selInst]);
+
+  useEffect(() => {
+    systemSettingsDb.getRedirectDelay().then(setRedirectDelay);
+  }, []);
 
   function handleInstChange(id: string) {
     setSelInst(id);
-    setInstCfg(systemSettingsDb.getInstConfig(id));
   }
 
-  function handleSaveSettings() {
-    systemSettingsDb.setInstConfig(selInst, instCfg);
-    systemSettingsDb.setRedirectDelay(redirectDelay);
+  async function handleSaveSettings() {
+    await systemSettingsDb.setInstConfig(selInst, instCfg);
+    await systemSettingsDb.setRedirectDelay(redirectDelay);
     setSettingsSaved(true);
     setTimeout(() => setSettingsSaved(false), 2000);
-    addLog(
+    await addLog(
       "admin",
       "success",
       "Giriş parametrləri yeniləndi",
@@ -291,7 +301,11 @@ export default function Admins() {
   }
 
   // ── Yalnız bu müəssisənin təhsilalan datasında mövcud olan sütunlar ──
-  const instCadets = (userDb.getAll() as any[]).filter(
+  const [allStudents, setAllStudents] = useState<any[]>([]);
+  useEffect(() => {
+    userDb.getAll().then((list: any[]) => setAllStudents(list));
+  }, []);
+  const instCadets = allStudents.filter(
     (u: any) => u.institution === selInst,
   );
   const availColumns0 = STUDENT_COLUMNS.filter((c) =>
@@ -324,7 +338,7 @@ export default function Admins() {
     setPwModal(true);
   }
 
-  function handleChangePw() {
+  async function handleChangePw() {
     if (!pwNew || !pwNew2) {
       setPwError("Bütün sahələri doldurun");
       return;
@@ -348,14 +362,14 @@ export default function Admins() {
       setPwError("Yeni şifrələr uyğun gəlmir");
       return;
     }
-    adminDb.update(pwTarget.id, { password: pwNew });
+    await adminDb.update(pwTarget.id, { password: pwNew });
     // Öz şifrəsini dəyişirsə sessionı yenilə
     if (pwTarget?.id === session?.id) {
-      sessionStorage.setItem("admin_session", JSON.stringify({ ...session, password: pwNew }));
+      setAdminSession({ ...(session as any), password: pwNew });
     }
-    refresh();
+    await refresh();
     setPwModal(false);
-    addLog(
+    await addLog(
       "admin",
       "success",
       `Şifrə dəyişdirildi: ${pwTarget.name}`,
@@ -375,35 +389,35 @@ export default function Admins() {
   const isOperator = form.role === "operator";
   const needsPerms = !!form.role && form.role !== "superadmin";
 
-  function addCustomRole() {
+  async function addCustomRole() {
     const n = newRole.trim();
     if (!n) return;
-    customRoleDb.add(n);
-    setCustomRoles(customRoleDb.getAll());
+    await customRoleDb.add(n);
+    setCustomRoles(await customRoleDb.getAll());
     setForm((f) => ({ ...f, role: n }));
     setAddingRole(false);
     setNewRole("");
   }
 
-  function confirmRoleDelete() {
-    const superadmin = (adminDb.getAll() as any[]).find((a: any) => a.role === "superadmin");
+  async function confirmRoleDelete() {
+    const superadmin = (await adminDb.getAll() as any[]).find((a: any) => a.role === "superadmin");
     if (!superadmin || rolePw !== superadmin.password) {
       setRolePwError("Superadmin şifrəsi yanlışdır");
       return;
     }
     const r = roleToDelete!;
-    customRoleDb.remove(r);
-    setCustomRoles(customRoleDb.getAll());
+    await customRoleDb.remove(r);
+    setCustomRoles(await customRoleDb.getAll());
     setForm((f) => (f.role === r ? { ...f, role: "" } : f));
     setRoleToDelete(null);
     setRolePw("");
     setRolePwError("");
-    addLog("admin", "warning", `Rol silindi: "${r}"`, "Superadmin şifrəsi ilə təsdiqləndi");
+    await addLog("admin", "warning", `Rol silindi: "${r}"`, "Superadmin şifrəsi ilə təsdiqləndi");
   }
 
-  function handleAdd() {
+  async function handleAdd() {
     if (!form.name || !form.username || !form.password || !form.role) return;
-    adminDb.create({
+    await adminDb.create({
       name: form.name,
       email: isOperator ? "" : form.email,
       role: form.role,
@@ -411,13 +425,13 @@ export default function Admins() {
       password: form.password,
       permissions: needsPerms ? form.permissions : undefined,
     });
-    addLog(
+    await addLog(
       "admin",
       "success",
       `Yeni hesab yaradıldı: "${form.name}" (${ROLES[form.role] || form.role})`,
       `@${form.username.trim()}${needsPerms ? ` · ${form.permissions.length} icazə` : ""}`,
     );
-    refresh();
+    await refresh();
     setModal(false);
     setForm({ ...EMPTY_FORM });
   }
@@ -429,17 +443,25 @@ export default function Admins() {
     setPermTarget(a);
     setPermSel(a.permissions || []);
   }
-  function savePerms() {
-    adminDb.update(permTarget.id, { permissions: permSel });
-    addLog(
+  async function savePerms() {
+    await adminDb.update(permTarget.id, { permissions: permSel });
+    await addLog(
       "admin",
       "info",
       `İcazələr yeniləndi: "${permTarget.name}"`,
       `${permSel.length} icazə`,
       session?.name,
     );
-    refresh();
+    await refresh();
     setPermTarget(null);
+  }
+
+  if (!admins) {
+    return (
+      <div style={{ padding: 40, textAlign: "center", color: "var(--muted)" }}>
+        Yüklənir...
+      </div>
+    );
   }
 
   function handleDelete(a: any) {
@@ -462,10 +484,10 @@ export default function Admins() {
       message: `"${a.name}" hesabı silinəcək. Bu əməliyyat geri alına bilməz.`,
       confirmLabel: "Sil",
       confirmColor: "#ff4d4f",
-      onConfirm: () => {
-        adminDb.delete(a.id);
-        refresh();
-        addLog(
+      onConfirm: async () => {
+        await adminDb.delete(a.id);
+        await refresh();
+        await addLog(
           "admin",
           "warning",
           `Hesab silindi: "${a.name}" (${ROLES[a.role] || a.role})`,

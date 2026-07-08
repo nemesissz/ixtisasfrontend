@@ -1,4 +1,5 @@
 import { NavLink, Outlet, useLocation, useNavigate, Navigate } from 'react-router-dom'
+import { getOperatorSession, clearOperatorSession } from '../api/auth'
 
 const NAV = [
   { section: 'Əsas' },
@@ -14,14 +15,13 @@ export default function OperatorLayout() {
   const navigate = useNavigate()
 
   // Session yoxla
-  const sessionRaw = sessionStorage.getItem('operator_session')
-  const session    = sessionRaw ? JSON.parse(sessionRaw) : null
+  const session = getOperatorSession()
   if (!session) return <Navigate to="/operator/login" replace />
 
   const meta = PAGE_META[pathname] ?? { title: 'Operator', sub: '' }
 
   function handleLogout() {
-    sessionStorage.removeItem('operator_session')
+    clearOperatorSession()
     navigate('/')
   }
 

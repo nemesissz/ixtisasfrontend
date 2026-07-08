@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { userDb, submissionDb, selectionDb, treeDb, institutionDb, useLocalState, addLog } from '../../db'
 import InstTabs from '../../components/InstTabs'
 import { AppDialog, useDialog } from '../../components/AppDialog'
@@ -110,21 +110,37 @@ function maxflowRebalancePartial(opts: {
 
 export default function Redistribute() {
   const [users, refreshUsers] = useLocalState(userDb.getAll)
-  const institutions = institutionDb.getAll() as any[]
-  const allSels = selectionDb.getAll().filter((s: any) => s.status !== 'draft') as any[]
+  const [institutions, setInstitutions] = useState<any[]>([])
+  const [allSels, setAllSels] = useState<any[]>([])
+  useEffect(() => {
+    Promise.all([institutionDb.getAll(), selectionDb.getAll()]).then(([insts, sels]) => {
+      setInstitutions(insts)
+      setAllSels(sels.filter((s: any) => s.status !== 'draft'))
+    })
+  }, [])
   const { dialog, showConfirm, showInfo, closeDialog } = useDialog()
 
-  const [instId, setInstId]   = useState<string>(institutions[0]?.id || '')
+  const [instId, setInstId]   = useState<string>('')
+  useEffect(() => { if (institutions.length && !instId) setInstId(institutions[0].id) }, [institutions])
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [preview, setPreview] = useState<Record<string, { specId: string; choiceNum: number }> | null>(null)
   const [busy, setBusy] = useState(false)
 
-  const allUsers = users as any[]
+  const allUsers = users ?? []
   // Bu müəssisə üzrə yerləşmə olan seçim
   const instSels = allSels.filter((s: any) => s.institution === instId)
   const sel = instSels.find((s: any) => allUsers.some((u: any) => u.placedSelectionId === s.id && u.placedSpecialty)) || instSels[0] || null
-  const tree = sel ? treeDb.get(sel.treeId) : null
-  const subs = sel ? (submissionDb.getBySelection(sel.id) as any[]) : []
+  const [tree, setTree] = useState<any>(null)
+  const [subs, setSubs] = useState<any[]>([])
+  useEffect(() => {
+    if (!sel) { setTree(null); setSubs([]); return }
+    let cancelled = false
+    Promise.all([treeDb.get(sel.treeId), submissionDb.getBySelection(sel.id)]).then(([t, s]) => {
+      if (cancelled) return
+      setTree(t); setSubs(s)
+    })
+    return () => { cancelled = true }
+  }, [sel?.id])
 
   const { leafStats, pathMap, placedById } = useMemo(() => {
     const leaves = tree ? getLeavesWithPath(tree.nodes || []) : []
@@ -213,7 +229,7 @@ export default function Redistribute() {
       title: 'Qismən yerləşdirməni tətbiq et',
       message: `${pool.length} təhsilalanın yerləşməsi yenidən hesablanıb bazaya yazılacaq. Əvvəlki vəziyyət snapshot kimi saxlanılacaq (geri alına bilər).`,
       confirmLabel: 'Tətbiq et', confirmColor: '#c9962a',
-      onConfirm: () => {
+      onConfirm: async () => {
         setBusy(true)
         // Snapshot — köhnə yerləşmə + köhnə kvotalar (= seçilmiş ixtisasların köhnə yerləşən sayı)
         try {
@@ -224,25 +240,25 @@ export default function Redistribute() {
           const snap = { id: Date.now().toString(), ts: new Date().toISOString(), selName: `${sel.name} (qismən)`, algorithm: 'partial', method: 'partial', placedCount: pool.length, userStates, treeId: tree?.id, quotas: oldQuotas }
           localStorage.setItem('dist_snapshots', JSON.stringify([snap, ...snaps].slice(0, 8)))
         } catch {}
-        // Yaz: əvvəlcə hovuzdakı köhnə yerləşməni təmizlə, sonra yenisini yaz
-        pool.forEach((u: any) => {
-          if (!preview[u.id]) {
-            userDb.update(u.id, { placedSpecialty: null, choiceNum: null, placedSpecialtyId: null, placedSelectionId: null })
-          }
-        })
-        Object.entries(preview).forEach(([uid, a]) => {
+        // Yaz: əvvəlcə hovuzdakı köhnə yerləşməni təmizlə, sonra yenisini yaz — bir sorğuda
+        const clearPatches = pool
+          .filter((u: any) => !preview[u.id])
+          .map((u: any) => ({ id: u.id, placedSpecialty: null, choiceNum: null, placedSpecialtyId: null, placedSelectionId: null }))
+        const assignPatches = Object.entries(preview).map(([uid, a]) => {
           const path = pathMap[a.specId] || []
-          userDb.update(uid, {
+          return {
+            id: uid,
             placedSpecialty:   path.map((n: any) => n.name).join(' → '),
             choiceNum:         a.choiceNum,
             placedSpecialtyId: a.specId,
             placedSelectionId: sel.id,
-          })
+          }
         })
+        await userDb.bulkUpdate([...clearPatches, ...assignPatches])
         const changed = pool.filter((u: any) => preview[u.id]?.specId !== u.placedSpecialtyId).length
         addLog('distribution', 'success', `Qismən yenidən yerləşdirmə: ${pool.length} təhsilalan`,
           `Seçilmiş ixtisas: ${selected.size} · Yerini dəyişən: ${changed} · Seçim: ${sel.name}`)
-        refreshUsers(); setPreview(null); setSelected(new Set()); setBusy(false)
+        await refreshUsers(); setPreview(null); setSelected(new Set()); setBusy(false)
         showInfo({ icon: '✅', iconBg: '#f0fff4', iconColor: '#52c41a', title: 'Tətbiq edildi', message: `${pool.length} təhsilalan yenidən bölündü (${changed} təhsilalan yerini dəyişdi).`, confirmLabel: 'Bağla' })
       },
     })

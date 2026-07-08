@@ -1,4 +1,4 @@
-import { useState, useMemo, Fragment } from 'react'
+import { useState, useMemo, useEffect, Fragment } from 'react'
 import * as XLSX from 'xlsx'
 import { selectionDb, treeDb, userDb, submissionDb, buildNameMap, institutionDb, addLog } from '../../db'
 import InstIcon from '../../components/InstIcon'
@@ -23,13 +23,27 @@ const choiceBadge = (c: number) => {
 }
 
 export default function Results() {
-  const allSelections = selectionDb.getAll().filter((s: any) => s.status !== 'draft')
-  const allUsers      = userDb.getAll() as any[]
-  const institutions  = institutionDb.getAll() as any[]
+  const [allSelections, setAllSelections] = useState<any[]>([])
+  const [allUsers,      setAllUsers]      = useState<any[]>([])
+  const [institutions,  setInstitutions]  = useState<any[]>([])
+  const [loaded,        setLoaded]        = useState(false)
+
+  useEffect(() => {
+    Promise.all([selectionDb.getAll(), userDb.getAll(), institutionDb.getAll()]).then(([sels, users, insts]) => {
+      setAllSelections(sels.filter((s: any) => s.status !== 'draft'))
+      setAllUsers(users)
+      setInstitutions(insts)
+      setLoaded(true)
+    })
+  }, [])
+
   const instMap: Record<string, any> = {}
   for (const inst of institutions) instMap[inst.id] = inst
 
-  const [selId, setSelId]   = useState<string>(allSelections[0]?.id || '')
+  const [selId, setSelId]   = useState<string>('')
+  useEffect(() => {
+    if (!selId && allSelections.length > 0) setSelId(allSelections[0].id)
+  }, [allSelections])
   const [search, setSearch] = useState('')
   const [instFlt, setInstFlt] = useState('all')
   const [statusFlt, setStatusFlt] = useState<'all' | 'placed' | 'unplaced'>('all')
@@ -38,8 +52,18 @@ export default function Results() {
   const toggleExpand = (id: string) => setExpanded(p => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n })
 
   const sel  = allSelections.find((s: any) => s.id === selId)
-  const tree = sel ? treeDb.get(sel.treeId) : null
-  const subs = sel ? (submissionDb.getBySelection(sel.id) as any[]) : []
+
+  const [tree, setTree] = useState<any>(null)
+  const [subs, setSubs] = useState<any[]>([])
+  useEffect(() => {
+    let cancelled = false
+    if (!sel) { setTree(null); setSubs([]); return }
+    Promise.all([treeDb.get(sel.treeId), submissionDb.getBySelection(sel.id)]).then(([t, s]) => {
+      if (!cancelled) { setTree(t); setSubs(s) }
+    })
+    return () => { cancelled = true }
+  }, [sel?.id])
+
   const nameMap = tree ? buildNameMap(tree) : {}
   // Hər leaf üçün tam yol (Qoşun növü → ... → İxtisas) və təhsilalan üzrə seçim sıralaması
   const leafPaths = useMemo(() => {
@@ -100,6 +124,8 @@ export default function Results() {
     XLSX.writeFile(wb, `Neticeler_${new Date().toLocaleDateString('az-AZ').replace(/\./g, '-')}.xlsx`)
     addLog('distribution', 'info', `Nəticələr Excel-ə ixrac edildi`, `${data.length} təhsilalan · ${sel?.name || ''}`)
   }
+
+  if (!loaded) return null
 
   if (allSelections.length === 0) {
     return (

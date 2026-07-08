@@ -1,9 +1,13 @@
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { selectionDb } from '../db'
 
 export default function Home() {
   const navigate  = useNavigate()
-  const published = selectionDb.getAll().filter((s: any) => s.status === 'published')
+  const [published, setPublished] = useState<any[]>([])
+  useEffect(() => {
+    selectionDb.getAll().then(list => setPublished(list.filter((s: any) => s.status === 'published')))
+  }, [])
   const hasActive = published.length > 0
 
   return (

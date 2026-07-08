@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { selectionDb, treeDb, userDb, institutionDb, addLog } from '../../db'
 import { FlatView, NestedView, treeToNested, nestedToFlat } from '../../components/SpecialtyViews'
@@ -48,13 +48,14 @@ function ViewPreviewOverlay({
 // ── Ana form ──────────────────────────────────────────────────────────────────
 export default function SelectionNew() {
   const navigate     = useNavigate()
-  const trees        = treeDb.getAll() as any[]
-  const institutions = institutionDb.getAll() as any[]
-  const allUsers     = userDb.getAll() as any[]
+  const [trees, setTrees]             = useState<any[]>([])
+  const [institutions, setInstitutions] = useState<any[]>([])
+  const [allUsers, setAllUsers]       = useState<any[]>([])
+  const [loaded, setLoaded]           = useState(false)
 
   const [form, setForm] = useState({
     name:               '',
-    institution:        institutions[0]?.id || '',
+    institution:        '',
     treeId:             '',
     sourceProportional: false,
     viewMode:           'list' as 'list' | 'nested',
@@ -62,6 +63,23 @@ export default function SelectionNew() {
   })
   const [showPreview, setShowPreview] = useState(false)
   const [previewMode, setPreviewMode] = useState<'list' | 'nested'>('list')
+
+  useEffect(() => {
+    let cancelled = false
+    Promise.all([treeDb.getAll(), institutionDb.getAll(), userDb.getAll()]).then(([t, i, u]) => {
+      if (cancelled) return
+      setTrees(t); setInstitutions(i); setAllUsers(u); setLoaded(true)
+    })
+    return () => { cancelled = true }
+  }, [])
+
+  useEffect(() => {
+    if (loaded && !form.institution && institutions[0]?.id) {
+      setForm(f => ({ ...f, institution: institutions[0].id }))
+    }
+  }, [loaded, institutions, form.institution])
+
+  if (!loaded) return <div className="card"><div className="card-body pad">Yüklənir...</div></div>
 
   // ── Hesablamalar ─────────────────────────────────────────────────────────────
   const instStudents = allUsers.filter((u: any) => u.institution === form.institution)
@@ -90,12 +108,12 @@ export default function SelectionNew() {
     })
   }
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (!form.name.trim() || !form.treeId) {
       alert('Zəhmət olmasa bütün məcburi sahələri doldurun')
       return
     }
-    const sel = selectionDb.create({
+    const sel = await selectionDb.create({
       name:               form.name.trim(),
       institution:        form.institution,
       studentCount,

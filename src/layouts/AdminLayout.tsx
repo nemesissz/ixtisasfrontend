@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { userDb, selectionDb, addLog } from '../db'
 import { TopbarProvider, useTopbar } from '../contexts/TopbarContext'
 import { PATH_PERM, hasPerm, pathAllowed } from '../permissions'
+import { getAdminSession, clearAdminSession } from '../api/auth'
 
 const NAV = [
   { section: 'Əsas' },
@@ -11,11 +12,11 @@ const NAV = [
   { to: '/admin/users',        icon: '👥', label: 'Təhsilalanlar' },
   { to: '/admin/specialties',  icon: '🎓', label: 'Müəssisə/İxtisaslar' },
   { to: '/admin/selections',   icon: '🗳',  label: 'Seçimlər' },
-  { to: '/admin/distribution', icon: '⚖️', label: 'Yerləşdirmə', badge: () => (userDb.getAll() as any[]).filter((u:any) => !u.institution).length || undefined },
+  { to: '/admin/distribution', icon: '⚖️', label: 'Yerləşdirmə', badgeKey: 'distribution' },
   { to: '/admin/redistribute', icon: '🔧', label: 'Qismən Yerləşdirmə' },
   { to: '/admin/results',      icon: '📋', label: 'Nəticələr' },
   { section: 'Sistem' },
-  { to: '/admin/archive',      icon: '🗄️', label: 'Arxiv',      badge: () => selectionDb.getArchived().length || undefined },
+  { to: '/admin/archive',      icon: '🗄️', label: 'Arxiv',      badgeKey: 'archive' },
   { to: '/admin/logs',         icon: '📋', label: 'Loglar' },
   { to: '/admin/admins',       icon: '🔐', label: 'Adminlər' },
 ]
@@ -42,11 +43,24 @@ function AdminLayoutInner() {
   const toggleCollapsed = () => setCollapsed(c => { localStorage.setItem('admin_sidebar_collapsed', c ? '0' : '1'); return !c })
   const navigate = useNavigate()
 
-  const session = (() => { try { return JSON.parse(sessionStorage.getItem('admin_session') || 'null') } catch { return null } })()
+  const session = getAdminSession()
+
+  const [badges, setBadges] = useState<Record<string, number | undefined>>({})
+  useEffect(() => {
+    let cancelled = false
+    Promise.all([userDb.getAll(), selectionDb.getArchived()]).then(([users, archived]) => {
+      if (cancelled) return
+      setBadges({
+        distribution: (users as any[]).filter((u: any) => !u.institution).length || undefined,
+        archive: archived.length || undefined,
+      })
+    })
+    return () => { cancelled = true }
+  }, [])
 
   function handleLogout() {
     addLog('admin', 'info', `Sistemdən çıxış: ${session?.name || 'Admin'}`, `Rol: ${session?.role || 'admin'}`)
-    sessionStorage.removeItem('admin_session')
+    clearAdminSession()
     navigate('/admin/login')
   }
 
@@ -112,7 +126,7 @@ function AdminLayoutInner() {
             if ('section' in item) {
               return <div key={i} className="nav-section">{item.section}</div>
             }
-            const badge = item.badge?.()
+            const badge = (item as any).badgeKey ? badges[(item as any).badgeKey] : undefined
             const [itemPath, itemQuery] = item.to.split('?')
             const isActive = pathname === itemPath && (!itemQuery || search === `?${itemQuery}`)
             return (
