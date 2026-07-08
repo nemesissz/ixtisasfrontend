@@ -2226,7 +2226,7 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
 export default function Users() {
   const [params, setParams] = useSearchParams()
   const [institutions, refreshInstitutions] = useLocalState(institutionDb.getAll)
-  const insts = institutions as any[]
+  const insts = institutions ?? []
 
   const instParam  = params.get('inst')
   const [tab, setTab] = useState<string>(instParam || (insts[0]?.id ?? ''))
