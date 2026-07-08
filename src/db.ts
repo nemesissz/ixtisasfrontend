@@ -200,6 +200,11 @@ function toStudentDto(data: any) {
 }
 
 // ── Xüsusi rollar ──────────────────────────────────────────────────────────
+// (Köhnə localStorage seed/self-healing bloklar (default superadmin, BHK, HƏHİ-300,
+// NHK, source normalizasiyası, junk-müəssisə təmizliyi) buradan çıxarılıb — data indi
+// real MySQL-də yaşayır. Superadmin backend Program.cs-də, BHK isə BhkImporter ilə
+// bir dəfəlik seed olunub. Digərləri lazım olsa backend tərəfdə bir dəfəlik
+// migrasiya/skript kimi tətbiq edilməlidir, hər səhifə yüklənməsində yox.)
 export const customRoleDb = {
   getAll: async (): Promise<string[]> => { try { return await http.get<string[]>('/api/customroles') } catch { return [] } },
   add: async (name: string): Promise<string> => http.post<string>('/api/customroles', name.trim()),

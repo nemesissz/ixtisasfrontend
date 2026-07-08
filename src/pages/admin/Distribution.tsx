@@ -257,7 +257,7 @@ function runPacketPlacement(
 }
 
 // ── Yerləşdirmə alqoritmi ─────────────────────────────────────────────────────
-function runPlacement(users: any[], subs: any[], tree: any, sourceProportional = false) {
+function runPlacement(users: any[], subs: any[], tree: any, sourceProportional = false, instCounts?: { total: number; mülki: number }) {
   const leavesWithPath = getLeavesWithPath(tree?.nodes || [])
   const quotas: Record<string, number> = {}
   const pathMap: Record<string, any[]> = {}
@@ -309,9 +309,9 @@ function runPlacement(users: any[], subs: any[], tree: any, sourceProportional =
   }
 
   if (sourceProportional) {
-    // ── Mülki / lisey nisbətini hesabla
-    const total      = users.length
-    const mülkiTotal = users.filter((u: any) => u.source === 'mülki').length
+    // ── Mülki / lisey nisbətini hesabla (bütün müəssisəyə görə, seçim göndərənlərə görə deyil)
+    const total      = instCounts ? instCounts.total : users.length
+    const mülkiTotal = instCounts ? instCounts.mülki : users.filter((u: any) => u.source === 'mülki').length
 
     const mülkiQ: Record<string, number>  = {}
     const liseyQ: Record<string, number>  = {}
@@ -1231,7 +1231,10 @@ export default function Distribution() {
     }
 
     if (algorithm === 'gale-shapley') return runGaleShapley(submittedUsers, sels, tree)
-    return runPlacement(submittedUsers, sels, tree, !!(tree?.sourceProportional))
+    return runPlacement(submittedUsers, sels, tree, !!(tree?.sourceProportional), {
+      total: allInstUsers.length,
+      mülki: allInstUsers.filter((u: any) => u.source === 'mülki').length,
+    })
   }, [mode, method, selId, treeKey, (users ?? []).length, packets, packetPlacements, tree?.sourceProportional, algorithm])
 
   const placedCount   = placement ? Object.keys(placement.assignments).length : 0

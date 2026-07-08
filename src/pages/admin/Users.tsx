@@ -480,6 +480,15 @@ export function normGender(v: any): 'qadın' | 'kişi' | null {
   return null
 }
 
+// Mənbə dəyərini standart 'mülki' / 'lisey'-ə normalizə et (böyük/kiçik hərf, boşluq, variantlar)
+export function normSource(v: any): 'mülki' | 'lisey' | null {
+  const s = String(v ?? '').trim().toLowerCase()
+  if (!s || s === '—' || s === '-') return null
+  if (s.startsWith('mülk') || s.startsWith('mulk') || s === 'm') return 'mülki'
+  if (s.startsWith('lise') || s.startsWith('lyse') || s === 'l') return 'lisey'
+  return null
+}
+
 function parseExcel(file: File, instId: string, subjectCols: string[] = [], levelNames: string[] = []): Promise<{ ok: any[]; errors: string[] }> {
   return new Promise(resolve => {
     const reader = new FileReader()
@@ -527,7 +536,7 @@ function parseExcel(file: File, instId: string, subjectCols: string[] = [], leve
             institution: instId, name: norm.name, parentName: norm.parentName || '',
             workNumber: norm.workNumber || '', fin: norm.fin,
             score: isNaN(score) ? 0 : score, group: norm.group || null,
-            source: norm.source || null,
+            source: normSource(norm.source),
             gender: normGender(norm.gender),
             packet: 1, status: 'pending',
             printStatus: norm.printStatus === 'Çap edilib' ? 'printed' : 'not_printed',

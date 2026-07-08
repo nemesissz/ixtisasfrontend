@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { selectionDb, userDb, submissionDb, institutionDb, treeDb, buildNameMap, useLocalState, addLog } from '../../db'
 import { getOperatorSession } from '../../api/auth'
+import InstIcon from '../../components/InstIcon'
 
 // ── Qrup rəngləri ─────────────────────────────────────────────────────────────
 const GRP_COLORS: Record<string, { bg: string; color: string }> = {
@@ -355,7 +356,10 @@ export default function OperatorDashboard() {
                 boxShadow:  isActive ? '0 2px 10px #00b96b33' : 'none',
               }}
             >
-              {inst.icon} {inst.label}
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, minWidth: 0, maxWidth: 240, verticalAlign: 'middle' }}>
+                <InstIcon icon={inst.icon} size={18} />
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{inst.label}</span>
+              </span>
               {sel && (
                 <span style={{
                   marginLeft: 8, fontSize: 11, fontWeight: 600,
