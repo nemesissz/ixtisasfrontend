@@ -1,5 +1,5 @@
 // Backend API-yə fetch əsaslı nazik sarğı — token-i avtomatik əlavə edir, JSON encode/decode edir.
-import { getToken } from './auth'
+import { getToken, clearAdminSession, clearOperatorSession, clearStudentSession } from './auth'
 
 const BASE_URL: string = (import.meta as any).env?.VITE_API_URL || 'http://localhost:5199'
 
@@ -25,6 +25,11 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 
   if (!res.ok) {
     const text = await res.text().catch(() => '')
+    if (res.status === 401) {
+      // Token yoxdur/köhnədir/vaxtı bitib — köhnə sessiyanı təmizlə və uyğun giriş
+      // səhifəsinə qaytar (əks halda istifadəçi "asılı" qalmış boş səhifədə qalır)
+      redirectToLoginAfterAuthFailure()
+    }
     throw new ApiError(res.status, text || `${method} ${path} -> ${res.status}`)
   }
 
@@ -32,6 +37,21 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   const text = await res.text()
   if (!text) return undefined as T
   return JSON.parse(text) as T
+}
+
+function redirectToLoginAfterAuthFailure() {
+  if (typeof window === 'undefined') return
+  const path = window.location.pathname
+  if (path.startsWith('/admin')) {
+    clearAdminSession()
+    if (path !== '/admin/login') window.location.href = '/admin/login'
+  } else if (path.startsWith('/operator')) {
+    clearOperatorSession()
+    if (path !== '/operator/login') window.location.href = '/operator/login'
+  } else if (path.startsWith('/student')) {
+    clearStudentSession()
+    if (path !== '/student') window.location.href = '/student'
+  }
 }
 
 export const http = {
