@@ -120,8 +120,14 @@ export default function Dashboard() {
     const instUsers = allUsers.filter(u => u.institution === instId)
     const tree = (sel && allTrees.find(t => t.id === sel.treeId)) || allTrees.find(t => t.institution === instId)
     const leaves = tree ? getLeaves(tree.nodes || []) : []
+    // firstChoice — birinci seçim sayı (məmnuniyyət üçün)
+    // demandCount — ümumi tələb: ixtisası HƏR HANSI sırada seçənlərin sayı (rəqabət üçün düzgün ölçü)
     const firstChoice: Record<string, number> = {}
-    for (const s of subs) { const f = s.ranking?.[0]; if (f) firstChoice[f] = (firstChoice[f] || 0) + 1 }
+    const demandCount: Record<string, number> = {}
+    for (const s of subs) {
+      const f = s.ranking?.[0]; if (f) firstChoice[f] = (firstChoice[f] || 0) + 1
+      for (const sid of (s.ranking || [])) if (sid) demandCount[sid] = (demandCount[sid] || 0) + 1
+    }
 
     const placedUsers = instUsers.filter(u => u.placedSpecialtyId)
     // "Seçim etdi" — status sahəsi etibarsız ola bilər; faktiki göndərilmiş seçimə (submission),
@@ -143,7 +149,8 @@ export default function Dashboard() {
         avg: scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : 0,
         min: scores.length ? Math.min(...scores) : 0,
         max: scores.length ? Math.max(...scores) : 0,
-        demand: firstChoice[leaf.id] || 0,
+        demand: demandCount[leaf.id] || 0,
+        firstChoice: firstChoice[leaf.id] || 0,
       }
     })
 
@@ -203,7 +210,7 @@ export default function Dashboard() {
         specs: lv.length,
         quota: lv.reduce((s, x) => s + (x.leaf.quota || 0), 0),
         placed: placedUsers.filter(u => ids.has(u.placedSpecialtyId)).length,
-        demand: lv.reduce((s, x) => s + (firstChoice[x.leaf.id] || 0), 0),
+        demand: lv.reduce((s, x) => s + (demandCount[x.leaf.id] || 0), 0),
       }
     }).filter((b: any) => b.quota > 0 || b.specs > 0)
 
