@@ -33,6 +33,14 @@ export function buildNameMap(tree: any): Record<string, string> {
 // ── Şəkil (shape) adapterləri ─────────────────────────────────────────────
 // Backend FK sahələri "xId" adlanır (institutionId), amma frontend tarixən
 // institution FK-sını sadəcə "institution" kimi oxuyur/yazır — burada map olunur.
+
+// Backend vaxtları UTC saxlayır, amma ISO sətri "Z" şəkilçisi OLMADAN göndərir
+// (məs. "2026-07-10T09:51:50.583"). JS bunu lokal vaxt kimi oxuyub 4 saat (Bakı UTC+4)
+// geri göstərirdi. Timezone məlumatı yoxdursa "Z" əlavə edib düzgün UTC kimi oxuyuruq.
+function utc(ts: any): any {
+  if (typeof ts !== 'string' || !ts) return ts
+  return /(?:Z|[+-]\d{2}:?\d{2})$/.test(ts) ? ts : ts + 'Z'
+}
 function mapInstitution(a: any) {
   return { id: a.id, label: a.label, icon: a.icon, year: a.year }
 }
@@ -40,7 +48,7 @@ function mapTree(a: any) {
   return {
     id: a.id, name: a.name, institution: a.institutionId,
     levelNames: a.levelNames || [], icon: a.icon, year: a.year,
-    sourceProportional: !!a.sourceProportional, createdAt: a.createdAt,
+    sourceProportional: !!a.sourceProportional, createdAt: utc(a.createdAt),
     nodes: a.nodes || [],
   }
 }
@@ -50,8 +58,8 @@ function mapSelection(a: any) {
     studentCount: a.studentCount, choiceCount: a.choiceCount,
     tiebreaker: a.tiebreaker || [], viewMode: a.viewMode,
     sourceProportional: !!a.sourceProportional, preAssignLevel: a.preAssignLevel ?? null,
-    status: a.status, createdAt: a.createdAt, publishedAt: a.publishedAt,
-    closedAt: a.closedAt, archivedAt: a.archivedAt,
+    status: a.status, createdAt: utc(a.createdAt), publishedAt: utc(a.publishedAt),
+    closedAt: utc(a.closedAt), archivedAt: utc(a.archivedAt),
   }
 }
 function mapStudent(a: any) {
@@ -68,13 +76,13 @@ function mapStudent(a: any) {
 function mapAdmin(a: any) {
   return {
     id: a.id, name: a.name, email: a.email, username: a.username,
-    role: a.role, status: a.status, lastLogin: a.lastLogin, permissions: a.permissions ?? undefined,
+    role: a.role, status: a.status, lastLogin: utc(a.lastLogin), permissions: a.permissions ?? undefined,
   }
 }
 function mapSubmission(a: any) {
   return {
     id: a.id, userId: a.userId, userName: a.userName, selectionId: a.selectionId,
-    ranking: a.ranking || [], createdAt: a.createdAt, updatedAt: a.updatedAt,
+    ranking: a.ranking || [], createdAt: utc(a.createdAt), updatedAt: utc(a.updatedAt),
   }
 }
 
@@ -296,7 +304,7 @@ export const institutionDb = {
 export const userArchiveDb = {
   getAll: async () => {
     const raw = await http.get<Array<{ id: string; archivedAt: string; data: any }>>('/api/user-archives')
-    return raw.map(a => ({ ...a.data, id: a.id, archivedAt: a.archivedAt }))
+    return raw.map(a => ({ ...a.data, id: a.id, archivedAt: utc(a.archivedAt) }))
   },
   delete: async (id: string) => { await http.delete(`/api/user-archives/${id}`) },
   save: async (data: any) => http.post<{ id: string; archivedAt: string }>('/api/user-archives', data),
@@ -306,7 +314,7 @@ export const userArchiveDb = {
 export const treeArchiveDb = {
   getAll: async () => {
     const raw = await http.get<Array<{ id: string; archivedAt: string; data: any }>>('/api/tree-archives')
-    return raw.map(a => ({ ...a.data, id: a.id, archivedAt: a.archivedAt }))
+    return raw.map(a => ({ ...a.data, id: a.id, archivedAt: utc(a.archivedAt) }))
   },
   delete: async (id: string) => { await http.delete(`/api/tree-archives/${id}`) },
   save: async (data: any) => http.post<{ id: string; archivedAt: string }>('/api/tree-archives', data),
@@ -345,7 +353,8 @@ export interface LogEntry {
 }
 
 export const logDb = {
-  getAll: async (): Promise<LogEntry[]> => http.get<LogEntry[]>('/api/logs'),
+  getAll: async (): Promise<LogEntry[]> =>
+    (await http.get<LogEntry[]>('/api/logs')).map(l => ({ ...l, timestamp: utc(l.timestamp) })),
   add: async (entry: Omit<LogEntry, 'id' | 'timestamp'>): Promise<LogEntry> =>
     http.post<LogEntry>('/api/logs', entry),
   clear: async () => { await http.delete('/api/logs') },
