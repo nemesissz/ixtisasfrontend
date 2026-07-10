@@ -402,7 +402,8 @@ export default function Admins() {
 
   async function confirmRoleDelete() {
     const superadmin = (await adminDb.getAll() as any[]).find((a: any) => a.role === "superadmin");
-    if (!superadmin || rolePw !== superadmin.password) {
+    const ok = superadmin && (await adminDb.loginAdmin(superadmin.username, rolePw));
+    if (!ok) {
       setRolePwError("Superadmin şifrəsi yanlışdır");
       return;
     }

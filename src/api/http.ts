@@ -1,4 +1,4 @@
-// Backend API-yə fetch əsaslı nazik sarğı — token-i avtomatik əlavə edir, JSON encode/decode edir.
+0// Backend API-yə fetch əsaslı nazik sarğı — token-i avtomatik əlavə edir, JSON encode/decode edir.
 import { getToken, clearAdminSession, clearOperatorSession, clearStudentSession } from './auth'
 
 const BASE_URL: string = (import.meta as any).env?.VITE_API_URL || 'http://localhost:5199'
