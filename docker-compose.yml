@@ -67,10 +67,10 @@ services:
     build:
       context: .
       args:
-        # Brauzer backend-ə bu ünvandan çıxır.
-        # Serverdə qurulanda serverin IP-si ilə əvəz edin:
-        #   VITE_API_URL: "http://SERVER_IP:5199"
-        VITE_API_URL: "http://localhost:5199"
+        # Boş = nisbi ünvan: API sorğuları eyni mənşədən gedir, nginx onları
+        # daxili şəbəkə ilə backend-ə ötürür. Beləliklə tətbiq localhost-dan da,
+        # şəbəkədəki istənilən IP-dən də (http://IP:5174) dəyişikliksiz işləyir.
+        VITE_API_URL: ""
     depends_on:
       - backend
     ports:

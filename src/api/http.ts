@@ -1,7 +1,12 @@
-0// Backend API-yə fetch əsaslı nazik sarğı — token-i avtomatik əlavə edir, JSON encode/decode edir.
+// Backend API-yə fetch əsaslı nazik sarğı — token-i avtomatik əlavə edir, JSON encode/decode edir.
 import { getToken, clearAdminSession, clearOperatorSession, clearStudentSession } from './auth'
 
-const BASE_URL: string = (import.meta as any).env?.VITE_API_URL || 'http://localhost:5199'
+// VITE_API_URL:
+//   - təyin olunmayıb (dev rejimi)  → http://localhost:5199
+//   - boş string "" (Docker build)  → nisbi ünvan: eyni mənşə, nginx /api-ni backend-ə ötürür.
+//     Beləliklə tətbiq istənilən IP/hostname üzərindən işləyir.
+const _env = (import.meta as any).env?.VITE_API_URL
+const BASE_URL: string = _env !== undefined ? _env : 'http://localhost:5199'
 
 export class ApiError extends Error {
   status: number
