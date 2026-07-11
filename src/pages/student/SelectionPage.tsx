@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { selectionDb, treeDb, userDb, submissionDb, systemSettingsDb, addLog } from '../../db'
 import { getStudentSession, clearStudentSession } from '../../api/auth'
@@ -44,6 +44,17 @@ function filterTreeByBranch(tree: any, branchName: string | null | undefined, le
   return { ...tree, nodes }
 }
 
+// ── Təyin edilmiş səviyyəni ağacdan yığışdır ─────────────────────────────────
+// Qoşun növü seçimdə əvvəlcədən təyin edilibsə, kursant onu görməməlidir —
+// həmin səviyyənin node-ları silinir, uşaqları bir səviyyə yuxarı qaldırılır.
+function collapseLevel(tree: any, level: number): any {
+  function walk(nodes: any[], depth: number): any[] {
+    if (depth === level) return nodes.flatMap(n => n.children || [])
+    return nodes.map(n => n.children?.length ? { ...n, children: walk(n.children, depth + 1) } : n)
+  }
+  return { ...tree, nodes: walk(tree.nodes || [], 0) }
+}
+
 // ── Cinsə görə ağacı filtrə et ───────────────────────────────────────────────
 // Təhsilalanın cinsinə icazə verilməyən ixtisaslar siyahıdan çıxarılır
 function filterTreeByGender(tree: any, gender: string | null | undefined): any {
@@ -78,6 +89,15 @@ export default function SelectionPage() {
   const [redirectSeconds, setRedirectSeconds] = useState(10)
   const viewMode: 'list' | 'nested' = selection?.viewMode || 'list'
 
+  // Kursanta göstərilən səviyyə adları — təyin edilmiş (yığışdırılmış) səviyyə çıxarılır
+  const displayLevelNames = useMemo(() => {
+    const lv: string[] = tree?.levelNames || []
+    const pal = selection?.preAssignLevel
+    const branchName = pal != null ? student?.branchByLevel?.[pal] : null
+    if (pal == null || !branchName) return lv
+    return lv.filter((_: string, i: number) => i !== pal)
+  }, [tree, selection, student])
+
   // ── State ─────────────────────────────────────────────────────────────────
   const [flat,        setFlat]        = useState<FlatRow[]>([])
   const [nested,      setNested]      = useState<GroupEntry[]>([])
@@ -102,10 +122,14 @@ export default function SelectionPage() {
     if (!tree || !student) return
     (async () => {
       const branchName = selection?.preAssignLevel != null ? student.branchByLevel?.[selection.preAssignLevel] : null
-      const filteredTree = filterTreeByGender(
+      let filteredTree = filterTreeByGender(
         filterTreeByBranch(filterTreeByGroup(tree, student.group), branchName, selection?.preAssignLevel),
         student.gender,
       )
+      // Təyin edilmiş səviyyə kursanta göstərilmir — ağacdan yığışdırılır
+      if (branchName && selection?.preAssignLevel != null) {
+        filteredTree = collapseLevel(filteredTree, selection.preAssignLevel)
+      }
       const initNested = treeToNested(filteredTree)
       const initFlat   = nestedToFlat(initNested)
       const existing   = await submissionDb.getByUser(student.id, selId!)
@@ -400,7 +424,7 @@ export default function SelectionPage() {
 
       {/* ── Görünüş ── */}
       {viewMode === 'list'
-        ? <FlatView   flat={flat}     onChange={submitted ? undefined : handleFlatChange}   submitted={submitted} levelNames={tree?.levelNames} />
+        ? <FlatView   flat={flat}     onChange={submitted ? undefined : handleFlatChange}   submitted={submitted} levelNames={displayLevelNames} />
         : <NestedView nested={nested} onChange={submitted ? undefined : handleNestedChange} submitted={submitted} />
       }
 
