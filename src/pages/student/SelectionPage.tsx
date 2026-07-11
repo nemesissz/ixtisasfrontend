@@ -195,8 +195,8 @@ export default function SelectionPage() {
     const pct = redirectSeconds > 0 ? Math.min(100, Math.round((redirectSeconds - redirectIn) / redirectSeconds * 100)) : 100
     return (
       <div style={{
-        position: 'fixed', inset: 0, overflowY: 'auto', background: '#eef1f5',
-        backgroundImage: 'repeating-linear-gradient(135deg,#ffffff 0px,#ffffff 1px,transparent 1px,transparent 26px)',
+        position: 'fixed', inset: 0, overflowY: 'auto',
+        background: '#eef1f5 url(/background.jpeg) center center / cover no-repeat fixed',
         display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 20px',
         animation: 'mmuBgFade .5s ease both',
       }}>

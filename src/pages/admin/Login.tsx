@@ -43,8 +43,7 @@ export default function AdminLogin() {
   return (
     <div style={{
       width: '100vw', minHeight: '100vh',
-      background: '#eef1f5',
-      backgroundImage: 'repeating-linear-gradient(135deg,#ffffff 0px,#ffffff 1px,transparent 1px,transparent 26px)',
+      background: '#eef1f5 url(/background.jpeg) center center / cover no-repeat fixed',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       position: 'relative', overflow: 'hidden',
     }}>
