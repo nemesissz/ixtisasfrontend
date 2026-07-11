@@ -1,0 +1,80 @@
+# ══════════════════════════════════════════════════════════════════
+#  İxtisas Seçim Proqramı — tam stack (DB + Backend + Frontend)
+#
+#  Qovluq düzümü (iki repo yanaşı klonlanmalıdır):
+#     isp/
+#     ├── mmu-ixtisas/      ← bu repo (newapifrontend branch)
+#     └── ixtisasbackend/   ← https://github.com/nemesissz/ixtisasbackend
+#
+#  İşə salmaq (bu qovluqda):   docker compose up -d --build
+#  Dayandırmaq:                docker compose down        (data qalır)
+#  Bazanı sıfırlamaq:          docker compose down -v     (⚠ data silinir)
+# ══════════════════════════════════════════════════════════════════
+
+services:
+  db:
+    image: mariadb:11
+    container_name: isp-db
+    restart: unless-stopped
+    environment:
+      MARIADB_ROOT_PASSWORD: isp_root_2026
+      MARIADB_DATABASE: mmuisp
+    ports:
+      - "3307:3306"            # hostda 3307 (lokal MySQL/MariaDB ilə toqquşmasın)
+    volumes:
+      - isp_dbdata:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  backend:
+    container_name: isp-backend
+    restart: unless-stopped
+    build:
+      context: ../ixtisasbackend
+      # Dockerfile backend reposunda olmadığı üçün buraya daxil edilib
+      dockerfile_inline: |
+        FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+        WORKDIR /src
+        COPY MmuIspApi.csproj .
+        RUN dotnet restore
+        COPY . .
+        RUN dotnet publish -c Release -o /app/publish
+        FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
+        WORKDIR /app
+        COPY --from=build /app/publish .
+        ENV ASPNETCORE_URLS=http://+:5199
+        EXPOSE 5199
+        ENTRYPOINT ["dotnet", "MmuIspApi.dll"]
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development     # Swagger aktiv olsun
+      ConnectionStrings__Default: "Server=db;Port=3306;Database=mmuisp;User=root;Password=isp_root_2026;"
+      Jwt__Issuer: MmuIspApi
+      Jwt__Audience: MmuIspFrontend
+      Jwt__Key: "mmu-isp-dev-secret-key-2026-min-32-chars!!"
+      Jwt__ExpiryMinutes: "480"
+    ports:
+      - "5199:5199"
+
+  frontend:
+    container_name: isp-frontend
+    restart: unless-stopped
+    build:
+      context: .
+      args:
+        # Brauzer backend-ə bu ünvandan çıxır.
+        # Serverdə qurulanda serverin IP-si ilə əvəz edin:
+        #   VITE_API_URL: "http://SERVER_IP:5199"
+        VITE_API_URL: "http://localhost:5199"
+    depends_on:
+      - backend
+    ports:
+      - "5174:80"
+
+volumes:
+  isp_dbdata:
