@@ -476,6 +476,62 @@ export default function Dashboard() {
             </Card>
           )}
 
+          {/* Sıra 2.8: paket kvota bölgüsü — yalnız yerləşdirmə paket üsulu ilə aparılıbsa */}
+          {(() => {
+            let alloc: any = null
+            try { alloc = sel ? (JSON.parse(localStorage.getItem('dist_packet_alloc') || '{}')[sel.id] || null) : null } catch { alloc = null }
+            const placementSaved = A.instUsers.some((u: any) => u.placedSelectionId === sel?.id && u.placedSpecialtyId)
+            if (!alloc || !placementSaved) return null
+            const PACK_TXT = ['#1f6fb2', '#b8860b', '#237804', '#c41d7f', '#531dab', '#d46b08']
+            const PACK_BG  = ['#e8f4ff', '#fbf1d6', '#f0fff4', '#fff0f6', '#f9f0ff', '#fff7e6']
+            return (
+              <Card title="İxtisas kvota bölgüsü (paketlər üzrə)" icon="📊">
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5, minWidth: 560 }}>
+                    <thead>
+                      <tr style={{ background: '#f8f9fd', color: 'var(--muted)', textAlign: 'left' }}>
+                        <th style={{ padding: '9px 12px', fontWeight: 700 }}>İxtisas</th>
+                        <th style={{ padding: '9px 12px', fontWeight: 700, textAlign: 'center' }}>Cəmi</th>
+                        {alloc.packetNums.map((n: number, i: number) => (
+                          <th key={n} style={{ padding: '9px 12px', fontWeight: 700, textAlign: 'center', color: PACK_TXT[i % PACK_TXT.length] }}>P{n}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {alloc.rows.map((r: any, ri: number) => (
+                        <tr key={r.id} style={{ borderTop: '1px solid #f0f2fa', background: ri % 2 ? '#fafbff' : '#fff' }}>
+                          <td style={{ padding: '9px 12px' }}>
+                            <div style={{ fontWeight: 700, color: 'var(--text)' }}>{r.name}</div>
+                            {r.path && <div style={{ fontSize: 11, color: 'var(--muted)' }}>{r.path}</div>}
+                          </td>
+                          <td style={{ padding: '9px 12px', textAlign: 'center', fontWeight: 800 }}>{r.quota}</td>
+                          {r.perPacket.map((q: number, i: number) => (
+                            <td key={i} style={{ padding: '9px 12px', textAlign: 'center' }}>
+                              {q > 0
+                                ? <span style={{ display: 'inline-block', minWidth: 26, padding: '2px 8px', borderRadius: 8, background: PACK_BG[i % PACK_BG.length], color: PACK_TXT[i % PACK_TXT.length], fontWeight: 800 }}>{q}</span>
+                                : <span style={{ color: '#ddd' }}>—</span>}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr style={{ borderTop: '2px solid var(--border)' }}>
+                        <td style={{ padding: '9px 12px', fontWeight: 800 }}>Cəmi kvota</td>
+                        <td style={{ padding: '9px 12px', textAlign: 'center', fontWeight: 900 }}>{alloc.rows.reduce((s: number, r: any) => s + r.quota, 0)}</td>
+                        {alloc.packetTotals.map((t: number, i: number) => (
+                          <td key={i} style={{ padding: '9px 12px', textAlign: 'center' }}>
+                            <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: 8, background: PACK_BG[i % PACK_BG.length], color: PACK_TXT[i % PACK_TXT.length], fontWeight: 900 }}>{t}</span>
+                          </td>
+                        ))}
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </Card>
+            )
+          })()}
+
           {/* Sıra 3: ixtisas performans cədvəli */}
           <Card title="İxtisas üzrə performans" icon="🎓">
             {A.byLeaf.length === 0 ? (

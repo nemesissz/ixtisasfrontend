@@ -1445,6 +1445,30 @@ export default function Distribution() {
       return { id: u.id, placedSpecialty: null, choiceNum: null, placedSpecialtyId: null, placedSelectionId: null }
     })
     await userDb.bulkUpdate(patches)
+
+    // Paket üsulu ilə yazılıbsa kvota bölgüsünü saxla — Statistika səhifəsi göstərir.
+    // Sadə üsulda köhnə qeyd silinir ki, kart yalnız paket yerləşdirməsində görünsün.
+    try {
+      const store = JSON.parse(localStorage.getItem('dist_packet_alloc') || '{}')
+      if (method === 'packet' && packets.length > 0) {
+        const allocLeaves = getLeavesWithPath(tree?.nodes || [])
+        store[sel!.id] = {
+          ts: new Date().toISOString(),
+          packetNums: packets.map((p: any) => p.num),
+          packetTotals: packets.map((p: any) => p.totalQuota),
+          rows: allocLeaves.map(({ leaf, path }) => ({
+            id: leaf.id, name: leaf.name,
+            path: path.slice(0, -1).map((n: any) => n.name).join(' → '),
+            quota: leaf.quota || 0,
+            perPacket: packets.map((p: any) => (p.specs.find((s: any) => s.id === leaf.id)?.quota ?? 0)),
+          })),
+        }
+      } else {
+        delete store[sel!.id]
+      }
+      localStorage.setItem('dist_packet_alloc', JSON.stringify(store))
+    } catch { /* saxlama alınmasa yerləşdirməyə mane olma */ }
+
     await refreshUsers(); setSaved(true); setShowConf(false)
     addLog('distribution', 'success', `Yerləşdirmə bazaya yazıldı: ${Object.keys(placement.assignments).length} təhsilalan`,
       `Seçim: ${sel?.name} · Metod: ${method} · Alqoritm: ${algorithm}${tree?.sourceProportional ? ' · Proporsional bölgü' : ''}`)
@@ -2274,83 +2298,6 @@ export default function Distribution() {
             </div>
           )}
 
-          {/* ── İxtisas bölgü cədvəli ── */}
-          {packetsReady && packets.length > 0 && (() => {
-            const leaves = getLeavesWithPath(tree?.nodes || [])
-            return (
-              <div className="card" style={{ marginBottom: 20 }}>
-                <div className="card-head">
-                  <div>
-                    <div className="card-title">📊 İxtisas Kvota Bölgüsü</div>
-                    <div className="card-sub">Hər ixtisasın kvotası paketlərə görə</div>
-                  </div>
-                </div>
-                <div style={{ overflowX: 'auto' }}>
-                  <table style={{ minWidth: 500 }}>
-                    <thead>
-                      <tr>
-                        <th style={{ textAlign: 'left', minWidth: 200 }}>İXTİSAS</th>
-                        <th style={{ textAlign: 'center', width: 70 }}>CƏMİ</th>
-                        {packets.map((p, i) => (
-                          <th key={p.num} style={{ textAlign: 'center', width: 70, color: PACK_COLORS[i % PACK_COLORS.length].text }}>
-                            P{p.num}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {leaves.map(({ leaf, path }, li) => {
-                        return (
-                          <tr key={leaf.id}>
-                            <td>
-                              <div style={{ fontWeight: 600, fontSize: 13 }}>{leaf.name}</div>
-                              <div style={{ fontSize: 11, color: 'var(--muted)' }}>
-                                {path.slice(0, -1).map((n: any) => n.name).join(' → ')}
-                              </div>
-                            </td>
-                            <td style={{ textAlign: 'center', fontWeight: 800, color: 'var(--text)' }}>
-                              {leaf.quota}
-                            </td>
-                            {packets.map((p, i) => {
-                              const sp = p.specs.find((s: any) => s.id === leaf.id)
-                              const q  = sp?.quota ?? 0
-                              const col = PACK_COLORS[i % PACK_COLORS.length]
-                              return (
-                                <td key={p.num} style={{ textAlign: 'center' }}>
-                                  {q > 0
-                                    ? <span style={{ display: 'inline-block', minWidth: 28, padding: '2px 8px', borderRadius: 8, background: col.light, color: col.text, fontWeight: 800, fontSize: 13 }}>{q}</span>
-                                    : <span style={{ color: '#ddd', fontSize: 13 }}>—</span>
-                                  }
-                                </td>
-                              )
-                            })}
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                    <tfoot>
-                      <tr style={{ borderTop: '2px solid var(--border)' }}>
-                        <td style={{ fontWeight: 700, fontSize: 13 }}>Cəmi kvota</td>
-                        <td style={{ textAlign: 'center', fontWeight: 900, fontSize: 15 }}>
-                          {leaves.reduce((s, { leaf }) => s + (leaf.quota || 0), 0)}
-                        </td>
-                        {packets.map((p, i) => {
-                          const col = PACK_COLORS[i % PACK_COLORS.length]
-                          return (
-                            <td key={p.num} style={{ textAlign: 'center' }}>
-                              <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: 8, background: col.light, color: col.text, fontWeight: 900, fontSize: 14 }}>
-                                {p.totalQuota}
-                              </span>
-                            </td>
-                          )
-                        })}
-                      </tr>
-                    </tfoot>
-                  </table>
-                </div>
-              </div>
-            )
-          })()}
 
           {/* Nəticə — Yerləşdir adi, Simulyasiya paket animasiyalı */}
           {mode === 'distribute' && placement && <PlacementResult
