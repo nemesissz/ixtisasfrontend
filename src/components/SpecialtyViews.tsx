@@ -106,6 +106,16 @@ export function FlatView({ flat, onChange, submitted = false, levelNames }: {
 
   const interactive = !submitted && !!onChange
 
+  // 2 səviyyəli ağac (məs. qoşun növü əvvəlcədən təyin edilib yığışdırılanda):
+  // treeToNested alt qrupu sintetik "__sub_" id ilə doldurur — o sütun gizlədilir
+  const twoLevel = flat.length > 0 && flat.every(r => String(r.subId).startsWith('__sub_'))
+  const gridCols = twoLevel
+    ? '40px minmax(0,1fr) minmax(0,1fr) 44px'
+    : '40px minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) 44px'
+  const headCells: Array<[string, string, string, string]> = twoLevel
+    ? [['№','center','#f3e3b8','#5a4a12'], [lv[0] || 'Səviyyə 1','left','#f3e3b8','#5a4a12'], [lv[1] || 'Səviyyə 2','left','#fff4ef','#8c3a1f'], ['','center','#f3e3b8','#5a4a12']]
+    : [['№','center','#f3e3b8','#5a4a12'], [lv[0] || 'Səviyyə 1','left','#f3e3b8','#5a4a12'], [lv[1] || 'Səviyyə 2','left','#f7eccf','#6a4a12'], [lv[2] || 'Səviyyə 3','left','#fff4ef','#8c3a1f'], ['','center','#f3e3b8','#5a4a12']]
+
   function onDragStart(i: number) { if (!interactive) return; dragIdx.current = i; setDragging(i) }
   function onDragOver(e: React.DragEvent, i: number) {
     if (!interactive) return
@@ -129,17 +139,16 @@ export function FlatView({ flat, onChange, submitted = false, levelNames }: {
     <>
       {/* Başlıq sətiri */}
       <div style={{
-        display: 'grid', gridTemplateColumns: '40px minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) 44px',
+        display: 'grid', gridTemplateColumns: gridCols,
         background: '#f3e3b8', border: '2px solid #ecd9a0',
         borderRadius: '12px 12px 0 0', overflow: 'hidden',
       }}>
-        {[['№','center'],[lv[0] || 'Səviyyə 1','left'],[lv[1] || 'Səviyyə 2','left'],[lv[2] || 'Səviyyə 3','left'],['','center']].map(([h, align], i) => (
+        {headCells.map(([h, align, bg, color], i) => (
           <div key={i} style={{
             padding: '10px 14px', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5,
             minWidth: 0, overflowWrap: 'anywhere', wordBreak: 'break-word',
-            borderRight: i < 4 ? '2px solid #ecd9a0' : 'none', textAlign: align as any,
-            background: i === 2 ? '#f7eccf' : i === 3 ? '#fff4ef' : '#f3e3b8',
-            color:      i === 2 ? '#6a4a12' : i === 3 ? '#8c3a1f' : '#5a4a12',
+            borderRight: i < headCells.length - 1 ? '2px solid #ecd9a0' : 'none', textAlign: align as any,
+            background: bg, color,
           }}>{h}</div>
         ))}
       </div>
@@ -159,7 +168,7 @@ export function FlatView({ flat, onChange, submitted = false, levelNames }: {
               onDragOver={e => onDragOver(e, i)}
               onDragEnd={onDragEnd}
               style={{
-                display: 'grid', gridTemplateColumns: '40px minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) 44px',
+                display: 'grid', gridTemplateColumns: gridCols,
                 alignItems: 'stretch',
                 borderBottom: i < flat.length - 1 ? '1.5px solid #eef0f8' : 'none',
                 background: isFlash ? '#fffbe6' : isDrag ? 'rgba(79,124,255,.05)' : '#fff',
@@ -180,10 +189,12 @@ export function FlatView({ flat, onChange, submitted = false, levelNames }: {
               <div style={{ padding: '9px 12px', display: 'flex', alignItems: 'center', minWidth: 0, overflowWrap: 'anywhere', wordBreak: 'break-word', fontSize: 12, fontWeight: 500, color: '#5a4a12', background: '#f8f9ff', borderRight: '2px solid #dde2f5' }}>
                 {row.groupName}
               </div>
-              {/* Alt Qrup */}
-              <div style={{ padding: '9px 12px', display: 'flex', alignItems: 'center', minWidth: 0, overflowWrap: 'anywhere', wordBreak: 'break-word', fontSize: 12, fontWeight: 500, color: '#5a4a12', background: '#faf8ff', borderRight: '1.5px solid #ece8ff' }}>
-                {row.subName}
-              </div>
+              {/* Alt Qrup — 2 səviyyəli rejimdə gizlidir */}
+              {!twoLevel && (
+                <div style={{ padding: '9px 12px', display: 'flex', alignItems: 'center', minWidth: 0, overflowWrap: 'anywhere', wordBreak: 'break-word', fontSize: 12, fontWeight: 500, color: '#5a4a12', background: '#faf8ff', borderRight: '1.5px solid #ece8ff' }}>
+                  {row.subName}
+                </div>
+              )}
               {/* İxtisas */}
               <div style={{ padding: '9px 12px', display: 'flex', alignItems: 'center', minWidth: 0, overflowWrap: 'anywhere', wordBreak: 'break-word', fontSize: 12, fontWeight: 500, color: '#5a4a12' }}>
                 {row.specName}
@@ -326,9 +337,13 @@ export function NestedView({ nested, onChange, submitted = false }: {
                 const isOS = sOverKey === sk && sDragging !== null && sDragging !== sk
                 const isFS = flashKey === `s-${group.groupId}-${sub.subId}`
 
+                // Sintetik alt qrup (2 səviyyəli ağac — qoşun növü yığışdırılıb) göstərilmir
+                const syntheticSub = String(sub.subId).startsWith('__sub_')
+
                 return (
                   <div key={sub.subId} style={{ display: 'flex', alignItems: 'stretch', gap: 6 }}>
                     {/* Alt Qrup */}
+                    {!syntheticSub && (
                     <div
                       draggable={interactive}
                       onDragStart={e => sStart(e, gi, si)}
@@ -351,6 +366,7 @@ export function NestedView({ nested, onChange, submitted = false }: {
                       <div style={{ flex: 1, padding: 9, fontSize: 11, fontWeight: 600, color: '#6a4a12', lineHeight: 1.3 }}>{sub.subName}</div>
                       {interactive && <div style={{ display: 'flex', alignItems: 'center', padding: '0 6px', color: '#ccc', fontSize: 13 }}>⠿</div>}
                     </div>
+                    )}
 
                     {/* İxtisaslar */}
                     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4, background: '#fff9f6', border: '1.5px solid #fde8dc', borderRadius: 8, padding: 6 }}>
