@@ -417,6 +417,16 @@ export default function SelectionPage() {
               <span style={{ fontWeight: 600 }}>İmtahan Nəticəsi:</span>{' '}
               <span style={{ color: '#f5a623', fontWeight: 700 }}>{Number(student.score).toFixed(2)}</span>
             </div>
+            {/* Təyin edilmiş səviyyə (məs. Qoşun növü: HHQ) — dinamik ad + dəyər */}
+            {selection?.preAssignLevel != null && student.branchByLevel?.[selection.preAssignLevel] && (
+              <div style={{ fontSize: 12, color: '#8892b0' }}>
+                <span style={{ fontWeight: 600 }}>{tree?.levelNames?.[selection.preAssignLevel] || `Səviyyə ${selection.preAssignLevel + 1}`}:</span>{' '}
+                <span style={{
+                  color: '#1f3864', fontWeight: 800, background: '#eef2fb',
+                  border: '1px solid #c9d6f2', borderRadius: 12, padding: '1px 10px',
+                }}>{student.branchByLevel[selection.preAssignLevel]}</span>
+              </div>
+            )}
           </div>
         </div>
       </div>
