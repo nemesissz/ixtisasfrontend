@@ -118,7 +118,6 @@ export default function Logs() {
   }, [filtered])
 
   const toggleExpand = (id: string) => setExpanded(p => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n })
-  const handleRefresh = async () => setLogs(await logDb.getAll())
   const hasFilter = catFlt !== 'all' || typeFlt !== 'all' || !!search || !!dateFrom || !!dateTo
 
 
@@ -137,7 +136,6 @@ export default function Logs() {
             </button>
           ))}
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
-            <button onClick={handleRefresh} style={btnStyle('#fff', 'var(--text)', 'var(--border)')}>🔄 Yenilə</button>
             <button onClick={() => exportCsv(filtered)} disabled={!filtered.length} style={{ ...btnStyle('#f6ffed', '#237804', '#b7eb8f'), opacity: filtered.length ? 1 : .5, cursor: filtered.length ? 'pointer' : 'not-allowed' }}>⬇️ İxrac (CSV)</button>
           </div>
         </div>
