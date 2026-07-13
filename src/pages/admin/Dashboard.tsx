@@ -87,12 +87,14 @@ export default function Dashboard() {
 
   useEffect(() => {
     let cancelled = false
-    Promise.all([institutionDb.getAll(), userDb.getAll(), treeDb.getAll(), selectionDb.getAll()])
+    const load = () => Promise.all([institutionDb.getAll(), userDb.getAll(), treeDb.getAll(), selectionDb.getAll()])
       .then(([i, u, t, s]) => {
         if (cancelled) return
         setInsts(i); setAllUsers(u); setAllTrees(t); setAllSels(s); setLoaded(true)
       })
-    return () => { cancelled = true }
+    load()
+    const timer = setInterval(load, 30_000) // real-time: 30 saniyədə bir avtomatik yenilənmə
+    return () => { cancelled = true; clearInterval(timer) }
   }, [])
 
   useEffect(() => {
