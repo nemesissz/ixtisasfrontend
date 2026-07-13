@@ -54,10 +54,10 @@ function dayKey(ts: string) {
 }
 
 function exportCsv(rows: LogEntry[]) {
-  const head = ['Vaxt', 'Kateqoriya', 'Növ', 'Mesaj', 'Detal', 'İcraçı']
+  const head = ['Vaxt', 'Kateqoriya', 'Növ', 'Mesaj', 'Detal', 'İcraçı', 'IP']
   const esc = (c: any) => `"${String(c ?? '').replace(/"/g, '""')}"`
   const lines = [head.join(',')]
-  rows.forEach(l => lines.push([fmt(l.timestamp), CAT_LABEL[l.category], TYPE_LABEL[l.type], l.message, l.detail || '', l.actor || ''].map(esc).join(',')))
+  rows.forEach(l => lines.push([fmt(l.timestamp), CAT_LABEL[l.category], TYPE_LABEL[l.type], l.message, l.detail || '', l.actor || '', l.ip || ''].map(esc).join(',')))
   const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
@@ -98,7 +98,7 @@ export default function Logs() {
     if (typeFlt !== 'all' && l.type !== typeFlt) return false
     if (search) {
       const q = search.toLowerCase()
-      if (!l.message.toLowerCase().includes(q) && !(l.detail || '').toLowerCase().includes(q) && !(l.actor || '').toLowerCase().includes(q)) return false
+      if (!l.message.toLowerCase().includes(q) && !(l.detail || '').toLowerCase().includes(q) && !(l.actor || '').toLowerCase().includes(q) && !(l.ip || '').includes(q)) return false
     }
     if (dateFrom && new Date(l.timestamp) < new Date(dateFrom)) return false
     if (dateTo) { const to = new Date(dateTo); to.setHours(23, 59, 59, 999); if (new Date(l.timestamp) > to) return false }
@@ -207,6 +207,10 @@ export default function Logs() {
                     {/* İcraçı */}
                     {log.actor && (
                       <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', background: '#f5f6fa', padding: '3px 10px', borderRadius: 20, border: '1px solid var(--border)', whiteSpace: 'nowrap', flexShrink: 0, maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis' }}>👤 {log.actor}</span>
+                    )}
+                    {/* IP ünvanı */}
+                    {log.ip && (
+                      <span style={{ fontSize: 11, fontWeight: 600, color: '#1f6fb2', background: '#e8f4ff', padding: '3px 10px', borderRadius: 20, border: '1px solid #bfd0ff', whiteSpace: 'nowrap', flexShrink: 0 }}>🌐 {log.ip}</span>
                     )}
                     {/* Toggle */}
                     <span style={{ width: 16, fontSize: 12, color: 'var(--muted)', flexShrink: 0, textAlign: 'center' }}>{log.detail ? (isOpen ? '▲' : '▼') : ''}</span>

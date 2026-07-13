@@ -349,6 +349,7 @@ export interface LogEntry {
   message:   string
   detail?:   string
   actor?:    string
+  ip?:       string
   timestamp: string
 }
 
