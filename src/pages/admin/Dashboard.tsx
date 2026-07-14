@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { institutionDb, userDb, treeDb, selectionDb, submissionDb } from '../../db'
+import { institutionDb, userDb, treeDb, selectionDb, submissionDb, POLL_MS } from '../../db'
 import InstIcon from '../../components/InstIcon'
 import InstTabs from '../../components/InstTabs'
 
@@ -93,8 +93,11 @@ export default function Dashboard() {
         setInsts(i); setAllUsers(u); setAllTrees(t); setAllSels(s); setLoaded(true)
       })
     load()
-    const timer = setInterval(load, 30_000) // real-time: 30 saniyədə bir avtomatik yenilənmə
-    return () => { cancelled = true; clearInterval(timer) }
+    // real-time: tab aktiv olduqda hər 10 saniyədə avtomatik yenilənmə
+    const timer = setInterval(() => { if (document.visibilityState !== 'hidden') load() }, POLL_MS)
+    const onVisible = () => { if (document.visibilityState === 'visible') load() }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => { cancelled = true; clearInterval(timer); document.removeEventListener('visibilitychange', onVisible) }
   }, [])
 
   useEffect(() => {

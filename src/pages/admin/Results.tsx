@@ -1,6 +1,6 @@
-import { useState, useMemo, useEffect, Fragment } from 'react'
+import { useState, useMemo, useEffect, useCallback, Fragment } from 'react'
 import * as XLSX from 'xlsx'
-import { selectionDb, treeDb, userDb, submissionDb, buildNameMap, institutionDb, addLog } from '../../db'
+import { selectionDb, treeDb, userDb, submissionDb, buildNameMap, institutionDb, addLog, usePoll } from '../../db'
 import InstIcon from '../../components/InstIcon'
 
 const pct = (a: number, b: number) => (b > 0 ? Math.round((a / b) * 100) : 0)
@@ -28,7 +28,7 @@ export default function Results() {
   const [institutions,  setInstitutions]  = useState<any[]>([])
   const [loaded,        setLoaded]        = useState(false)
 
-  useEffect(() => {
+  const loadBase = useCallback(() => {
     Promise.all([selectionDb.getAll(), userDb.getAll(), institutionDb.getAll()]).then(([sels, users, insts]) => {
       setAllSelections(sels.filter((s: any) => s.status !== 'draft'))
       setAllUsers(users)
@@ -36,6 +36,8 @@ export default function Results() {
       setLoaded(true)
     })
   }, [])
+  useEffect(() => { loadBase() }, [loadBase])
+  usePoll(loadBase)   // real-time: yerləşdirmə/status dəyişiklikləri avtomatik görünür
 
   const instMap: Record<string, any> = {}
   for (const inst of institutions) instMap[inst.id] = inst
@@ -55,14 +57,14 @@ export default function Results() {
 
   const [tree, setTree] = useState<any>(null)
   const [subs, setSubs] = useState<any[]>([])
-  useEffect(() => {
-    let cancelled = false
+  const loadSel = useCallback(() => {
     if (!sel) { setTree(null); setSubs([]); return }
     Promise.all([treeDb.get(sel.treeId), submissionDb.getBySelection(sel.id)]).then(([t, s]) => {
-      if (!cancelled) { setTree(t); setSubs(s) }
+      setTree(t); setSubs(s)
     })
-    return () => { cancelled = true }
-  }, [sel?.id])
+  }, [sel?.id, sel?.treeId])
+  useEffect(() => { loadSel() }, [loadSel])
+  usePoll(loadSel)   // real-time: yeni seçim göndərişləri avtomatik görünür
 
   const nameMap = tree ? buildNameMap(tree) : {}
   // Hər leaf üçün tam yol (Qoşun növü → ... → İxtisas) və təhsilalan üzrə seçim sıralaması

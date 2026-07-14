@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo } from 'react'
-import { logDb, type LogEntry, type LogCategory, type LogType } from '../../db'
+import { useState, useEffect, useMemo, useCallback } from 'react'
+import { logDb, usePoll, type LogEntry, type LogCategory, type LogType } from '../../db'
 
 // ── Sabit etiketlər ──────────────────────────────────────────────────────────
 const CAT_LABEL: Record<LogCategory, string> = {
@@ -68,11 +68,9 @@ function exportCsv(rows: LogEntry[]) {
 export default function Logs() {
   const [logs, setLogs] = useState<LogEntry[]>([])
 
-  useEffect(() => {
-    let cancelled = false
-    logDb.getAll().then(list => { if (!cancelled) setLogs(list) })
-    return () => { cancelled = true }
-  }, [])
+  const loadLogs = useCallback(() => { logDb.getAll().then(setLogs) }, [])
+  useEffect(() => { loadLogs() }, [loadLogs])
+  usePoll(loadLogs)   // real-time: yeni loglar avtomatik görünür
   const [catFlt, setCatFlt] = useState<string>('all')
   const [typeFlt, setTypeFlt] = useState<string>('all')
   const [search, setSearch] = useState('')

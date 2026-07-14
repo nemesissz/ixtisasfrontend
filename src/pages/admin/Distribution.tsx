@@ -909,8 +909,12 @@ function StorySim({ students, packets, subs, tree, onClose }: { students?: any[]
 }
 
 export default function Distribution() {
-  const [users, refreshUsers]       = useLocalState(userDb.getAll)
-  const [allTrees, refreshAllTrees] = useLocalState(treeDb.getAll)
+  // Polling söndürülüb: bu aktiv iş səhifəsidir (paket qurma, yerləşdirmə
+  // simulyasiyası) — arxa fonda avtomatik yenilənmə iş prosesini poza bilər.
+  // Yeni göndərişlər onsuz da monitor səhifələrində (Statistika, Nəticələr,
+  // Seçim detalı) canlı görünür.
+  const [users, refreshUsers]       = useLocalState(userDb.getAll, { poll: false })
+  const [allTrees, refreshAllTrees] = useLocalState(treeDb.getAll, { poll: false })
 
   const [institutions, setInstitutions] = useState<any[]>([])
   const [allSelections, setAllSelections] = useState<any[]>([])

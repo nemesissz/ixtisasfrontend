@@ -109,7 +109,8 @@ function maxflowRebalancePartial(opts: {
 }
 
 export default function Redistribute() {
-  const [users, refreshUsers] = useLocalState(userDb.getAll)
+  // Aktiv iş səhifəsi — polling söndürülüb (Distribution ilə eyni səbəb)
+  const [users, refreshUsers] = useLocalState(userDb.getAll, { poll: false })
   const [institutions, setInstitutions] = useState<any[]>([])
   const [allSels, setAllSels] = useState<any[]>([])
   useEffect(() => {

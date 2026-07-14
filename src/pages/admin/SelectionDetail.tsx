@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
-import { selectionDb, treeDb, institutionDb, userDb, resetAndAutoSeedSubmissions, addLog } from '../../db'
+import { selectionDb, treeDb, institutionDb, userDb, resetAndAutoSeedSubmissions, addLog, usePoll } from '../../db'
 import { AppDialog, useDialog } from '../../components/AppDialog'
 import InstIcon from '../../components/InstIcon'
 import { FlatView, NestedView, treeToNested, nestedToFlat } from '../../components/SpecialtyViews'
@@ -166,6 +166,7 @@ export default function SelectionDetail() {
   }, [id])
 
   useEffect(() => { refresh() }, [refresh])
+  usePoll(refresh)   // real-time: yeni göndərişlər/status avtomatik görünür
 
   const instObj = insts.find((i: any) => i.id === sel?.institution)
   const instLabel = instObj

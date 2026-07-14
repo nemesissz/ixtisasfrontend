@@ -323,7 +323,25 @@ export const treeArchiveDb = {
 // ── React hook: asenxron fetcher-i state-ə bağlayır ─────────────────────────
 // Çağırış forması eyni qalıb: `const [data, refresh] = useLocalState(() => xDb.getAll())`
 // — daxildə indi useEffect ilə asenxron yüklənir, `refresh()` Promise qaytarır.
-export function useLocalState<T>(fetcher: () => Promise<T>): [T | undefined, () => Promise<void>] {
+// ── Real-time yenilənmə (polling) ─────────────────────────────────────────
+// Bütün panellər arxa planda müəyyən intervalla backend-dən data-nı yenidən
+// çəkir — istifadəçi əl ilə yeniləmədən dəyişikliklər (yeni tələbə, göndərilmiş
+// seçim, yerləşdirmə və s.) avtomatik görünür.
+export const POLL_MS = 10000
+let pollSuspend = 0
+// Sürükləmə/aktiv əməliyyat zamanı yenilənməni müvəqqəti dayandırmaq üçün
+export function suspendPolling() { pollSuspend++ }
+export function resumePolling() { pollSuspend = Math.max(0, pollSuspend - 1) }
+function pollActive(): boolean {
+  if (pollSuspend > 0) return false
+  if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return false
+  return true
+}
+
+export function useLocalState<T>(
+  fetcher: () => Promise<T>,
+  opts?: { poll?: boolean },
+): [T | undefined, () => Promise<void>] {
   const [data, setData] = useState<T | undefined>(undefined)
   const fetcherRef = useRef(fetcher)
   fetcherRef.current = fetcher
@@ -333,9 +351,29 @@ export function useLocalState<T>(fetcher: () => Promise<T>): [T | undefined, () 
     setData(result)
   }, [])
 
-  useEffect(() => { refresh() }, [refresh])
+  useEffect(() => {
+    refresh()
+    if (opts?.poll === false) return
+    const id = setInterval(() => { if (pollActive()) refresh() }, POLL_MS)
+    // Tab yenidən aktiv olanda dərhal təzələ
+    const onVisible = () => { if (document.visibilityState === 'visible') refresh() }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => { clearInterval(id); document.removeEventListener('visibilitychange', onVisible) }
+  }, [refresh])
 
   return [data, refresh]
+}
+
+// Öz yükləmə məntiqi olan səhifələr üçün (Logs, Results kimi) eyni polling qaydası
+export function usePoll(fn: () => void, ms: number = POLL_MS) {
+  const ref = useRef(fn)
+  ref.current = fn
+  useEffect(() => {
+    const id = setInterval(() => { if (pollActive()) ref.current() }, ms)
+    const onVisible = () => { if (document.visibilityState === 'visible') ref.current() }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => { clearInterval(id); document.removeEventListener('visibilitychange', onVisible) }
+  }, [ms])
 }
 
 // ── Logs ──────────────────────────────────────────────────────────────────
