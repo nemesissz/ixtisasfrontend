@@ -171,6 +171,8 @@ metadata:
   name: frontend
   namespace: isp
 spec:
+  # Docker Desktop (kind) NodePort-u localhost-a çıxarmır — girişi port-forward
+  # ilə edirik (k8s/access.ps1). İstehsalda (k3s) NodePort/Ingress işləyəcək.
   selector: { app: frontend }
   ports:
     - port: 80
