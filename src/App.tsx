@@ -1,6 +1,5 @@
 import React from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
-import { initClientIp } from './api/clientIp'
 import AdminLogin    from './pages/admin/Login'
 
 import AdminLayout   from './layouts/AdminLayout'
@@ -34,9 +33,6 @@ function AdminGuard({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
-  // Real müştəri IP-sini hostdakı ip-helper-dən bir dəfə al (loglar üçün);
-  // xidmət işləmirsə səssiz keçilir
-  React.useEffect(() => { initClientIp() }, [])
   return (
     <Routes>
       {/* ── Kök: birbaşa idarəetmə login (admin/super/operator) ── */}

@@ -6,7 +6,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { http, ApiError } from './api/http'
 import { currentActorName } from './api/auth'
-import { getClientIp } from './api/clientIp'
 
 async function getOrNull<T>(path: string): Promise<T | null> {
   try { return await http.get<T>(path) }
@@ -357,10 +356,8 @@ export interface LogEntry {
 export const logDb = {
   getAll: async (): Promise<LogEntry[]> =>
     (await http.get<LogEntry[]>('/api/logs')).map(l => ({ ...l, timestamp: utc(l.timestamp) })),
-  // ip-helper-dən alınmış real müştəri IP-si (varsa) hər log yazılışına əlavə olunur —
-  // backend onu üstün tutur, yoxdursa bağlantıdan özü tapır
   add: async (entry: Omit<LogEntry, 'id' | 'timestamp'>): Promise<LogEntry> =>
-    http.post<LogEntry>('/api/logs', { ...entry, ip: entry.ip ?? getClientIp() }),
+    http.post<LogEntry>('/api/logs', entry),
   clear: async () => { await http.delete('/api/logs') },
 }
 
