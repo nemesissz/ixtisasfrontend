@@ -2062,12 +2062,6 @@ export default function Distribution() {
                   style={{ padding: '7px 14px', borderRadius: 8, border: '1.5px solid #e7eaf0', background: 'transparent', color: '#8892b0', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>
                   ← Geri
                 </button>
-                {mode && (
-                  <button onClick={() => { setMode(null); setSaved(false) }}
-                    style={{ padding: '7px 14px', borderRadius: 8, border: '1.5px solid #ff4d4f', background: 'transparent', color: '#ff4d4f', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>
-                    🔄 Sıfırla
-                  </button>
-                )}
               </div>
             </div>
 
@@ -2135,12 +2129,6 @@ export default function Distribution() {
                   style={{ padding: '7px 14px', borderRadius: 8, border: '1.5px solid #e7eaf0', background: 'transparent', color: '#8892b0', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>
                   ← Geri
                 </button>
-                {packetsReady && (
-                  <button onClick={() => { setPacketsReady(false); setAnimStep(0); setMode(null); setSaved(false) }}
-                    style={{ padding: '7px 14px', borderRadius: 8, border: '1.5px solid #ff4d4f', background: 'transparent', color: '#ff4d4f', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>
-                    🔄 Sıfırla
-                  </button>
-                )}
               </div>
             </div>
 
