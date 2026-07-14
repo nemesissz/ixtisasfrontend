@@ -1,7 +1,7 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import * as XLSX from 'xlsx'
-import { userDb, submissionDb, institutionDb, userArchiveDb, selectionDb, treeDb, adminDb, buildNameMap, useLocalState, addLog, systemSettingsDb } from '../../db'
+import { userDb, submissionDb, institutionDb, userArchiveDb, selectionDb, treeDb, adminDb, buildNameMap, useLocalState, usePoll, addLog, systemSettingsDb } from '../../db'
 import InstIcon, { isImageIcon } from '../../components/InstIcon'
 import InstTabs from '../../components/InstTabs'
 import { AppDialog, useDialog } from '../../components/AppDialog'
@@ -1731,16 +1731,15 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
   const [allSubs, setAllSubs] = useState<any[]>([])
   const [instTreeU, setInstTreeU] = useState<any>(null)
   const [activeSel, setActiveSel] = useState<any>(null)
-  useEffect(() => {
-    let cancelled = false
+  const loadSubs = useCallback(() => {
     Promise.all([submissionDb.getAll(), treeDb.getAll(), selectionDb.getAll()]).then(([subs, trees, sels]) => {
-      if (cancelled) return
       setAllSubs(subs)
       setInstTreeU(trees.find((t: any) => t.institution === instId) || null)
       setActiveSel(sels.find((s: any) => s.institution === instId && s.status === 'published') || null)
     })
-    return () => { cancelled = true }
   }, [instId])
+  useEffect(() => { loadSubs() }, [loadSubs])
+  usePoll(loadSubs)   // real-time: kursant seçim göndərən kimi "Seçim etdi" avtomatik yenilənir
 
   const subCountMap: Record<string, number> = {}
   for (const s of allSubs) subCountMap[s.userId] = (subCountMap[s.userId] || 0) + 1

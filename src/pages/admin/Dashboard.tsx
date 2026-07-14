@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo } from 'react'
-import { institutionDb, userDb, treeDb, selectionDb, submissionDb, POLL_MS } from '../../db'
+import { useState, useEffect, useMemo, useCallback } from 'react'
+import { institutionDb, userDb, treeDb, selectionDb, submissionDb, POLL_MS, usePoll } from '../../db'
 import InstIcon from '../../components/InstIcon'
 import InstTabs from '../../components/InstTabs'
 
@@ -109,15 +109,12 @@ export default function Dashboard() {
       || allSels.find((s: any) => s.institution === instId),
     [allSels, instId])
 
-  useEffect(() => {
-    let cancelled = false
-    if (sel) {
-      submissionDb.getBySelection(sel.id).then(list => { if (!cancelled) setSubs(list) })
-    } else {
-      setSubs([])
-    }
-    return () => { cancelled = true }
-  }, [sel])
+  const loadSubs = useCallback(() => {
+    if (sel) submissionDb.getBySelection(sel.id).then(setSubs)
+    else setSubs([])
+  }, [sel?.id])
+  useEffect(() => { loadSubs() }, [loadSubs])
+  usePoll(loadSubs)   // real-time: yeni göndərişlər statistikada avtomatik görünür
 
   // ── Qlobal göstəricilər (bütün müəssisələr) ──
   // ── Seçilmiş müəssisə analitikası ──
