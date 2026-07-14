@@ -1,0 +1,57 @@
+# ══════════════════════════════════════════════════════════════════
+#  İxtisas Seçim Proqramı — İSTEHSAL (offline server, Ubuntu VM)
+#
+#  Image-lər öncədən qurulub .tar ilə gətirilir (build YOXDUR — offline).
+#  İşə salmaq:  docker compose -f docker-compose.prod.yml up -d
+#  Dayandırmaq: docker compose -f docker-compose.prod.yml down
+# ══════════════════════════════════════════════════════════════════
+
+services:
+  db:
+    image: mysql:8.4
+    container_name: isp-db
+    restart: always
+    # Yüzlərlə eyni anda bağlantı üçün limit artırılır
+    command: ["--max-connections=500", "--max-allowed-packet=64M"]
+    environment:
+      # ⚠ İSTEHSALDA MÜTLƏQ DƏYİŞİN (güclü parol):
+      MYSQL_ROOT_PASSWORD: "CHANGE_ME_strong_2026"
+      MYSQL_DATABASE: mmuisp
+    volumes:
+      - isp_mysqldata:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-pCHANGE_ME_strong_2026"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  backend:
+    image: mmu-ixtisas-backend:latest
+    container_name: isp-backend
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development     # Swagger açıq (daxili şəbəkə); Production da olar
+      ASPNETCORE_URLS: "http://+:5199"
+      # ⚠ Parol yuxarıdakı ilə eyni olmalıdır:
+      ConnectionStrings__Default: "Server=db;Port=3306;Database=mmuisp;User=root;Password=CHANGE_ME_strong_2026;"
+      Jwt__Issuer: MmuIspApi
+      Jwt__Audience: MmuIspFrontend
+      # ⚠ İSTEHSALDA DƏYİŞİN (32+ simvol):
+      Jwt__Key: "CHANGE_ME_jwt_secret_key_min_32_chars_2026!!"
+      Jwt__ExpiryMinutes: "480"
+
+  frontend:
+    image: mmu-ixtisas-frontend:latest
+    container_name: isp-frontend
+    restart: always
+    depends_on:
+      - backend
+    ports:
+      # Port 80 → kursantlar sadəcə http://SERVER_IP açır (port yazmadan)
+      - "80:80"
+
+volumes:
+  isp_mysqldata:
