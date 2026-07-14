@@ -186,24 +186,21 @@ export default function Results() {
 
   const nowStr = () => new Date().toLocaleDateString('az-AZ', { day: '2-digit', month: 'long', year: 'numeric' })
 
-  function generateActHTML() {
+  // Rəsmi akt HTML-i (kargüzarlıq rekvizitləri ilə) — həm çap, həm Word üçün.
+  // Word uyğunluğu üçün layout cədvəl-əsaslıdır (grid/flex yerinə).
+  function buildActHtml(forPrint: boolean): string {
     const d = buildActData()
     const esc = (s: any) => String(s ?? '').replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]!))
     const f2 = (n: number) => Number(n).toFixed(2)
+    const BL = (w = 180) => `<span class="bl" style="min-width:${w}px"></span>`
 
     const specSections = d.perSpec.map((s, si) => `
       <div class="spec">
-        <div class="spec-head">
-          <span class="spec-no">${si + 1}</span>
-          <div>
-            <div class="spec-name">${esc(s.name)}</div>
-            ${s.path ? `<div class="spec-path">${esc(s.path)}</div>` : ''}
-          </div>
-          <div class="spec-fill">${s.students.length} / ${s.quota}</div>
-        </div>
+        <div class="spec-head"><b>${si + 1}. ${esc(s.name)}</b>${s.path ? ` <span class="spec-path">(${esc(s.path)})</span>` : ''}
+          <span class="spec-fill">Kvota: ${s.quota} · Yerləşdi: ${s.students.length}</span></div>
         ${s.students.length === 0 ? `<div class="empty">Yerləşdirilən təhsilalan yoxdur</div>` : `
         <table class="tbl">
-          <thead><tr><th>№</th><th>Soyad, ad, ata adı</th><th>FİN</th><th>İş №</th><th class="c">Bal</th><th class="c">Seçim</th></tr></thead>
+          <thead><tr><th style="width:34px">№</th><th>Soyad, ad, ata adı</th><th>FİN</th><th>İş №</th><th class="c">Bal</th><th class="c">Seçim</th></tr></thead>
           <tbody>
             ${s.students.map((u: any, i: number) => `<tr>
               <td class="c">${i + 1}</td>
@@ -231,62 +228,87 @@ export default function Results() {
         <tbody>${d.sourceStats.map(s => `<tr><td class="b">${esc(s.name)}</td><td class="c">${s.count}</td><td class="c">${s.placed}</td></tr>`).join('')}</tbody>
       </table>` : ''
 
-    const html = `<!DOCTYPE html><html lang="az"><head><meta charset="utf-8">
+    const printBtn = forPrint
+      ? `<div class="noprint"><button onclick="window.print()">🖨️ Çap et / PDF yadda saxla</button></div>` : ''
+
+    return `<!DOCTYPE html><html lang="az"><head><meta charset="utf-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
     <title>Yerləşdirmə aktı — ${esc(d.instLabel)}</title>
     <style>
       * { box-sizing: border-box; }
-      body { font-family: 'Times New Roman', Georgia, serif; color: #1a1a1a; margin: 0; padding: 32px 40px; font-size: 12px; line-height: 1.45; }
-      .doc-head { text-align: center; border-bottom: 2.5px solid #1a1a1a; padding-bottom: 14px; margin-bottom: 20px; }
-      .doc-head .org { font-size: 13px; letter-spacing: .5px; text-transform: uppercase; }
-      .doc-head .title { font-size: 20px; font-weight: bold; margin: 10px 0 4px; letter-spacing: 1px; }
-      .doc-head .meta { font-size: 12px; color: #333; margin-top: 6px; }
-      h2 { font-size: 13.5px; text-transform: uppercase; letter-spacing: .5px; border-bottom: 1.5px solid #888; padding-bottom: 5px; margin: 24px 0 12px; }
-      .sum { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 6px; }
-      .sum .box { border: 1px solid #bbb; border-radius: 6px; padding: 9px 11px; }
-      .sum .v { font-size: 19px; font-weight: bold; }
-      .sum .l { font-size: 10.5px; color: #555; margin-top: 2px; }
-      table.tbl { width: 100%; border-collapse: collapse; margin-bottom: 4px; }
-      table.tbl th, table.tbl td { border: 1px solid #999; padding: 4px 7px; text-align: left; font-size: 11px; }
-      table.tbl th { background: #ececec; font-weight: bold; }
+      body { font-family: 'Times New Roman', serif; color: #000; margin: 0; padding: 30px 40px; font-size: 12pt; line-height: 1.4; }
+      .approve { width: 100%; border: none; }
+      .approve td { border: none; vertical-align: top; padding: 0; }
+      .approve .g { text-align: center; font-size: 11pt; }
+      .center { text-align: center; }
+      .org { font-weight: bold; font-size: 12pt; text-transform: uppercase; margin-top: 6px; }
+      .akt-title { font-size: 17pt; font-weight: bold; letter-spacing: 6px; margin: 12px 0 4px; }
+      .reqs { width: 100%; border: none; margin: 6px 0 14px; }
+      .reqs td { border: none; font-size: 11pt; }
+      .subject { text-align: center; font-weight: bold; font-size: 12.5pt; margin: 10px 0 12px; }
+      .bl { display: inline-block; border-bottom: 1px solid #000; height: 1em; vertical-align: baseline; }
+      h2 { font-size: 12pt; text-transform: uppercase; letter-spacing: .5px; border-bottom: 1px solid #000; padding-bottom: 4px; margin: 20px 0 10px; }
+      p { margin: 0 0 12px; text-align: justify; }
+      table.tbl { width: 100%; border-collapse: collapse; margin-bottom: 6px; }
+      table.tbl th, table.tbl td { border: 1px solid #000; padding: 4px 7px; text-align: left; font-size: 10.5pt; }
+      table.tbl th { background: #e8e8e8; font-weight: bold; }
       table.tbl td.c, table.tbl th.c { text-align: center; }
       table.tbl td.b { font-weight: bold; }
-      table.stat { width: auto; min-width: 55%; }
-      .spec { margin-bottom: 16px; page-break-inside: avoid; }
-      .spec-head { display: flex; align-items: center; gap: 10px; background: #f4f4f4; border: 1px solid #999; border-bottom: none; padding: 7px 10px; }
-      .spec-no { background: #1a1a1a; color: #fff; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: bold; flex-shrink: 0; }
-      .spec-name { font-weight: bold; font-size: 13px; }
-      .spec-path { font-size: 10.5px; color: #666; }
-      .spec-fill { margin-left: auto; font-weight: bold; font-size: 13px; white-space: nowrap; }
-      .empty { border: 1px solid #999; border-top: none; padding: 8px 10px; color: #888; font-style: italic; }
-      .sign { display: grid; grid-template-columns: 1fr 1fr; gap: 34px 60px; margin-top: 46px; page-break-inside: avoid; }
-      .sign .row { border-top: 1px solid #1a1a1a; padding-top: 5px; font-size: 11.5px; }
-      .sign .role { font-weight: bold; }
-      .sign .hint { color: #777; font-size: 10px; }
-      .foot { margin-top: 30px; font-size: 10.5px; color: #777; text-align: center; border-top: 1px solid #ccc; padding-top: 8px; }
+      table.sum td { border: 1px solid #000; padding: 6px 9px; font-size: 10.5pt; }
+      table.sum .lab { background: #f2f2f2; font-weight: bold; }
+      table.stat { width: auto; min-width: 60%; }
+      .spec { margin-bottom: 12px; page-break-inside: avoid; }
+      .spec-head { background: #f2f2f2; border: 1px solid #000; padding: 5px 8px; font-size: 11pt; }
+      .spec-path { font-weight: normal; color: #333; font-size: 10pt; }
+      .spec-fill { float: right; font-weight: bold; }
+      .empty { border: 1px solid #000; border-top: none; padding: 6px 8px; font-style: italic; }
+      .copies { margin: 14px 0; }
+      .comm { margin-top: 26px; page-break-inside: avoid; }
+      .comm .row { margin-bottom: 20px; }
+      .comm .role { display: inline-block; width: 200px; }
+      .my { margin-top: 30px; font-weight: bold; }
       @media print { body { padding: 14mm 16mm; } .noprint { display: none; } }
       .noprint { text-align: center; margin-bottom: 18px; }
       .noprint button { font-family: sans-serif; font-size: 13px; padding: 9px 22px; border-radius: 8px; border: none; background: #1d6f42; color: #fff; font-weight: 700; cursor: pointer; }
     </style></head><body>
-      <div class="noprint"><button onclick="window.print()">🖨️ Çap et / PDF yadda saxla</button></div>
-      <div class="doc-head">
-        <div class="org">İxtisas Seçim Proqramı</div>
-        <div class="title">YERLƏŞDİRMƏ AKTI</div>
-        <div class="meta">${esc(d.instLabel)} &nbsp;·&nbsp; ${esc(d.selName)} &nbsp;·&nbsp; ${nowStr()}</div>
+      ${printBtn}
+
+      <!-- ── TƏSDİQ EDİRƏM grifi (yuxarı sağ) ── -->
+      <table class="approve"><tr>
+        <td style="width:52%"></td>
+        <td class="g">
+          <b>TƏSDİQ EDİRƏM</b><br>
+          ${BL(200)}<br><span style="font-size:9pt">(vəzifə, hərbi rütbə)</span><br>
+          ${BL(200)}<br><span style="font-size:9pt">(ad, soyad, imza)</span><br>
+          «___» ____________ 20__
+        </td>
+      </tr></table>
+
+      <!-- ── Başlıq (mətn) ── -->
+      <div class="center">
+        <div class="org">${esc(d.instLabel)}</div>
+        <div class="akt-title">A K T</div>
       </div>
 
-      <p style="margin:0 0 14px">Aşağıda göstərilən nəticələr üzrə <b>${esc(d.instLabel)}</b> müəssisəsində ixtisas seçimi və yerləşdirmə prosesi yekunlaşdırılmış, təhsilalanların topladıqları ballara və seçim üstünlüklərinə əsasən aşağıdakı bölgü aparılmışdır.</p>
+      <!-- ── Rekvizitlər: № / şəhər / tarix ── -->
+      <table class="reqs"><tr>
+        <td style="text-align:left">№ ${BL(90)}</td>
+        <td style="text-align:right">${BL(120)} ş.&nbsp;&nbsp;&nbsp; ${nowStr()}</td>
+      </tr></table>
+
+      <div class="subject">«${esc(d.instLabel)} üzrə ixtisas seçimi və yerləşdirmə nəticələri haqqında»</div>
+
+      <p><b>Əsas:</b> ${BL(120)} №-li, «___» ____________ 20__ tarixli əmr (protokol).</p>
+
+      <p><b>${esc(d.instLabel)}</b> müəssisəsində ixtisas seçimi və yerləşdirmə prosesi yekunlaşdırılmış; təhsilalanların topladıqları ballara və seçim üstünlüklərinə əsasən, kvotalar çərçivəsində aşağıdakı bölgü aparılmışdır:</p>
 
       <h2>Ümumi xülasə</h2>
-      <div class="sum">
-        <div class="box"><div class="v">${d.total}</div><div class="l">Ümumi təhsilalan</div></div>
-        <div class="box"><div class="v">${d.placed}</div><div class="l">Yerləşdirildi (${d.rate}%)</div></div>
-        <div class="box"><div class="v">${d.unplaced}</div><div class="l">Yerləşdirilmədi</div></div>
-        <div class="box"><div class="v">${d.sat}%</div><div class="l">1-ci seçimə düşdü</div></div>
-        <div class="box"><div class="v">${d.totalQuota}</div><div class="l">Ümumi kvota (${d.quotaFill}% dolu)</div></div>
-        <div class="box"><div class="v">${f2(d.avg)}</div><div class="l">Orta bal</div></div>
-        <div class="box"><div class="v">${f2(d.minS)}</div><div class="l">Ən aşağı bal</div></div>
-        <div class="box"><div class="v">${f2(d.maxS)}</div><div class="l">Ən yüksək bal</div></div>
-      </div>
+      <table class="sum">
+        <tr><td class="lab">Ümumi təhsilalan</td><td>${d.total}</td><td class="lab">Yerləşdirildi</td><td>${d.placed} (${d.rate}%)</td></tr>
+        <tr><td class="lab">Yerləşdirilmədi</td><td>${d.unplaced}</td><td class="lab">1-ci seçimə düşdü</td><td>${d.sat}%</td></tr>
+        <tr><td class="lab">Ümumi kvota</td><td>${d.totalQuota} (${d.quotaFill}% dolu)</td><td class="lab">Orta bal</td><td>${f2(d.avg)}</td></tr>
+        <tr><td class="lab">Ən aşağı bal</td><td>${f2(d.minS)}</td><td class="lab">Ən yüksək bal</td><td>${f2(d.maxS)}</td></tr>
+      </table>
 
       ${groupTable}
       ${sourceTable}
@@ -294,20 +316,40 @@ export default function Results() {
       <h2>İxtisas üzrə yerləşdirmə siyahısı</h2>
       ${specSections || '<div class="empty">Yerləşdirmə aparılmayıb.</div>'}
 
-      <h2>Komissiya</h2>
-      <div class="sign">
-        <div class="row"><span class="role">Komissiya sədri</span><br><span class="hint">(ad, soyad, imza)</span></div>
-        <div class="row"><span class="role">Komissiya üzvü</span><br><span class="hint">(ad, soyad, imza)</span></div>
-        <div class="row"><span class="role">Komissiya üzvü</span><br><span class="hint">(ad, soyad, imza)</span></div>
-        <div class="row"><span class="role">Komissiya üzvü</span><br><span class="hint">(ad, soyad, imza)</span></div>
+      <p class="copies">Akt ${BL(50)} nüsxədə tərtib edilmişdir.</p>
+
+      <!-- ── Komissiya (boş imza sətirləri) ── -->
+      <div class="comm">
+        <div style="font-weight:bold; margin-bottom:14px">Komissiya:</div>
+        <div class="row"><span class="role">Komissiya sədri:</span> ${BL(150)} / ${BL(200)} /</div>
+        <div class="row"><span class="role">Komissiya üzvü:</span> ${BL(150)} / ${BL(200)} /</div>
+        <div class="row"><span class="role">Komissiya üzvü:</span> ${BL(150)} / ${BL(200)} /</div>
+        <div class="row"><span class="role">Komissiya üzvü:</span> ${BL(150)} / ${BL(200)} /</div>
+        <div style="font-size:9pt; color:#333">(imza)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(ad, soyad)</div>
+        <div class="my">M.Y.</div>
       </div>
-
-      <div class="foot">Bu akt İxtisas Seçim Proqramı tərəfindən ${nowStr()} tarixində avtomatik formalaşdırılmışdır.</div>
     </body></html>`
+  }
 
+  function generateActHTML() {
+    const d = buildActData()
     const w = window.open('', '_blank')
-    if (w) { w.document.write(html); w.document.close() }
-    addLog('distribution', 'info', 'Yerləşdirmə aktı hazırlandı', `${d.instLabel} · ${d.selName} · ${d.placed}/${d.total} yerləşdi`)
+    if (w) { w.document.write(buildActHtml(true)); w.document.close() }
+    addLog('distribution', 'info', 'Yerləşdirmə aktı (çap) hazırlandı', `${d.instLabel} · ${d.selName} · ${d.placed}/${d.total} yerləşdi`)
+  }
+
+  // Word (.doc) — eyni HTML Word MIME ilə yüklənir, redaktə oluna bilir
+  function exportActWord() {
+    const d = buildActData()
+    const html = buildActHtml(false)
+    const blob = new Blob(['﻿' + html], { type: 'application/msword;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `Yerlesdirme_Akti_${d.instLabel}_${new Date().toLocaleDateString('az-AZ').replace(/\./g, '-')}.doc`
+    a.click()
+    URL.revokeObjectURL(url)
+    addLog('distribution', 'info', 'Yerləşdirmə aktı (Word) ixrac edildi', `${d.instLabel} · ${d.placed}/${d.total} yerləşdi`)
   }
 
   function exportActExcel() {
@@ -424,6 +466,10 @@ export default function Results() {
             <button onClick={generateActHTML}
               style={{ padding: '8px 16px', borderRadius: 9, border: 'none', background: '#1a1a1a', color: '#fff', fontWeight: 700, fontSize: 12.5, cursor: 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 6 }}>
               📄 <span className="res-export-label">Akt (çap / PDF)</span>
+            </button>
+            <button onClick={exportActWord}
+              style={{ padding: '8px 16px', borderRadius: 9, border: '1.5px solid #2b579a', background: '#fff', color: '#2b579a', fontWeight: 700, fontSize: 12.5, cursor: 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 6 }}>
+              📝 <span className="res-export-label">Akt (Word)</span>
             </button>
             <button onClick={exportActExcel}
               style={{ padding: '8px 16px', borderRadius: 9, border: '1.5px solid #1d6f42', background: '#fff', color: '#1d6f42', fontWeight: 700, fontSize: 12.5, cursor: 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 6 }}>
