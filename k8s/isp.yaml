@@ -1,0 +1,177 @@
+# ══════════════════════════════════════════════════════════════════
+#  İxtisas Seçim Proqramı — Kubernetes manifestləri
+#  Tətbiq:   kubectl apply -f k8s/isp.yaml
+#  Silmək:   kubectl delete -f k8s/isp.yaml   (PVC/data qalır)
+#  Baxış:    kubectl get all -n isp
+# ══════════════════════════════════════════════════════════════════
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: isp
+---
+# ── Gizli məlumatlar (parol, JWT açarı) ───────────────────────────
+apiVersion: v1
+kind: Secret
+metadata:
+  name: isp-secrets
+  namespace: isp
+type: Opaque
+stringData:
+  MYSQL_ROOT_PASSWORD: "isp_root_2026"
+  JWT_KEY: "mmu-isp-dev-secret-key-2026-min-32-chars!!"
+---
+# ══════════════════════════════════════════════════════════════════
+#  DB — MySQL 8.4 (qalıcı disk ilə)
+# ══════════════════════════════════════════════════════════════════
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: db-data
+  namespace: isp
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 2Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: db
+  namespace: isp
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate          # tək instansiya — eyni disk üzərində iki pod işləməsin
+  selector:
+    matchLabels: { app: db }
+  template:
+    metadata:
+      labels: { app: db }
+    spec:
+      containers:
+        - name: mysql
+          image: mysql:8.4
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: isp-secrets, key: MYSQL_ROOT_PASSWORD }
+            - name: MYSQL_DATABASE
+              value: mmuisp
+          ports:
+            - containerPort: 3306
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/mysql
+          readinessProbe:
+            exec:
+              command: ["mysqladmin", "ping", "-h", "localhost", "-pisp_root_2026"]
+            initialDelaySeconds: 15
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 30
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: db-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: db                  # backend bura "db:3306" kimi qoşulur (k8s DNS)
+  namespace: isp
+spec:
+  selector: { app: db }
+  ports:
+    - port: 3306
+      targetPort: 3306
+---
+# ══════════════════════════════════════════════════════════════════
+#  Backend — .NET 8 API
+# ══════════════════════════════════════════════════════════════════
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: isp
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: backend }
+  template:
+    metadata:
+      labels: { app: backend }
+    spec:
+      # DB hazır olana qədər gözlə (Service yalnız "ready" DB pod-una yönləndirir)
+      initContainers:
+        - name: wait-for-db
+          image: busybox:1.36
+          command: ["sh", "-c", "until nc -z db 3306; do echo 'DB gözlənilir...'; sleep 2; done"]
+      containers:
+        - name: backend
+          image: mmu-ixtisas-backend:latest
+          imagePullPolicy: IfNotPresent   # lokal image — reyestrdən çəkmə
+          env:
+            - name: ASPNETCORE_ENVIRONMENT
+              value: Development
+            - name: ASPNETCORE_URLS
+              value: "http://+:5199"
+            - name: ConnectionStrings__Default
+              value: "Server=db;Port=3306;Database=mmuisp;User=root;Password=isp_root_2026;"
+            - name: Jwt__Issuer
+              value: MmuIspApi
+            - name: Jwt__Audience
+              value: MmuIspFrontend
+            - name: Jwt__Key
+              valueFrom:
+                secretKeyRef: { name: isp-secrets, key: JWT_KEY }
+            - name: Jwt__ExpiryMinutes
+              value: "480"
+          ports:
+            - containerPort: 5199
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend             # nginx /api sorğularını "backend:5199"-a ötürür
+  namespace: isp
+spec:
+  selector: { app: backend }
+  ports:
+    - port: 5199
+      targetPort: 5199
+---
+# ══════════════════════════════════════════════════════════════════
+#  Frontend — nginx (React build + /api proxy)
+# ══════════════════════════════════════════════════════════════════
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: isp
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: frontend }
+  template:
+    metadata:
+      labels: { app: frontend }
+    spec:
+      containers:
+        - name: frontend
+          image: mmu-ixtisas-frontend:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  namespace: isp
+spec:
+  selector: { app: frontend }
+  ports:
+    - port: 80
+      targetPort: 80
