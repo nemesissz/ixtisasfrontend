@@ -1,5 +1,5 @@
 // Backend API-yə fetch əsaslı nazik sarğı — token-i avtomatik əlavə edir, JSON encode/decode edir.
-import { getToken, clearAdminSession, clearOperatorSession, clearStudentSession } from './auth'
+import { getToken, clearAdminSession, clearStudentSession } from './auth'
 
 // VITE_API_URL:
 //   - təyin olunmayıb (dev rejimi)  → http://localhost:5199
@@ -50,9 +50,6 @@ function redirectToLoginAfterAuthFailure() {
   if (path.startsWith('/admin')) {
     clearAdminSession()
     if (path !== '/admin/login') window.location.href = '/admin/login'
-  } else if (path.startsWith('/operator')) {
-    clearOperatorSession()
-    if (path !== '/operator/login') window.location.href = '/operator/login'
   } else if (path.startsWith('/student')) {
     clearStudentSession()
     if (path !== '/student') window.location.href = '/student'

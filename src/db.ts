@@ -244,10 +244,6 @@ export const adminDb = {
     try { return await http.post<any>('/api/admins/login', { username, password }) }
     catch (e) { if (e instanceof ApiError && e.status === 401) return null; throw e }
   },
-  loginOperator: async (username: string, password: string) => {
-    try { return await http.post<any>('/api/admins/login-operator', { username, password }) }
-    catch (e) { if (e instanceof ApiError && e.status === 401) return null; throw e }
-  },
 }
 
 // ── Auth (tələbə girişi) ────────────────────────────────────────────────────

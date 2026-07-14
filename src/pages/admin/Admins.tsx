@@ -52,14 +52,12 @@ const ROLES: Record<string, string> = {
   superadmin: "Baş Admin",
   admin: "Admin",
   moderator: "Moderator",
-  operator: "Operator",
 };
 
 const ROLE_BADGE: Record<string, string> = {
   superadmin: "badge-purple",
   admin: "badge-blue",
   moderator: "badge-orange",
-  operator: "badge-green",
 };
 
 const EMPTY_FORM = {
@@ -387,7 +385,6 @@ export default function Admins() {
     });
   }
 
-  const isOperator = form.role === "operator";
   const needsPerms = !!form.role && form.role !== "superadmin";
 
   async function addCustomRole() {
@@ -421,7 +418,7 @@ export default function Admins() {
     if (!form.name || !form.username || !form.password || !form.role) return;
     await adminDb.create({
       name: form.name,
-      email: isOperator ? "" : form.email,
+      email: form.email,
       role: form.role,
       username: form.username.trim(),
       password: form.password,
@@ -813,9 +810,7 @@ export default function Admins() {
                     <label className="form-label">İstifadəçi adı *</label>
                     <input
                       className="form-input"
-                      placeholder={
-                        isOperator ? "Məs: operator1" : "Məs: admin2"
-                      }
+                      placeholder="Məs: admin2"
                       value={form.username}
                       onChange={(e) =>
                         setForm((f) => ({ ...f, username: e.target.value }))
@@ -859,23 +854,21 @@ export default function Admins() {
                     </div>
                   </div>
 
-                  {!isOperator && (
-                    <div className="form-group">
-                      <label className="form-label">Email</label>
-                      <input
-                        className="form-input"
-                        type="email"
-                        placeholder="Məs: admin@mmu.az"
-                        value={form.email}
-                        onChange={(e) =>
-                          setForm((f) => ({ ...f, email: e.target.value }))
-                        }
-                      />
-                    </div>
-                  )}
+                  <div className="form-group">
+                    <label className="form-label">Email</label>
+                    <input
+                      className="form-input"
+                      type="email"
+                      placeholder="Məs: admin@mmu.az"
+                      value={form.email}
+                      onChange={(e) =>
+                        setForm((f) => ({ ...f, email: e.target.value }))
+                      }
+                    />
+                  </div>
                 </div>
 
-                {/* Sağ sütun: icazə seçimi — admin / moderator / operator üçün */}
+                {/* Sağ sütun: icazə seçimi — admin / moderator üçün */}
                 {needsPerms && (
                   <PermSelector
                     value={form.permissions}
@@ -912,7 +905,7 @@ export default function Admins() {
         <div className="card-head">
           <div>
             <div className="card-title">Sistem İstifadəçiləri</div>
-            <div className="card-sub">Admin və operator hesabları</div>
+            <div className="card-sub">Admin hesabları</div>
           </div>
           <button
             className="btn btn-primary btn-sm"
@@ -949,10 +942,7 @@ export default function Admins() {
                           height: 34,
                           borderRadius: 10,
                           flexShrink: 0,
-                          background:
-                            a.role === "operator"
-                              ? "linear-gradient(135deg,#00b96b,#007a47)"
-                              : "linear-gradient(135deg,#c9962a,#b8860b)",
+                          background: "linear-gradient(135deg,#c9962a,#b8860b)",
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
@@ -961,19 +951,13 @@ export default function Admins() {
                           fontWeight: 800,
                         }}
                       >
-                        {a.role === "operator" ? "🛠️" : a.name[0]}
+                        {a.name[0]}
                       </div>
                       <span style={{ fontWeight: 700 }}>{a.name}</span>
                     </div>
                   </td>
                   <td style={{ color: "var(--muted)", fontSize: 12 }}>
-                    {a.role === "operator" ? (
-                      <span style={{ fontFamily: "monospace" }}>
-                        @{a.username}
-                      </span>
-                    ) : (
-                      a.email
-                    )}
+                    {a.email || <span style={{ fontFamily: "monospace" }}>@{a.username}</span>}
                   </td>
                   <td>
                     <span
@@ -1015,8 +999,7 @@ export default function Admins() {
                       )}
                       {isSuperAdmin &&
                         (a.role === "admin" ||
-                          a.role === "moderator" ||
-                          a.role === "operator") && (
+                          a.role === "moderator") && (
                           <button
                             className="btn-ghost"
                             title="İcazələr"

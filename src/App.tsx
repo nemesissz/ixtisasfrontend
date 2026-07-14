@@ -21,9 +21,6 @@ import Landing          from './pages/student/Landing'
 import SelectionPage    from './pages/student/SelectionPage'
 import ResultPage       from './pages/student/ResultPage'
 
-import OperatorLayout    from './layouts/OperatorLayout'
-import OperatorDashboard from './pages/operator/Dashboard'
-import OperatorLogin     from './pages/operator/Login'
 import { getAdminSession } from './api/auth'
 
 function AdminGuard({ children }: { children: React.ReactNode }) {
@@ -35,7 +32,7 @@ function AdminGuard({ children }: { children: React.ReactNode }) {
 export default function App() {
   return (
     <Routes>
-      {/* ── Kök: birbaşa idarəetmə login (admin/super/operator) ── */}
+      {/* ── Kök: birbaşa idarəetmə login (admin/superadmin) ── */}
       <Route path="/" element={<AdminLogin />} />
 
       {/* ── Admin login ── */}
@@ -56,13 +53,6 @@ export default function App() {
         <Route path="redistribute"        element={<Redistribute />} />
         <Route path="archive"             element={<Archive />} />
         <Route path="logs"                element={<Logs />} />
-      </Route>
-
-      {/* ── Operator panel ── */}
-      <Route path="/operator/login" element={<OperatorLogin />} />
-      <Route path="/operator" element={<OperatorLayout />}>
-        <Route index            element={<Navigate to="dashboard" replace />} />
-        <Route path="dashboard" element={<OperatorDashboard />} />
       </Route>
 
       {/* ── Student panel ── */}

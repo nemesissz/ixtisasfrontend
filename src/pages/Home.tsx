@@ -52,13 +52,13 @@ export default function Home() {
       {/* Kartlar — 2 giriş */}
       <div style={{ display: 'flex', gap: 28, zIndex: 1, flexWrap: 'wrap', justifyContent: 'center' }}>
 
-        {/* İdarəetmə girişi — admin / superadmin / operator */}
+        {/* İdarəetmə girişi — admin / superadmin */}
         <RoleCard
           icon="🔐"
           iconBg="linear-gradient(135deg,#c9962a,#3a5ecc)"
           iconShadow="#c9962a44"
           title="İdarəetmə Girişi"
-          subtitle="Admin · Operator"
+          subtitle="Admin"
           accentColor="#c9962a"
           active={true}
           onClick={() => navigate('/admin/login')}
