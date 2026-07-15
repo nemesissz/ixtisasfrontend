@@ -13,6 +13,8 @@ export interface AdminSession {
   username: string
   role: string
   permissions?: string[] | null
+  // Müəssisə əhatəsi: boş/yoxdursa = bütün müəssisələr; doludursa yalnız bunlar
+  institutions?: string[] | null
 }
 
 export interface StudentSession {

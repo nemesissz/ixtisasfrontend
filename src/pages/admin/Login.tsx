@@ -26,6 +26,7 @@ export default function AdminLogin() {
       setAdminSession({
         token: admin.token, id: admin.id, name: admin.name, username: admin.username, role: admin.role,
         permissions: admin.permissions || [],
+        institutions: admin.institutions || null,
       })
       addLog('admin', 'success', `Admin daxil oldu: ${admin.name}`, `@${admin.username}`, admin.name)
       // İcazəsi olduğu ilk səhifəyə yönləndir

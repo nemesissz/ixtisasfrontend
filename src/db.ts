@@ -77,6 +77,7 @@ function mapAdmin(a: any) {
   return {
     id: a.id, name: a.name, email: a.email, username: a.username,
     role: a.role, status: a.status, lastLogin: utc(a.lastLogin), permissions: a.permissions ?? undefined,
+    institutions: a.institutions ?? undefined,
   }
 }
 function mapSubmission(a: any) {
@@ -226,6 +227,7 @@ export const adminDb = {
     const created = await http.post<any>('/api/admins', {
       name: data.name, email: data.email ?? null, username: data.username,
       password: data.password, role: data.role, permissions: data.permissions ?? null,
+      institutions: data.institutions ?? null,
     })
     return mapAdmin(created)
   },
@@ -236,7 +238,7 @@ export const adminDb = {
     await http.put(`/api/admins/${id}`, {
       name: merged.name, email: merged.email ?? null,
       password: data.password || null, role: merged.role, status: merged.status,
-      permissions: merged.permissions ?? null,
+      permissions: merged.permissions ?? null, institutions: merged.institutions ?? null,
     })
   },
   delete: async (id: string) => { await http.delete(`/api/admins/${id}`) },

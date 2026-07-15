@@ -68,7 +68,49 @@ const EMPTY_FORM = {
   username: "",
   password: "",
   permissions: [] as string[],
+  institutions: [] as string[],
 };
+
+// ── Müəssisə əhatəsi seçimi (checkbox-lar) ──
+function InstSelector({
+  institutions,
+  value,
+  onChange,
+}: {
+  institutions: any[];
+  value: string[];
+  onChange: (v: string[]) => void;
+}) {
+  const toggle = (id: string) =>
+    onChange(value.includes(id) ? value.filter((c) => c !== id) : [...value, id]);
+  return (
+    <div style={{ border: "1.5px solid #e8eaf5", borderRadius: 12, overflow: "hidden", marginTop: 14 }}>
+      <div style={{ padding: "9px 14px", background: "#f8f9fd", borderBottom: "1.5px solid #eef0f8", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <span style={{ fontSize: 11, fontWeight: 800, color: "#9a7b1e", textTransform: "uppercase", letterSpacing: 0.5 }}>
+          🏛️ Müəssisə əhatəsi {value.length > 0 ? `(${value.length})` : "(hamısı)"}
+        </span>
+        <button type="button" onClick={() => onChange([])}
+          style={{ fontSize: 11, fontWeight: 700, color: "#999", background: "none", border: "none", cursor: "pointer" }}>
+          Hamısı
+        </button>
+      </div>
+      <div style={{ padding: "10px 14px", display: "flex", flexDirection: "column", gap: 6 }}>
+        <div style={{ fontSize: 11, color: "#8892b0", marginBottom: 2 }}>
+          Heç biri seçilməsə hesab BÜTÜN müəssisələri görür. Seçilsə yalnız işarələnənləri.
+        </div>
+        {institutions.map((inst) => (
+          <label key={inst.id} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 12.5, color: value.includes(inst.id) ? "#3a4cad" : "#555" }}>
+            <input type="checkbox" checked={value.includes(inst.id)} onChange={() => toggle(inst.id)} style={{ accentColor: "#c9962a" }} />
+            {inst.label}
+          </label>
+        ))}
+        {institutions.length === 0 && (
+          <span style={{ fontSize: 12, color: "#999" }}>Müəssisə tapılmadı</span>
+        )}
+      </div>
+    </div>
+  );
+}
 
 // ── İcazə seçimi (checkbox qrupları) ──
 function PermSelector({
@@ -427,6 +469,7 @@ export default function Admins() {
       username: form.username.trim(),
       password: form.password,
       permissions: needsPerms ? form.permissions : undefined,
+      institutions: needsPerms && form.institutions.length ? form.institutions : undefined,
     });
     await addLog(
       "admin",
@@ -442,12 +485,14 @@ export default function Admins() {
   // ── İcazə redaktə modalı ──
   const [permTarget, setPermTarget] = useState<any>(null);
   const [permSel, setPermSel] = useState<string[]>([]);
+  const [permInst, setPermInst] = useState<string[]>([]);
   function openPerms(a: any) {
     setPermTarget(a);
     setPermSel(a.permissions || []);
+    setPermInst(a.institutions || []);
   }
   async function savePerms() {
-    await adminDb.update(permTarget.id, { permissions: permSel });
+    await adminDb.update(permTarget.id, { permissions: permSel, institutions: permInst.length ? permInst : null });
     await addLog(
       "admin",
       "info",
@@ -704,6 +749,7 @@ export default function Admins() {
             </div>
             <div className="modal-body" style={{ maxHeight: "82vh" }}>
               <PermSelector value={permSel} onChange={setPermSel} />
+              <InstSelector institutions={institutions} value={permInst} onChange={setPermInst} />
             </div>
             <div className="modal-foot">
               <button
@@ -872,12 +918,19 @@ export default function Admins() {
                   </div>
                 </div>
 
-                {/* Sağ sütun: icazə seçimi — admin / moderator üçün */}
+                {/* Sağ sütun: icazə + müəssisə əhatəsi — admin / moderator üçün */}
                 {needsPerms && (
-                  <PermSelector
-                    value={form.permissions}
-                    onChange={(v) => setForm((f) => ({ ...f, permissions: v }))}
-                  />
+                  <div>
+                    <PermSelector
+                      value={form.permissions}
+                      onChange={(v) => setForm((f) => ({ ...f, permissions: v }))}
+                    />
+                    <InstSelector
+                      institutions={institutions}
+                      value={form.institutions}
+                      onChange={(v) => setForm((f) => ({ ...f, institutions: v }))}
+                    />
+                  </div>
                 )}
               </div>
             </div>
