@@ -1003,9 +1003,7 @@ export default function Admins() {
                           🔑
                         </button>
                       )}
-                      {isSuperAdmin &&
-                        (a.role === "admin" ||
-                          a.role === "moderator") && (
+                      {isSuperAdmin && a.role !== "superadmin" && (
                           <button
                             className="btn-ghost"
                             title="İcazələr"
