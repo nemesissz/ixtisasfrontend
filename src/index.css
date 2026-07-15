@@ -150,8 +150,11 @@ tbody tr:hover td { background: #fafbff; }
 }
 .adaptive-table thead th.sticky-col { background: #f8f9fd; z-index: 6; }
 .adaptive-table tbody tr:hover td.sticky-col { background: #f8f9ff; }
-.adaptive-table th.sticky-col-1, .adaptive-table td.sticky-col-1 { left: 0; }
-.adaptive-table th.sticky-col-2, .adaptive-table td.sticky-col-2 { left: 44px; }
+/* Sticky sütunların eni SABİT olmalıdır — icazə (redaktə düyməsi) olmasa da
+   col-2 44px qalsın ki, col-3-ün 88px məsafəsi düz gəlsin (yoxsa sütunlar
+   sürüşüb İş Nömrəsi/FİN kəsilir) */
+.adaptive-table th.sticky-col-1, .adaptive-table td.sticky-col-1 { left: 0; min-width: 44px; max-width: 44px; }
+.adaptive-table th.sticky-col-2, .adaptive-table td.sticky-col-2 { left: 44px; min-width: 44px; max-width: 44px; }
 .adaptive-table th.sticky-col-3, .adaptive-table td.sticky-col-3 { left: 88px; box-shadow: 3px 0 8px -2px rgba(79,124,255,0.13); }
 
 /* ── Badges ── */
