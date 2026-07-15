@@ -16,6 +16,7 @@ import {
 import { AppDialog, useDialog } from "../../components/AppDialog";
 import { PERM_GROUPS, ALL_PERMS } from "../../permissions";
 import { getAdminSession, setAdminSession } from "../../api/auth";
+import { can } from "../../permissions";
 
 const EyeIcon = ({ off }: { off: boolean }) =>
   off ? (
@@ -258,6 +259,9 @@ export default function Admins() {
 
   const session = getAdminSession();
   const isSuperAdmin = session?.role === "superadmin";
+  // Hesabları yaratmaq/silmək/redaktə etmək — yalnız admins.manage (backend ilə eyni şərt).
+  // Superadmin üçün can() həmişə true qaytarır.
+  const canManage = can("admins.manage");
 
   const [institutions, setInstitutions] = useState<any[]>([]);
   const [selInst, setSelInst] = useState<string>("");
@@ -907,15 +911,17 @@ export default function Admins() {
             <div className="card-title">Sistem İstifadəçiləri</div>
             <div className="card-sub">Admin hesabları</div>
           </div>
-          <button
-            className="btn btn-primary btn-sm"
-            onClick={() => {
-              setForm({ ...EMPTY_FORM });
-              setModal(true);
-            }}
-          >
-            + Hesab Yarat
-          </button>
+          {canManage && (
+            <button
+              className="btn btn-primary btn-sm"
+              onClick={() => {
+                setForm({ ...EMPTY_FORM });
+                setModal(true);
+              }}
+            >
+              + Hesab Yarat
+            </button>
+          )}
         </div>
         <div className="card-body">
           <table>
@@ -980,7 +986,7 @@ export default function Admins() {
                     <div
                       style={{ display: "flex", gap: 6, alignItems: "center" }}
                     >
-                      {a.username && (
+                      {a.username && (canManage || a.id === session?.id) && (
                         <button
                           className="btn-ghost"
                           title="Şifrəni dəyiş"
@@ -1016,7 +1022,7 @@ export default function Admins() {
                             🛡️ {(a.permissions || []).length}
                           </button>
                         )}
-                      {a.role !== "superadmin" && (
+                      {canManage && a.role !== "superadmin" && (
                         <button
                           className="btn-ghost"
                           onClick={() => handleDelete(a)}
