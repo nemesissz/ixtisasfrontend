@@ -1164,8 +1164,11 @@ function EditUserModal({ user, instLabel, activeSel, hasSub, onClose, onSaved }:
     // ── Seçim statusu dəyişibsə submission yarat/sil ──
     if (selStatus !== (hasSub ? 'submitted' : 'pending')) {
       if (selStatus === 'pending') {
-        // Təhsilalanın bu seçimdəki sıralamasını sil (tam sıfırla) + yerləşdirməni təmizlə
-        if (activeSel) await submissionDb.deleteByUser(user.id, activeSel.id)
+        // Təhsilalanın BÜTÜN seçimlərdəki sıralamalarını sil — yalnız activeSel deyil.
+        // (activeSel null ola bilər, ya da submission başqa/bağlanmış seçimə aid ola bilər;
+        //  əks halda submission bazada qalır və statistika hələ "seçdi" göstərir.)
+        const mySubs = (await submissionDb.getAll()).filter((s: any) => s.userId === user.id)
+        for (const s of mySubs) await submissionDb.deleteByUser(user.id, s.selectionId)
         await userDb.update(user.id, {
           status: 'pending',
           placedSpecialty: null, choiceNum: null, placedSpecialtyId: null, placedSelectionId: null,
