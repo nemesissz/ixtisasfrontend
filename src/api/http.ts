@@ -35,6 +35,10 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
       // səhifəsinə qaytar (əks halda istifadəçi "asılı" qalmış boş səhifədə qalır)
       redirectToLoginAfterAuthFailure()
     }
+    if (res.status === 429) {
+      // Rate-limit (çox sayda cəhd) — xam "429" əvəzinə istifadəçinin başa düşəcəyi mesaj
+      throw new ApiError(429, 'Çox sayda cəhd edildi. Zəhmət olmasa bir dəqiqə gözləyib yenidən cəhd edin.')
+    }
     throw new ApiError(res.status, text || `${method} ${path} -> ${res.status}`)
   }
 
