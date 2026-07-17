@@ -47,6 +47,7 @@ export default function Results() {
     if (!selId && allSelections.length > 0) setSelId(allSelections[0].id)
   }, [allSelections])
   const [search, setSearch] = useState('')
+  const [aktMenu, setAktMenu] = useState(false)
   const [instFlt, setInstFlt] = useState('all')
   const [statusFlt, setStatusFlt] = useState<'all' | 'placed' | 'unplaced'>('all')
   const [sortBy, setSortBy] = useState<'score' | 'name' | 'spec'>('score')
@@ -463,18 +464,35 @@ export default function Results() {
             <div className="card-sub">{sel?.name} · {rows.length} nəticə</div>
           </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <button onClick={generateActHTML}
-              style={{ padding: '8px 16px', borderRadius: 9, border: 'none', background: '#1a1a1a', color: '#fff', fontWeight: 700, fontSize: 12.5, cursor: 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 6 }}>
-              📄 <span className="res-export-label">Akt (çap / PDF)</span>
-            </button>
-            <button onClick={exportActWord}
-              style={{ padding: '8px 16px', borderRadius: 9, border: '1.5px solid #2b579a', background: '#fff', color: '#2b579a', fontWeight: 700, fontSize: 12.5, cursor: 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 6 }}>
-              📝 <span className="res-export-label">Akt (Word)</span>
-            </button>
-            <button onClick={exportActExcel}
-              style={{ padding: '8px 16px', borderRadius: 9, border: '1.5px solid #1d6f42', background: '#fff', color: '#1d6f42', fontWeight: 700, fontSize: 12.5, cursor: 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 6 }}>
-              📊 <span className="res-export-label">Akt (Excel)</span>
-            </button>
+            <div style={{ position: 'relative' }}>
+              <button onClick={() => setAktMenu(v => !v)}
+                style={{ padding: '8px 16px', borderRadius: 9, border: 'none', background: '#1a1a1a', color: '#fff', fontWeight: 700, fontSize: 12.5, cursor: 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 6 }}>
+                📋 <span className="res-export-label">Akt</span> <span style={{ fontSize: 9 }}>{aktMenu ? '▲' : '▼'}</span>
+              </button>
+              {aktMenu && (
+                <>
+                  <div onClick={() => setAktMenu(false)} style={{ position: 'fixed', inset: 0, zIndex: 40 }} />
+                  <div style={{ position: 'absolute', left: 0, top: '112%', zIndex: 41, background: '#fff', border: '1.5px solid #e8eaf5', borderRadius: 12, boxShadow: '0 12px 32px #0002', overflow: 'hidden', minWidth: 200 }}>
+                    {[
+                      { icon: '📄', label: 'Akt (PDF / çap)', sub: 'Çap pəncərəsi açılır', color: '#1a1a1a', fn: generateActHTML },
+                      { icon: '📝', label: 'Akt (Word)', sub: 'Redaktə oluna bilən sənəd', color: '#2b579a', fn: exportActWord },
+                      { icon: '📊', label: 'Akt (Excel)', sub: 'Cədvəl formatı', color: '#1d6f42', fn: exportActExcel },
+                    ].map((o, i) => (
+                      <button key={o.label} onClick={() => { o.fn(); setAktMenu(false) }}
+                        style={{ display: 'flex', alignItems: 'center', gap: 11, width: '100%', padding: '11px 14px', border: 'none', borderTop: i ? '1px solid #f0f2f8' : 'none', background: '#fff', cursor: 'pointer', textAlign: 'left' }}
+                        onMouseEnter={e => (e.currentTarget.style.background = '#f8f9fd')}
+                        onMouseLeave={e => (e.currentTarget.style.background = '#fff')}>
+                        <span style={{ fontSize: 19, width: 24, textAlign: 'center', flexShrink: 0 }}>{o.icon}</span>
+                        <span style={{ minWidth: 0 }}>
+                          <span style={{ display: 'block', fontSize: 12.5, fontWeight: 800, color: o.color }}>{o.label}</span>
+                          <span style={{ display: 'block', fontSize: 11, color: 'var(--muted)' }}>{o.sub}</span>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
             <button onClick={exportExcel}
               style={{ padding: '8px 16px', borderRadius: 9, border: 'none', background: '#1d6f42', color: '#fff', fontWeight: 700, fontSize: 12.5, cursor: 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 6 }}>
               📥 <span className="res-export-label">Excelə ixrac</span>
