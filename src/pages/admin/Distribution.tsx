@@ -1579,7 +1579,7 @@ export default function Distribution() {
           <div style={{ background: '#fff', borderRadius: 20, width: 440, maxWidth: '94vw', boxShadow: '0 24px 80px #0004', overflow: 'hidden' }}>
             <div style={{ background: '#f0f2f8', padding: '22px 26px', textAlign: 'center' }}>
               <div style={{ fontSize: 38, marginBottom: 10 }}>⚠️</div>
-              <div style={{ fontSize: 16, fontWeight: 800, color: '#fff', marginBottom: 6 }}>Nəticələri bazaya yazmaq istəyirsiniz?</div>
+              <div style={{ fontSize: 16, fontWeight: 800, color: '#2b2f3a', marginBottom: 6 }}>Nəticələri bazaya yazmaq istəyirsiniz?</div>
               <div style={{ fontSize: 12, color: '#8892b0', lineHeight: 1.6 }}>
                 <span style={{ color: '#f5a623', fontWeight: 700 }}>{placedCount} təhsilalan</span> üçün yerləşdirmə nəticəsi bazaya yazılacaq.
               </div>
