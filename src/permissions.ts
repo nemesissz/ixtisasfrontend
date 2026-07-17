@@ -23,7 +23,7 @@ export const PERM_GROUPS: PermGroup[] = [
   },
   {
     group: 'Müəssisə / İxtisaslar', icon: '🏛️', perms: [
-      { code: 'tree.view',   label: 'Bölməyə baxış' },
+      { code: 'tree.view',   label: 'İxtisaslara baxış' },
       { code: 'inst.create', label: 'Müəssisə yaratma' },
       { code: 'inst.edit',   label: 'Müəssisə redaktəsi' },
       { code: 'inst.delete', label: 'Müəssisə silmə' },
@@ -33,9 +33,9 @@ export const PERM_GROUPS: PermGroup[] = [
   },
   {
     group: 'Seçimlər', icon: '🗳', perms: [
-      { code: 'sel.view',    label: 'Bölməyə baxış' },
+      { code: 'sel.view',    label: 'Seçimlərə baxış' },
       { code: 'sel.create',  label: 'Seçim yaratma' },
-      { code: 'sel.publish', label: 'Aktivləşdirmə / bağlama' },
+      { code: 'sel.publish', label: 'Yayımlama / bağlama' },
       { code: 'sel.edit',    label: 'Parametr redaktəsi' },
       { code: 'sel.delete',  label: 'Seçim silmə' },
     ],
