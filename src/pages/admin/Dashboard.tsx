@@ -62,6 +62,148 @@ function Bars({ data, max }: { data: { label: string; value: number; color: stri
   )
 }
 
+// ── Statistik hesabat (yüklənə bilən sənəd: çap/PDF + Word) ─────────────────────
+const esc = (v: any) => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+
+function buildStatsReportHtml(A: any, instLabel: string, selName: string): string {
+  const today = new Date().toLocaleDateString('az-AZ', { day: '2-digit', month: 'long', year: 'numeric' })
+  const p = (a: number, b: number) => (b > 0 ? Math.round((a / b) * 100) : 0)
+  const N = A.instUsers.length
+
+  const row = (k: string, v: any) => `<tr><td class="k">${esc(k)}</td><td class="v">${esc(v)}</td></tr>`
+
+  // KPI icmalı
+  const kpi = `
+    <table class="t2">
+      ${row('Ümumi təhsilalan', N)}
+      ${A.levelStats.map((l: any) => row(l.name, l.count)).join('')}
+      ${row('Ümumi kvota', A.totalQuota)}
+      ${row('Yerləşdirilib', `${A.placed} (${p(A.placed, N)}%)`)}
+      ${row('Seçim edib', `${A.submittedCount} (${p(A.submittedCount, N)}%)`)}
+      ${row('Seçim etməyib', A.pendingCount)}
+      ${row('Kvota doluluğu', `${p(A.placed, A.totalQuota)}% (${A.placed}/${A.totalQuota})`)}
+      ${row('Ən aşağı bal', A.minScore.toFixed(1))}
+      ${row('Orta bal', A.avgScore.toFixed(1))}
+      ${row('Ən yüksək bal', A.maxScore.toFixed(1))}
+      ${row('Seçim məmnuniyyəti (1-ci seçiminə düşən)', `${A.satisfaction}%`)}
+    </table>`
+
+  // Bal paylanması
+  const scoreDist = `
+    <table class="t">
+      <thead><tr><th>Bal aralığı</th><th>Say</th><th>Faiz</th></tr></thead>
+      <tbody>${A.scoreBuckets.map(([lo, hi]: any, i: number) =>
+        `<tr><td>${lo}–${hi}</td><td class="c">${A.hist[i]}</td><td class="c">${p(A.hist[i], N)}%</td></tr>`).join('')}</tbody>
+    </table>`
+
+  // Seçim məmnuniyyəti (neçənci seçiminə düşdü)
+  const choiceKeys = Object.keys(A.choiceDist).map(Number).sort((a, b) => a - b)
+  const choice = choiceKeys.length ? `
+    <table class="t">
+      <thead><tr><th>Seçim sırası</th><th>Yerləşən say</th><th>Faiz</th></tr></thead>
+      <tbody>${choiceKeys.map(c =>
+        `<tr><td>${c}-ci seçim</td><td class="c">${A.choiceDist[c]}</td><td class="c">${A.placed > 0 ? ((A.choiceDist[c] / A.placed) * 100).toFixed(1) : '0'}%</td></tr>`).join('')}</tbody>
+    </table>` : '<p class="muted">Hələ yerləşdirmə aparılmayıb.</p>'
+
+  // Demoqrafiya
+  const demo = (A.hasGender || A.hasSource) ? `
+    <table class="t">
+      <thead><tr><th>Kateqoriya</th><th>Say</th><th>Faiz</th></tr></thead>
+      <tbody>
+        ${A.hasGender ? `<tr><td>Qadın</td><td class="c">${A.fem}</td><td class="c">${p(A.fem, N)}%</td></tr>
+        <tr><td>Kişi</td><td class="c">${A.mal}</td><td class="c">${p(A.mal, N)}%</td></tr>` : ''}
+        ${A.hasSource ? `<tr><td>Mülki</td><td class="c">${A.mulki}</td><td class="c">${p(A.mulki, N)}%</td></tr>
+        <tr><td>Lisey</td><td class="c">${A.lisey}</td><td class="c">${p(A.lisey, N)}%</td></tr>` : ''}
+      </tbody>
+    </table>` : ''
+
+  // Qoşun növü / 1-ci səviyyə bölgüsü
+  const branch = A.branchStats.length ? `
+    <table class="t">
+      <thead><tr><th>${esc(A.tree?.levelNames?.[0] || 'Bölmə')}</th><th>İxtisas</th><th>Kvota</th><th>Yerləşən</th><th>Tələb</th><th>Rəqabət</th></tr></thead>
+      <tbody>${A.branchStats.map((b: any) =>
+        `<tr><td>${esc(b.name)}</td><td class="c">${b.specs}</td><td class="c">${b.quota}</td><td class="c">${b.placed}</td><td class="c">${b.demand}</td><td class="c">${b.quota > 0 ? (b.demand / b.quota).toFixed(1) : '0'}×</td></tr>`).join('')}</tbody>
+    </table>` : ''
+
+  // Fənn ortalamaları
+  const subj = A.subjectAvg.length ? `
+    <table class="t">
+      <thead><tr><th>Fənn</th><th>Orta bal</th><th>Say</th></tr></thead>
+      <tbody>${A.subjectAvg.map((s: any) =>
+        `<tr><td>${esc(s.name)}</td><td class="c">${s.avg.toFixed(1)}</td><td class="c">${s.count}</td></tr>`).join('')}</tbody>
+    </table>` : ''
+
+  // Qrup üzrə bölgü
+  const group = A.hasGroups ? `
+    <table class="t">
+      <thead><tr><th>Qrup</th><th>Təhsilalan</th><th>Yerləşən</th>${A.hasGender ? '<th>Qadın/Kişi</th>' : ''}<th>Orta bal</th></tr></thead>
+      <tbody>${A.groupStats.map((g: any) =>
+        `<tr><td>${esc(g.name)}</td><td class="c">${g.count}</td><td class="c">${g.placed}</td>${A.hasGender ? `<td class="c">${g.fem}/${g.mal}</td>` : ''}<td class="c">${g.avg.toFixed(2)}</td></tr>`).join('')}</tbody>
+    </table>` : ''
+
+  // İxtisas performansı
+  const perf = A.byLeaf.length ? `
+    <table class="t">
+      <thead><tr><th>İxtisas</th><th>Kvota</th><th>Yerləşən</th><th>Doluluq</th><th>Ən aşağı</th><th>Orta</th><th>Ən yüksək</th></tr></thead>
+      <tbody>${[...A.byLeaf].sort((a: any, b: any) => b.quota - a.quota).map((l: any) =>
+        `<tr><td>${esc(l.name)}${l.path ? `<div class="sub">${esc(l.path)}</div>` : ''}</td><td class="c">${l.quota}</td><td class="c">${l.placed}</td><td class="c">${p(l.placed, l.quota)}%</td><td class="c">${l.min ? l.min.toFixed(1) : '—'}</td><td class="c">${l.avg ? l.avg.toFixed(1) : '—'}</td><td class="c">${l.max ? l.max.toFixed(1) : '—'}</td></tr>`).join('')}</tbody>
+    </table>` : ''
+
+  // Rəqabət
+  const comp = A.byLeaf.length ? `
+    <div class="two">
+      <div><h3>Ən rəqabətli ixtisaslar</h3>
+        <table class="t"><thead><tr><th>#</th><th>İxtisas</th><th>Tələb/Yer</th><th>Rəqabət</th></tr></thead>
+        <tbody>${A.mostCompetitive.map((l: any, i: number) => `<tr><td class="c">${i + 1}</td><td>${esc(l.name)}</td><td class="c">${l.demand}/${l.quota}</td><td class="c">${l.comp.toFixed(1)}×</td></tr>`).join('')}</tbody></table>
+      </div>
+      <div><h3>Ən az tələb olunan ixtisaslar</h3>
+        <table class="t"><thead><tr><th>#</th><th>İxtisas</th><th>Tələb/Yer</th><th>Rəqabət</th></tr></thead>
+        <tbody>${A.leastDemanded.map((l: any, i: number) => `<tr><td class="c">${i + 1}</td><td>${esc(l.name)}</td><td class="c">${l.demand}/${l.quota}</td><td class="c">${l.comp.toFixed(1)}×</td></tr>`).join('')}</tbody></table>
+      </div>
+    </div>` : ''
+
+  const sec = (title: string, body: string) => body ? `<h2>${esc(title)}</h2>${body}` : ''
+
+  return `<!DOCTYPE html><html lang="az"><head><meta charset="UTF-8"><title>Statistik hesabat — ${esc(instLabel)}</title>
+<style>
+  body { font-family: 'Times New Roman', serif; color: #111; max-width: 820px; margin: 0 auto; padding: 28px; font-size: 13px; line-height: 1.5; }
+  .head { text-align: center; border-bottom: 2px solid #111; padding-bottom: 12px; margin-bottom: 18px; }
+  .head .t1 { font-size: 20px; font-weight: 800; letter-spacing: 1px; }
+  .head .t2 { font-size: 14px; margin-top: 4px; }
+  .head .meta { font-size: 12px; color: #444; margin-top: 6px; }
+  h2 { font-size: 15px; margin: 22px 0 8px; border-left: 4px solid #2b579a; padding-left: 8px; color: #1a1a2e; }
+  h3 { font-size: 13px; margin: 10px 0 6px; }
+  table { border-collapse: collapse; width: 100%; margin-bottom: 8px; }
+  table.t th, table.t td { border: 1px solid #999; padding: 5px 8px; }
+  table.t th { background: #eceff5; font-weight: 700; text-align: left; }
+  table.t2 td { border: 1px solid #ccc; padding: 5px 10px; }
+  table.t2 .k { background: #f6f8fb; font-weight: 600; width: 55%; }
+  table.t2 .v { font-weight: 700; }
+  .c { text-align: center; }
+  .sub { font-size: 11px; color: #666; }
+  .muted { color: #777; font-style: italic; }
+  .two { display: flex; gap: 16px; } .two > div { flex: 1; }
+  .foot { margin-top: 26px; font-size: 11px; color: #555; border-top: 1px solid #ccc; padding-top: 8px; }
+  @media print { body { padding: 0; } h2 { page-break-after: avoid; } table { page-break-inside: avoid; } }
+</style></head><body>
+  <div class="head">
+    <div class="t1">STATİSTİK HESABAT</div>
+    <div class="t2">${esc(instLabel)}${selName ? ` — «${esc(selName)}»` : ''}</div>
+    <div class="meta">İxtisas seçimi və yerləşdirmə statistikası · Tarix: ${today}</div>
+  </div>
+  ${sec('1. Ümumi göstəricilər', kpi)}
+  ${sec('2. Bal paylanması', scoreDist)}
+  ${sec('3. Seçim məmnuniyyəti', choice)}
+  ${sec('4. Demoqrafiya', demo)}
+  ${sec(`5. ${A.tree?.levelNames?.[0] || 'Bölmə'} üzrə bölgü`, branch)}
+  ${sec('6. Fənn üzrə orta ballar', subj)}
+  ${sec('7. Qrup üzrə bölgü', group)}
+  ${sec('8. İxtisas üzrə performans', perf)}
+  ${sec('9. Rəqabət təhlili', comp)}
+  <div class="foot">Hesabat ${today} tarixində İxtisas Seçim Proqramı tərəfindən avtomatik hazırlanmışdır.</div>
+</body></html>`
+}
+
 function Card({ title, icon, children, span }: { title: string; icon?: string; children: React.ReactNode; span?: number }) {
   return (
     <div style={{ background: '#fff', border: '1.5px solid var(--border)', borderRadius: 16, padding: '18px 20px', gridColumn: span ? `span ${span}` : undefined, minWidth: 0 }}>
@@ -276,6 +418,25 @@ export default function Dashboard() {
 
   const activeInst = insts.find(i => i.id === instId)
 
+  // ── Statistik hesabatı sənəd kimi çıxar (çap/PDF + Word) ──
+  const reportName = () => `Statistika_${(activeInst?.label || 'muessise').replace(/[^\wəğıöüçşĞİÖÜÇŞƏ]+/gi, '_')}_${new Date().toISOString().slice(0, 10)}`
+  function printReport() {
+    const html = buildStatsReportHtml(A, activeInst?.label || '', A.sel?.name || '')
+    const w = window.open('', '_blank')
+    if (!w) return
+    w.document.write(html); w.document.close()
+    w.onload = () => { w.focus(); w.print() }
+    setTimeout(() => { try { w.focus(); w.print() } catch {} }, 400)
+  }
+  function exportReportWord() {
+    const html = buildStatsReportHtml(A, activeInst?.label || '', A.sel?.name || '')
+    const blob = new Blob(['﻿', html], { type: 'application/msword' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url; a.download = `${reportName()}.doc`; a.click()
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+  }
+
   if (!loaded) return <div style={{ padding: '40px 0', textAlign: 'center', color: 'var(--muted)' }}>Yüklənir...</div>
 
   const LEVEL_ICONS = ['⚔️', '🎖️', '🎓', '📘', '📗']
@@ -289,8 +450,24 @@ export default function Dashboard() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-      {/* Müəssisə seçicisi */}
-      <InstTabs insts={insts} activeId={instId} onSelect={setInstId} />
+      {/* Müəssisə seçicisi + hesabat yükləmə */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <InstTabs insts={insts} activeId={instId} onSelect={setInstId} />
+        </div>
+        {activeInst && (
+          <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+            <button onClick={printReport} title="Statistikanı çap et / PDF kimi saxla"
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 16px', borderRadius: 10, border: '1.5px solid #c9962a', background: '#fff', color: '#b8860b', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>
+              📄 Hesabat (PDF)
+            </button>
+            <button onClick={exportReportWord} title="Statistikanı Word (.doc) faylı kimi yüklə"
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 16px', borderRadius: 10, border: 'none', background: '#2b579a', color: '#fff', fontWeight: 800, fontSize: 13, cursor: 'pointer', boxShadow: '0 3px 12px #2b579a44' }}>
+              📝 Hesabat (Word)
+            </button>
+          </div>
+        )}
+      </div>
 
       {!activeInst ? (
         <Card title="Məlumat yoxdur">
