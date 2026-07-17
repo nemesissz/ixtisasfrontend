@@ -976,8 +976,8 @@ export default function Admins() {
             </button>
           )}
         </div>
-        <div className="card-body">
-          <table>
+        <div className="card-body" style={{ overflowX: "auto" }}>
+          <table style={{ minWidth: 620 }}>
             <thead>
               <tr>
                 <th>Ad Soyad</th>
