@@ -2632,9 +2632,6 @@ function PlacementResult({ mode, saved, placement, submittedUsers, studentRows,
           </table>
         </div>
 
-        <div className="pagination">
-          <span className="page-info">{studentRows.length} nəticə · {placedCount} yerləşdirilib · {unplacedCount} yerləşdirilməyib</span>
-        </div>
       </div>
     </>
   )
