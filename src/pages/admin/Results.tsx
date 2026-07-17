@@ -493,10 +493,6 @@ export default function Results() {
                 </>
               )}
             </div>
-            <button onClick={exportExcel}
-              style={{ padding: '8px 16px', borderRadius: 9, border: 'none', background: '#1d6f42', color: '#fff', fontWeight: 700, fontSize: 12.5, cursor: 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 6 }}>
-              📥 <span className="res-export-label">Excelə ixrac</span>
-            </button>
           </div>
         </div>
 
