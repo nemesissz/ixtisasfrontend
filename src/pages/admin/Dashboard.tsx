@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
+import * as XLSX from 'xlsx'
 import { institutionDb, userDb, treeDb, selectionDb, submissionDb, POLL_MS, usePoll } from '../../db'
 import InstIcon from '../../components/InstIcon'
 import InstTabs from '../../components/InstTabs'
@@ -226,6 +227,7 @@ export default function Dashboard() {
   const [sortBy, setSortBy] = useState<'comp' | 'fill' | 'avg' | 'quota'>('quota')
   const [showAllChoices, setShowAllChoices] = useState(false)
   const [subs, setSubs] = useState<any[]>([])
+  const [reportMenu, setReportMenu] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -434,6 +436,68 @@ export default function Dashboard() {
     a.href = url; a.download = `${reportName()}.doc`; a.click()
     setTimeout(() => URL.revokeObjectURL(url), 1000)
   }
+  function exportReportExcel() {
+    const pc = (a: number, b: number) => (b > 0 ? Math.round((a / b) * 100) : 0)
+    const N = A.instUsers.length
+    const wb = XLSX.utils.book_new()
+
+    // İcmal vərəqi
+    const icmal: any[][] = [
+      ['STATİSTİK HESABAT'],
+      [activeInst?.label || '', A.sel?.name || ''],
+      ['Tarix', new Date().toLocaleDateString('az-AZ')],
+      [],
+      ['ÜMUMİ GÖSTƏRİCİLƏR'],
+      ['Ümumi təhsilalan', N],
+      ...A.levelStats.map((l: any) => [l.name, l.count]),
+      ['Ümumi kvota', A.totalQuota],
+      ['Yerləşdirilib', A.placed, `${pc(A.placed, N)}%`],
+      ['Seçim edib', A.submittedCount, `${pc(A.submittedCount, N)}%`],
+      ['Seçim etməyib', A.pendingCount],
+      ['Kvota doluluğu', `${pc(A.placed, A.totalQuota)}%`],
+      ['Ən aşağı bal', +A.minScore.toFixed(1)],
+      ['Orta bal', +A.avgScore.toFixed(1)],
+      ['Ən yüksək bal', +A.maxScore.toFixed(1)],
+      ['Məmnuniyyət (1-ci seçim)', `${A.satisfaction}%`],
+      [],
+      ['BAL PAYLANMASI'],
+      ['Aralıq', 'Say', 'Faiz'],
+      ...A.scoreBuckets.map(([lo, hi]: any, i: number) => [`${lo}–${hi}`, A.hist[i], `${pc(A.hist[i], N)}%`]),
+    ]
+    const choiceKeys = Object.keys(A.choiceDist).map(Number).sort((a, b) => a - b)
+    if (choiceKeys.length) {
+      icmal.push([], ['SEÇİM MƏMNUNİYYƏTİ'], ['Seçim sırası', 'Yerləşən', 'Faiz'])
+      choiceKeys.forEach(c => icmal.push([`${c}-ci seçim`, A.choiceDist[c], A.placed > 0 ? `${((A.choiceDist[c] / A.placed) * 100).toFixed(1)}%` : '0%']))
+    }
+    if (A.hasGender || A.hasSource) {
+      icmal.push([], ['DEMOQRAFİYA'], ['Kateqoriya', 'Say', 'Faiz'])
+      if (A.hasGender) { icmal.push(['Qadın', A.fem, `${pc(A.fem, N)}%`], ['Kişi', A.mal, `${pc(A.mal, N)}%`]) }
+      if (A.hasSource) { icmal.push(['Mülki', A.mulki, `${pc(A.mulki, N)}%`], ['Lisey', A.lisey, `${pc(A.lisey, N)}%`]) }
+    }
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(icmal), 'İcmal')
+
+    // İxtisaslar vərəqi
+    const perf: any[][] = [['İxtisas', 'Yol', 'Kvota', 'Yerləşən', 'Doluluq %', 'Ən aşağı bal', 'Orta bal', 'Ən yüksək bal'],
+      ...[...A.byLeaf].sort((a: any, b: any) => b.quota - a.quota).map((l: any) =>
+        [l.name, l.path, l.quota, l.placed, pc(l.placed, l.quota), l.min ? +l.min.toFixed(1) : '', l.avg ? +l.avg.toFixed(1) : '', l.max ? +l.max.toFixed(1) : ''])]
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(perf), 'İxtisaslar')
+
+    // Rəqabət vərəqi (1-ci seçim üzrə)
+    const comp: any[][] = [['ƏN RƏQABƏTLİ (1-ci seçim üzrə)'], ['#', 'İxtisas', 'Tələb', 'Yer', 'Rəqabət'],
+      ...A.mostCompetitive.map((l: any, i: number) => [i + 1, l.name, l.demand, l.quota, +l.comp.toFixed(1)]),
+      [], ['ƏN AZ TƏLƏB OLUNAN'], ['#', 'İxtisas', 'Tələb', 'Yer', 'Rəqabət'],
+      ...A.leastDemanded.map((l: any, i: number) => [i + 1, l.name, l.demand, l.quota, +l.comp.toFixed(1)])]
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(comp), 'Rəqabət')
+
+    // Qrup vərəqi (varsa)
+    if (A.hasGroups) {
+      const grp: any[][] = [['Qrup', 'Təhsilalan', 'Yerləşən', 'Qadın', 'Kişi', 'Orta bal'],
+        ...A.groupStats.map((g: any) => [g.name, g.count, g.placed, g.fem, g.mal, +g.avg.toFixed(2)])]
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(grp), 'Qruplar')
+    }
+
+    XLSX.writeFile(wb, `${reportName()}.xlsx`)
+  }
 
   if (!loaded) return <div style={{ padding: '40px 0', textAlign: 'center', color: 'var(--muted)' }}>Yüklənir...</div>
 
@@ -454,15 +518,34 @@ export default function Dashboard() {
           <InstTabs insts={insts} activeId={instId} onSelect={setInstId} />
         </div>
         {activeInst && (
-          <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-            <button onClick={printReport} title="Statistikanı çap et / PDF kimi saxla"
-              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 16px', borderRadius: 10, border: '1.5px solid #c9962a', background: '#fff', color: '#b8860b', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>
-              📄 Hesabat (PDF)
+          <div style={{ position: 'relative', flexShrink: 0 }}>
+            <button onClick={() => setReportMenu(v => !v)} title="Statistik hesabatı yüklə"
+              style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 18px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#b8860b,#e0a92e)', color: '#fff', fontWeight: 800, fontSize: 13, cursor: 'pointer', boxShadow: '0 3px 12px #c9962a55' }}>
+              📊 Hesabatı yüklə <span style={{ fontSize: 10 }}>{reportMenu ? '▲' : '▼'}</span>
             </button>
-            <button onClick={exportReportWord} title="Statistikanı Word (.doc) faylı kimi yüklə"
-              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 16px', borderRadius: 10, border: 'none', background: '#2b579a', color: '#fff', fontWeight: 800, fontSize: 13, cursor: 'pointer', boxShadow: '0 3px 12px #2b579a44' }}>
-              📝 Hesabat (Word)
-            </button>
+            {reportMenu && (
+              <>
+                <div onClick={() => setReportMenu(false)} style={{ position: 'fixed', inset: 0, zIndex: 40 }} />
+                <div style={{ position: 'absolute', right: 0, top: '112%', zIndex: 41, background: '#fff', border: '1.5px solid #e8eaf5', borderRadius: 12, boxShadow: '0 12px 32px #0002', overflow: 'hidden', minWidth: 210 }}>
+                  {[
+                    { icon: '📄', label: 'PDF (çap üçün)', sub: 'Çap pəncərəsi açılır', color: '#b8860b', fn: printReport },
+                    { icon: '📝', label: 'Word (.doc)', sub: 'Redaktə oluna bilən sənəd', color: '#2b579a', fn: exportReportWord },
+                    { icon: '📊', label: 'Excel (.xlsx)', sub: 'Cədvəllər, 3-4 vərəq', color: '#1d6f42', fn: exportReportExcel },
+                  ].map((o, i) => (
+                    <button key={o.label} onClick={() => { o.fn(); setReportMenu(false) }}
+                      style={{ display: 'flex', alignItems: 'center', gap: 11, width: '100%', padding: '11px 14px', border: 'none', borderTop: i ? '1px solid #f0f2f8' : 'none', background: '#fff', cursor: 'pointer', textAlign: 'left' }}
+                      onMouseEnter={e => (e.currentTarget.style.background = '#f8f9fd')}
+                      onMouseLeave={e => (e.currentTarget.style.background = '#fff')}>
+                      <span style={{ fontSize: 20, width: 26, textAlign: 'center', flexShrink: 0 }}>{o.icon}</span>
+                      <span style={{ minWidth: 0 }}>
+                        <span style={{ display: 'block', fontSize: 13, fontWeight: 800, color: o.color }}>{o.label}</span>
+                        <span style={{ display: 'block', fontSize: 11, color: 'var(--muted)' }}>{o.sub}</span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         )}
       </div>
