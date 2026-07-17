@@ -1416,6 +1416,14 @@ export default function Distribution() {
 
   async function handleConfirm() {
     if (!placement) return
+    // Üsul-spesifik icazə: sadə → dist.simple, paket → dist.packet
+    const needPerm = method === 'packet' ? 'dist.packet' : 'dist.simple'
+    if (!can(needPerm)) {
+      setShowConf(false)
+      addLog('distribution', 'warning', 'Yerləşdirmə icazəsi yoxdur',
+        `${method === 'packet' ? 'Paket' : 'Sadə'} üsulu ilə bazaya yazma icazəsi verilməyib`)
+      return
+    }
     // Bu yerləşdirmədən təsirlənən bütün təhsilalanlar: seçim edənlər + əvvəl bu seçimə yerləşənlər
     const submittedIds = new Set(sels.map((s: any) => s.userId))
     const affected = (allInstUsers as any[]).filter((u: any) =>
@@ -1448,7 +1456,7 @@ export default function Distribution() {
       // bu yerləşdirmədə yerləşmədi → köhnə yerləşdirməni sil
       return { id: u.id, placedSpecialty: null, choiceNum: null, placedSpecialtyId: null, placedSelectionId: null }
     })
-    await userDb.bulkUpdate(patches)
+    await userDb.bulkUpdate(patches, method === 'packet' ? 'packet' : 'simple')
 
     // Paket üsulu ilə yazılıbsa kvota bölgüsünü saxla — Statistika səhifəsi göstərir.
     // Sadə üsulda köhnə qeyd silinir ki, kart yalnız paket yerləşdirməsində görünsün.
@@ -1991,46 +1999,52 @@ export default function Distribution() {
 
           <div style={{ display: 'flex', gap: 20, justifyContent: 'center', flexWrap: 'wrap' }}>
             {/* Sadə üsul */}
+            {(() => { const okS = can('dist.simple'); return (
             <div
-              onClick={() => setMethod('simple')}
+              onClick={() => okS && setMethod('simple')}
+              title={okS ? '' : 'Sadə üsulla yazma icazəniz yoxdur'}
               style={{
                 width: 220, background: '#ffffff', border: '1.5px solid #e7eaf0',
-                borderRadius: 16, padding: '28px 20px', cursor: 'pointer',
-                transition: 'all .2s', textAlign: 'center',
+                borderRadius: 16, padding: '28px 20px', cursor: okS ? 'pointer' : 'not-allowed',
+                transition: 'all .2s', textAlign: 'center', opacity: okS ? 1 : 0.55,
               }}
-              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#c9962a22'; (e.currentTarget as HTMLElement).style.borderColor = '#c9962a' }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = '#ffffff'; (e.currentTarget as HTMLElement).style.borderColor = '#e7eaf0' }}
+              onMouseEnter={e => { if (!okS) return; (e.currentTarget as HTMLElement).style.background = '#c9962a22'; (e.currentTarget as HTMLElement).style.borderColor = '#c9962a' }}
+              onMouseLeave={e => { if (!okS) return; (e.currentTarget as HTMLElement).style.background = '#ffffff'; (e.currentTarget as HTMLElement).style.borderColor = '#e7eaf0' }}
             >
               <div style={{ fontSize: 40, marginBottom: 14 }}>📋</div>
               <div style={{ fontWeight: 800, fontSize: 15, color: '#2b2f3a', marginBottom: 8 }}>Sadə üsul</div>
               <div style={{ fontSize: 12, color: '#8a909c', lineHeight: 1.6 }}>
                 Bütün təhsilalanlar eyni anda bala görə ixtisaslara yerləşdirilir
               </div>
-              <div style={{ marginTop: 18, display: 'inline-block', padding: '8px 20px', borderRadius: 8, background: '#c9962a', color: '#fff', fontWeight: 700, fontSize: 12 }}>
-                Seç →
+              <div style={{ marginTop: 18, display: 'inline-block', padding: '8px 20px', borderRadius: 8, background: okS ? '#c9962a' : '#c2c7d6', color: '#fff', fontWeight: 700, fontSize: 12 }}>
+                {okS ? 'Seç →' : '🔒 İcazə yoxdur'}
               </div>
             </div>
+            )})()}
 
             {/* Paket üsulu */}
+            {(() => { const okP = can('dist.packet'); return (
             <div
-              onClick={() => setMethod('packet')}
+              onClick={() => okP && setMethod('packet')}
+              title={okP ? '' : 'Paket üsulu ilə yazma icazəniz yoxdur'}
               style={{
                 width: 220, background: '#ffffff', border: '1.5px solid #e7eaf0',
-                borderRadius: 16, padding: '28px 20px', cursor: 'pointer',
-                transition: 'all .2s', textAlign: 'center',
+                borderRadius: 16, padding: '28px 20px', cursor: okP ? 'pointer' : 'not-allowed',
+                transition: 'all .2s', textAlign: 'center', opacity: okP ? 1 : 0.55,
               }}
-              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#f5a62322'; (e.currentTarget as HTMLElement).style.borderColor = '#f5a623' }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = '#ffffff'; (e.currentTarget as HTMLElement).style.borderColor = '#e7eaf0' }}
+              onMouseEnter={e => { if (!okP) return; (e.currentTarget as HTMLElement).style.background = '#f5a62322'; (e.currentTarget as HTMLElement).style.borderColor = '#f5a623' }}
+              onMouseLeave={e => { if (!okP) return; (e.currentTarget as HTMLElement).style.background = '#ffffff'; (e.currentTarget as HTMLElement).style.borderColor = '#e7eaf0' }}
             >
               <div style={{ fontSize: 40, marginBottom: 14 }}>📦</div>
               <div style={{ fontWeight: 800, fontSize: 15, color: '#2b2f3a', marginBottom: 8 }}>Paket üsulu</div>
               <div style={{ fontSize: 12, color: '#8a909c', lineHeight: 1.6 }}>
                 Təhsilalanlar bala görə paketlərə bölünür, hər paket ayrıca idarə edilir
               </div>
-              <div style={{ marginTop: 18, display: 'inline-block', padding: '8px 20px', borderRadius: 8, background: '#f5a623', color: '#fff', fontWeight: 700, fontSize: 12 }}>
-                Seç →
+              <div style={{ marginTop: 18, display: 'inline-block', padding: '8px 20px', borderRadius: 8, background: okP ? '#f5a623' : '#c2c7d6', color: '#fff', fontWeight: 700, fontSize: 12 }}>
+                {okP ? 'Seç →' : '🔒 İcazə yoxdur'}
               </div>
             </div>
+            )})()}
           </div>
         </div>
         </>

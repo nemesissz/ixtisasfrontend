@@ -189,8 +189,9 @@ export const userDb = {
     })
   },
   // Distribution/Redistribute: N tələbənin yerləşdirmə sahələrini bir sorğuda yeniləyir
-  bulkUpdate: async (patches: Array<{ id: string; placedSpecialty?: string | null; placedSpecialtyId?: string | null; placedSelectionId?: string | null; choiceNum?: number | null; status?: string }>) => {
-    await http.post('/api/students/bulk-update', patches)
+  bulkUpdate: async (patches: Array<{ id: string; placedSpecialty?: string | null; placedSpecialtyId?: string | null; placedSelectionId?: string | null; choiceNum?: number | null; status?: string }>, method?: 'simple' | 'packet') => {
+    // method verilibsə backend uyğun icazəni (dist.simple / dist.packet) yoxlayır
+    await http.post(`/api/students/bulk-update${method ? `?method=${method}` : ''}`, patches)
   },
   deleteMany: async (ids: string[]) => { await http.post('/api/students/delete-many', ids) },
   delete: async (id: string) => { await http.delete(`/api/students/${id}`) },
