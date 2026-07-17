@@ -14,11 +14,11 @@ export const PERM_GROUPS: PermGroup[] = [
   {
     group: 'Təhsilalanlar', icon: '👥', perms: [
       { code: 'users.view',   label: 'Siyahıya baxış' },
-      { code: 'users.edit',   label: 'Təhsilalan redaktəsi' },
-      { code: 'users.import', label: 'Excel idxal' },
-      { code: 'users.export', label: 'Excel export' },
-      { code: 'users.print',  label: 'Çap əməliyyatı' },
-      { code: 'users.delete', label: 'Silmə / sıfırlama' },
+      { code: 'users.edit',   label: 'Redaktə et' },
+      { code: 'users.import', label: 'Əlavə et' },
+      { code: 'users.export', label: 'İxrac et' },
+      { code: 'users.print',  label: 'Çap et' },
+      { code: 'users.delete', label: 'Siyahını sil' },
     ],
   },
   {
