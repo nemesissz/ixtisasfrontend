@@ -416,6 +416,11 @@ tr.stu-last td { border-bottom: 2px solid #ecd9a0; }
 
   /* Flex rows that should wrap */
   .flex-row { flex-wrap: wrap; }
+
+  /* Axtarış + filtr sətri mobildə sarılsın (dropdown-lar kəsilməsin) */
+  .search-row { flex-wrap: wrap; }
+  .search-row .search-input { flex: 1 1 100%; min-width: 0; }
+  .search-row .filter-select { flex: 1 1 calc(50% - 5px); min-width: 0; }
 }
 
 /* ════════════════════════════════════════
