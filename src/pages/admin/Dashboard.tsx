@@ -195,7 +195,7 @@ function buildStatsReportHtml(A: any, instLabel: string, selName: string): strin
   ${sec('1. Ümumi göstəricilər', kpi)}
   ${sec('2. Bal paylanması', scoreDist)}
   ${sec('3. Seçim məmnuniyyəti', choice)}
-  ${sec('4. Demoqrafiya', demo)}
+  ${sec('4. Təhsil alanların tərkibi', demo)}
   ${sec(`5. ${A.tree?.levelNames?.[0] || 'Bölmə'} üzrə bölgü`, branch)}
   ${sec('6. Fənn üzrə orta ballar', subj)}
   ${sec('7. Qrup üzrə bölgü', group)}
@@ -640,7 +640,7 @@ export default function Dashboard() {
             </Card>
 
             {(A.hasGender || A.hasSource) && (
-              <Card title="Demoqrafiya" icon="👥">
+              <Card title="Təhsil alanların tərkibi" icon="👥">
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                   {A.hasGender && (
                     <div>
