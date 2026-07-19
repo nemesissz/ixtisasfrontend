@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, useCallback, Fragment } from 'react'
 import * as XLSX from 'xlsx'
 import { selectionDb, treeDb, userDb, submissionDb, buildNameMap, institutionDb, addLog, usePoll } from '../../db'
 import InstIcon from '../../components/InstIcon'
+import { can } from '../../permissions'
 
 const pct = (a: number, b: number) => (b > 0 ? Math.round((a / b) * 100) : 0)
 
@@ -464,6 +465,7 @@ export default function Results() {
             <div className="card-sub">{sel?.name} · {rows.length} nəticə</div>
           </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {can('results.export') && (
             <div style={{ position: 'relative' }}>
               <button onClick={() => setAktMenu(v => !v)}
                 style={{ padding: '8px 16px', borderRadius: 9, border: 'none', background: '#1a1a1a', color: '#fff', fontWeight: 700, fontSize: 12.5, cursor: 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -493,6 +495,7 @@ export default function Results() {
                 </>
               )}
             </div>
+            )}
           </div>
         </div>
 
