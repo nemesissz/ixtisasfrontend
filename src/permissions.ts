@@ -45,7 +45,6 @@ export const PERM_GROUPS: PermGroup[] = [
       { code: 'dist.view',     label: 'Baxış / simulyasiya' },
       { code: 'dist.simple',   label: 'Sadə üsulla yazma' },
       { code: 'dist.packet',   label: 'Paket üsulu ilə yazma' },
-      { code: 'dist.rollback', label: 'Rollback (geri qaytarma)' },
       { code: 'dist.partial',  label: 'Qismən yenidən yerləşdirmə' },
     ],
   },
