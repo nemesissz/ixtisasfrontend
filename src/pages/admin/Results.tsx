@@ -474,7 +474,7 @@ export default function Results() {
               {aktMenu && (
                 <>
                   <div onClick={() => setAktMenu(false)} style={{ position: 'fixed', inset: 0, zIndex: 40 }} />
-                  <div style={{ position: 'absolute', left: 0, top: '112%', zIndex: 41, background: '#fff', border: '1.5px solid #e8eaf5', borderRadius: 12, boxShadow: '0 12px 32px #0002', overflow: 'hidden', minWidth: 200 }}>
+                  <div style={{ position: 'absolute', right: 0, top: '112%', zIndex: 41, background: '#fff', border: '1.5px solid #e8eaf5', borderRadius: 12, boxShadow: '0 12px 32px #0002', overflow: 'hidden', minWidth: 210, whiteSpace: 'nowrap' }}>
                     {[
                       { icon: '📄', label: 'Akt (PDF / çap)', sub: 'Çap pəncərəsi açılır', color: '#1a1a1a', fn: generateActHTML },
                       { icon: '📝', label: 'Akt (Word)', sub: 'Redaktə oluna bilən sənəd', color: '#2b579a', fn: exportActWord },
