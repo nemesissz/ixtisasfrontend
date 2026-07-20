@@ -195,7 +195,7 @@ export default function Logs() {
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{log.message}</div>
                       {log.detail && !isOpen && (
-                        <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{log.detail}</div>
+                        <div title={log.detail} style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{log.detail}</div>
                       )}
                     </div>
                     {/* Kateqoriya çipi */}
@@ -204,7 +204,7 @@ export default function Logs() {
                     </span>
                     {/* İcraçı */}
                     {log.actor && (
-                      <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', background: '#f5f6fa', padding: '3px 10px', borderRadius: 20, border: '1px solid var(--border)', whiteSpace: 'nowrap', flexShrink: 0, maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis' }}>👤 {log.actor}</span>
+                      <span title={log.actor} style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', background: '#f5f6fa', padding: '3px 10px', borderRadius: 20, border: '1px solid var(--border)', whiteSpace: 'nowrap', flexShrink: 0, maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis' }}>👤 {log.actor}</span>
                     )}
                     {/* IP ünvanı */}
                     {log.ip && (
