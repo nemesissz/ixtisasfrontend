@@ -171,12 +171,15 @@ export function FlatView({ flat, onChange, submitted = false, levelNames }: {
                 display: 'grid', gridTemplateColumns: gridCols,
                 alignItems: 'stretch',
                 borderBottom: i < flat.length - 1 ? '1.5px solid #eef0f8' : 'none',
-                background: isFlash ? '#fffbe6' : isDrag ? 'rgba(79,124,255,.05)' : '#fff',
-                opacity: isDrag ? 0.35 : 1,
+                background: isFlash ? '#fffbe6' : isDrag ? '#fbeec4' : '#fff',
+                opacity: 1,
                 boxShadow: isFlash
                   ? 'inset 0 0 0 2px #f5a623'
+                  : isDrag ? 'inset 0 0 0 2px #c9962a'
                   : isOver ? 'inset 0 2px 0 #c9962a, inset 0 -2px 0 #c9962a' : 'none',
-                cursor: interactive ? 'grab' : 'default',
+                position: isDrag ? 'relative' : undefined,
+                zIndex: isDrag ? 2 : undefined,
+                cursor: interactive ? (isDrag ? 'grabbing' : 'grab') : 'default',
                 userSelect: 'none',
                 transition: isFlash ? 'background 1.8s ease, box-shadow 1.8s ease' : 'background .1s',
               }}
@@ -317,8 +320,8 @@ export function NestedView({ nested, onChange, submitted = false }: {
                 border: `2px solid ${isFG ? '#f5a623' : isOG ? '#c9962a' : '#ecd9a0'}`,
                 borderRadius: 12, overflow: 'hidden',
                 cursor: interactive ? 'grab' : 'default',
-                opacity: isDG ? 0.3 : 1,
-                boxShadow: isFG ? '0 0 0 3px #f5a62330' : isOG ? '0 0 0 3px #c9962a28' : 'none',
+                opacity: 1,
+                boxShadow: isFG ? '0 0 0 3px #f5a62330' : isDG ? '0 8px 18px rgba(201,150,42,.5), 0 0 0 2px #c9962a' : isOG ? '0 0 0 3px #c9962a28' : 'none',
                 userSelect: 'none',
                 transition: isFG ? 'background 1.8s ease, border-color 1.8s ease' : 'border-color .1s',
               }}
@@ -356,8 +359,8 @@ export function NestedView({ nested, onChange, submitted = false }: {
                         border: `2px solid ${isFS ? '#f5a623' : isOS ? '#b8860b' : '#f3e9cf'}`,
                         borderRadius: 8, overflow: 'hidden',
                         cursor: interactive ? 'grab' : 'default',
-                        opacity: isDS ? 0.3 : 1,
-                        boxShadow: isFS ? '0 0 0 2px #f5a62330' : isOS ? '0 0 0 2px #b8860b28' : 'none',
+                        opacity: 1,
+                        boxShadow: isFS ? '0 0 0 2px #f5a62330' : isDS ? '0 8px 18px rgba(184,134,11,.5), 0 0 0 2px #b8860b' : isOS ? '0 0 0 2px #b8860b28' : 'none',
                         userSelect: 'none',
                         transition: isFS ? 'background 1.8s ease, border-color 1.8s ease' : 'border-color .1s',
                       }}
@@ -391,8 +394,8 @@ export function NestedView({ nested, onChange, submitted = false }: {
                               border: `1.5px solid ${isFP ? '#f5a623' : isOP ? '#ff7c4f' : '#ffd5c2'}`,
                               borderRadius: 6, overflow: 'hidden',
                               cursor: interactive ? 'grab' : 'default',
-                              opacity: isDP ? 0.3 : 1,
-                              boxShadow: isFP ? '0 0 0 2px #f5a62330' : isOP ? '0 0 0 2px #ff7c4f28' : 'none',
+                              opacity: 1,
+                              boxShadow: isFP ? '0 0 0 2px #f5a62330' : isDP ? '0 8px 18px rgba(255,124,79,.5), 0 0 0 2px #ff7c4f' : isOP ? '0 0 0 2px #ff7c4f28' : 'none',
                               userSelect: 'none',
                               transition: isFP ? 'background 1.8s ease, border-color 1.8s ease' : 'border-color .1s',
                             }}
