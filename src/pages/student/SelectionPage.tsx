@@ -395,15 +395,6 @@ export default function SelectionPage() {
       }}>
         {/* Təhsilalan məlumatları */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
-          {/* İkon */}
-          <div style={{
-            width: 44, height: 44, borderRadius: '50%', flexShrink: 0,
-            border: '1.5px solid #e7eaf0',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22,
-          }}>
-            👤
-          </div>
-
           {/* Məlumatlar */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
             <div style={{ fontWeight: 800, fontSize: 15 }}>{student.name}</div>
