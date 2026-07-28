@@ -1,48 +1,105 @@
-import { useState, useEffect } from 'react'
-import { integrityDb, addLog, type IntegritySeal } from '../../db'
+import { useState, useEffect, useRef } from 'react'
+import { integrityDb, addLog } from '../../db'
 import { can } from '../../permissions'
 
 const GOLD = '#c9962a'
 const SEAL_KEY = 'isp_integrity_seal'
+type Src = 'db' | 'file'
 
-interface SavedSeal { hash: string; students: number; submissions: number; at: string }
+interface SavedSeal { hash: string; label: string; at: string }
+
+// ── SHA-256: brauzerin öz crypto-su, olmasa daxili JS impl ──
+async function sha256(buf: ArrayBuffer): Promise<string> {
+  if (window.crypto?.subtle) {
+    try {
+      const h = await crypto.subtle.digest('SHA-256', buf)
+      return [...new Uint8Array(h)].map(b => b.toString(16).padStart(2, '0')).join('')
+    } catch { /* fallback */ }
+  }
+  return sha256js(new Uint8Array(buf))
+}
+function sha256js(data: Uint8Array): string {
+  const rr = (n: number, x: number) => (x >>> n) | (x << (32 - n))
+  const K = [0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2]
+  let H = [0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19]
+  const l = data.length, bl = ((l + 8 >> 6) + 1) * 64, m = new Uint8Array(bl)
+  m.set(data); m[l] = 0x80
+  const bits = l * 8, dv = new DataView(m.buffer)
+  dv.setUint32(bl - 4, bits >>> 0); dv.setUint32(bl - 8, Math.floor(bits / 0x100000000))
+  const w = new Uint32Array(64)
+  for (let i = 0; i < bl; i += 64) {
+    for (let t = 0; t < 16; t++) w[t] = dv.getUint32(i + t * 4)
+    for (let t = 16; t < 64; t++) {
+      const s0 = rr(7, w[t-15]) ^ rr(18, w[t-15]) ^ (w[t-15] >>> 3)
+      const s1 = rr(17, w[t-2]) ^ rr(19, w[t-2]) ^ (w[t-2] >>> 10)
+      w[t] = (w[t-16] + s0 + w[t-7] + s1) | 0
+    }
+    let [a,b,c,d,e,f,g,h] = H
+    for (let t = 0; t < 64; t++) {
+      const S1 = rr(6,e) ^ rr(11,e) ^ rr(25,e), ch = (e & f) ^ (~e & g)
+      const t1 = (h + S1 + ch + K[t] + w[t]) | 0
+      const S0 = rr(2,a) ^ rr(13,a) ^ rr(22,a), mj = (a & b) ^ (a & c) ^ (b & c)
+      const t2 = (S0 + mj) | 0
+      h=g; g=f; f=e; e=(d+t1)|0; d=c; c=b; b=a; a=(t1+t2)|0
+    }
+    H = [(H[0]+a)|0,(H[1]+b)|0,(H[2]+c)|0,(H[3]+d)|0,(H[4]+e)|0,(H[5]+f)|0,(H[6]+g)|0,(H[7]+h)|0]
+  }
+  return H.map(x => (x >>> 0).toString(16).padStart(8, '0')).join('')
+}
+function readFile(file: File): Promise<ArrayBuffer> {
+  return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result as ArrayBuffer); r.onerror = rej; r.readAsArrayBuffer(file) })
+}
 
 export default function Integrity() {
   const canView = can('integrity.view')
   const [saved, setSaved] = useState<SavedSeal | null>(null)
-  const [current, setCurrent] = useState<IntegritySeal | null>(null)
   const [loading, setLoading] = useState(false)
+  const [err, setErr] = useState('')
+
+  const [sealSrc, setSealSrc] = useState<Src>('db')
+  const [sealFile, setSealFile] = useState<File | null>(null)
+  const sealFileRef = useRef<HTMLInputElement>(null)
+
+  const [verifySrc, setVerifySrc] = useState<Src>('db')
+  const [verifyFile, setVerifyFile] = useState<File | null>(null)
+  const verifyFileRef = useRef<HTMLInputElement>(null)
   const [checkInput, setCheckInput] = useState('')
   const [checkResult, setCheckResult] = useState<null | { same: boolean; now: string }>(null)
-  const [err, setErr] = useState('')
 
   useEffect(() => {
     try { const s = localStorage.getItem(SEAL_KEY); if (s) setSaved(JSON.parse(s)) } catch { /* */ }
   }, [])
 
-  async function computeSeal(): Promise<IntegritySeal | null> {
+  // Mənbədən hash + etiket al (db → API, file → yüklənmiş fayl)
+  async function computeHash(src: Src, file: File | null): Promise<{ hash: string; label: string } | null> {
     setErr('')
-    try { return await integrityDb.seal() }
-    catch (e: any) { setErr(e?.message || 'Möhür alına bilmədi'); return null }
+    try {
+      if (src === 'db') {
+        const r = await integrityDb.seal()
+        return { hash: r.hash, label: `Baza · ${r.students} təhsilalan · ${r.submissions} seçim` }
+      } else {
+        if (!file) { setErr('Əvvəlcə fayl seç.'); return null }
+        const buf = await readFile(file)
+        const h = await sha256(buf)
+        return { hash: h, label: `Fayl · ${file.name} (${(file.size / 1024).toFixed(1)} KB)` }
+      }
+    } catch (e: any) { setErr(e?.message || 'Hash alına bilmədi'); return null }
   }
 
-  // ── Möhürlə: hesabla və yadda saxla ──
   async function handleSeal() {
     setLoading(true)
-    const r = await computeSeal()
+    const r = await computeHash(sealSrc, sealFile)
     setLoading(false)
     if (!r) return
-    const s: SavedSeal = { hash: r.hash, students: r.students, submissions: r.submissions, at: r.at }
+    const s: SavedSeal = { hash: r.hash, label: r.label, at: new Date().toLocaleString('az-AZ') }
     localStorage.setItem(SEAL_KEY, JSON.stringify(s))
     setSaved(s)
-    setCurrent(r)
-    addLog('admin', 'success', 'Bazanın bütövlük möhürü alındı', `SHA-256: ${r.hash.slice(0, 24)}… · ${r.students} təhsilalan`)
+    addLog('admin', 'success', 'SHA-256 möhürü alındı', `${r.label} · ${r.hash.slice(0, 24)}…`)
   }
 
-  // ── Yoxla: cari hash-i əvvəlki ilə müqayisə et ──
   async function handleVerify() {
     setLoading(true)
-    const r = await computeSeal()
+    const r = await computeHash(verifySrc, verifyFile)
     setLoading(false)
     if (!r) return
     const expected = (checkInput.match(/[a-fA-F0-9]{64}/)?.[0] || saved?.hash || '').toLowerCase()
@@ -50,22 +107,45 @@ export default function Integrity() {
     const same = r.hash === expected
     setCheckResult({ same, now: r.hash })
     addLog('admin', same ? 'info' : 'warning',
-      same ? 'Bütövlük yoxlaması: baza dəyişməyib' : 'Bütövlük yoxlaması: BAZADA DƏYİŞİKLİK',
-      `Cari: ${r.hash.slice(0, 24)}… · Möhür: ${expected.slice(0, 24)}…`)
+      same ? 'SHA-256 yoxlaması: dəyişməyib' : 'SHA-256 yoxlaması: DƏYİŞİKLİK var',
+      `${r.label} · Cari: ${r.hash.slice(0, 16)}… · Möhür: ${expected.slice(0, 16)}…`)
   }
 
   function downloadSeal() {
     if (!saved) return
-    const content = `${saved.hash}\r\nTəhsilalan: ${saved.students}\r\nSubmission: ${saved.submissions}\r\nTarix: ${saved.at}\r\nAlqoritm: SHA-256\r\n`
+    const content = `${saved.hash}\r\nMənbə: ${saved.label}\r\nTarix: ${saved.at}\r\nAlqoritm: SHA-256\r\n`
     const a = document.createElement('a')
     a.href = URL.createObjectURL(new Blob([content], { type: 'text/plain' }))
-    a.download = `baza-mohur-${new Date().toISOString().slice(0, 10)}.seal.txt`
+    a.download = `sha256-mohur-${new Date().toISOString().slice(0, 10)}.seal.txt`
     a.click()
   }
-
   function copyHash(h: string) { navigator.clipboard?.writeText(h).catch(() => {}) }
 
   if (!canView) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted)' }}>İcazəniz yoxdur.</div>
+
+  // Mənbə seçici (segmented)
+  const SrcToggle = ({ value, onChange }: { value: Src; onChange: (s: Src) => void }) => (
+    <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+      {([['db', '🗄️ Hazırkı baza'], ['file', '📄 Fayl yüklə']] as [Src, string][]).map(([v, lbl]) => (
+        <button key={v} onClick={() => onChange(v)}
+          style={{
+            flex: 1, padding: '8px 10px', borderRadius: 9, fontSize: 12, fontWeight: 700, cursor: 'pointer',
+            border: `1.5px solid ${value === v ? GOLD : '#e0e4f0'}`,
+            background: value === v ? '#fdf6e6' : '#f8f9fd',
+            color: value === v ? '#a5731a' : '#8890a5',
+          }}>{lbl}</button>
+      ))}
+    </div>
+  )
+  const FilePick = ({ file, onPick, inputRef }: { file: File | null; onPick: (f: File | null) => void; inputRef: React.RefObject<HTMLInputElement> }) => (
+    <div style={{ marginBottom: 12 }}>
+      <button onClick={() => inputRef.current?.click()}
+        style={{ width: '100%', padding: '10px 12px', borderRadius: 9, border: '1.5px dashed #cfd6e6', background: '#fbfcfe', color: '#5a6178', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', textAlign: 'left' }}>
+        {file ? `📄 ${file.name} (${(file.size / 1024).toFixed(1)} KB)` : '📂 Fayl seç…'}
+      </button>
+      <input ref={inputRef} type="file" hidden onChange={e => onPick(e.target.files?.[0] || null)} />
+    </div>
+  )
 
   return (
     <div className="page-body" style={{ maxWidth: 1080 }}>
@@ -75,77 +155,80 @@ export default function Integrity() {
           <div>
             <div style={{ fontSize: 16, fontWeight: 800 }}>SHA-256</div>
             <div style={{ fontSize: 12.5, color: 'var(--muted)' }}>
-              Bazanın SHA-256 barmaq izini çıxarır. Sonra yenidən yoxlayıb məlumatların dəyişmədiyini sübut edirsən.
+              Hazırkı bazanın və ya seçdiyin faylın SHA-256 barmaq izini çıxar, sonra dəyişmədiyini yoxla.
             </div>
           </div>
         </div>
       </div>
 
       {err && (
-        <div className="card" style={{ padding: 14, background: '#fdeeec', border: '1.5px solid #f2a49c', color: '#c0281a', fontSize: 13 }}>
+        <div className="card" style={{ padding: 14, background: '#fdeeec', border: '1.5px solid #f2a49c', color: '#c0281a', fontSize: 13, marginBottom: 14 }}>
           {err}
         </div>
       )}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(340px,1fr))', gap: 16, alignItems: 'start' }}>
-      {/* ── 1. MÖHÜRLƏ ── */}
-      <div className="card" style={{ padding: 18, marginBottom: 0 }}>
-        <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 4 }}>🔒 1. Möhürlə</div>
-        <div style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 14 }}>
-          Tədbirin sonunda bir dəfə bas — bazanın hazırkı vəziyyətini möhürlə.
-        </div>
-        <button onClick={handleSeal} disabled={loading}
-          style={{ padding: '11px 22px', borderRadius: 10, border: 'none', background: GOLD, color: '#fff', fontWeight: 800, fontSize: 13.5, cursor: loading ? 'default' : 'pointer', opacity: loading ? .6 : 1 }}>
-          {loading ? 'Hesablanır…' : '🔒 Bazanı möhürlə'}
-        </button>
-
-        {saved && (
-          <div style={{ marginTop: 16, background: '#faf7ef', border: `1.5px solid ${GOLD}55`, borderRadius: 12, padding: 16 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: .5 }}>SHA-256 möhürü</div>
-            <div style={{ fontFamily: 'Consolas, monospace', fontSize: 14, wordBreak: 'break-all', margin: '8px 0', userSelect: 'all', lineHeight: 1.5 }}>{saved.hash}</div>
-            <div style={{ fontSize: 12, color: 'var(--muted)' }}>{saved.students} təhsilalan · {saved.submissions} seçim · {saved.at}</div>
-            <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
-              <button onClick={downloadSeal} style={btnGhost}>💾 Möhürü yüklə</button>
-              <button onClick={() => copyHash(saved.hash)} style={btnGhost}>📋 Kopyala</button>
-            </div>
-            <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 10, lineHeight: 1.5 }}>
-              ⚠ Möhürü təhlükəsiz yerə də köçür (yüklə / kopyala / foto). Kod kənarda olsa heç kim onu saxtalaşdıra bilməz.
-            </div>
+        {/* ── 1. MÖHÜRLƏ ── */}
+        <div className="card" style={{ padding: 18, marginBottom: 0 }}>
+          <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 4 }}>🔒 1. Möhürlə</div>
+          <div style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 14 }}>
+            Mənbəni seç və möhür vur.
           </div>
-        )}
-      </div>
+          <SrcToggle value={sealSrc} onChange={setSealSrc} />
+          {sealSrc === 'file' && <FilePick file={sealFile} onPick={setSealFile} inputRef={sealFileRef} />}
+          <button onClick={handleSeal} disabled={loading}
+            style={{ padding: '11px 22px', borderRadius: 10, border: 'none', background: GOLD, color: '#fff', fontWeight: 800, fontSize: 13.5, cursor: loading ? 'default' : 'pointer', opacity: loading ? .6 : 1 }}>
+            {loading ? 'Hesablanır…' : '🔒 Möhürlə'}
+          </button>
 
-      {/* ── 2. YOXLA ── */}
-      <div className="card" style={{ padding: 18, marginBottom: 0 }}>
-        <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 4 }}>✔️ 2. Yoxla</div>
-        <div style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 14 }}>
-          Sonra istənilən vaxt bas — indiki baza möhürlənmiş vəziyyətlə müqayisə olunur.
-          {saved ? '' : ' (Müqayisə üçün əvvəlcə möhürlə, ya da aşağıya əvvəlki SHA-256 kodunu yapışdır.)'}
+          {saved && (
+            <div style={{ marginTop: 16, background: '#faf7ef', border: `1.5px solid ${GOLD}55`, borderRadius: 12, padding: 16 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: .5 }}>SHA-256 möhürü</div>
+              <div style={{ fontFamily: 'Consolas, monospace', fontSize: 14, wordBreak: 'break-all', margin: '8px 0', userSelect: 'all', lineHeight: 1.5 }}>{saved.hash}</div>
+              <div style={{ fontSize: 12, color: 'var(--muted)' }}>{saved.label} · {saved.at}</div>
+              <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+                <button onClick={downloadSeal} style={btnGhost}>💾 Möhürü yüklə</button>
+                <button onClick={() => copyHash(saved.hash)} style={btnGhost}>📋 Kopyala</button>
+              </div>
+              <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 10, lineHeight: 1.5 }}>
+                ⚠ Möhürü təhlükəsiz yerə də köçür (yüklə / kopyala / foto).
+              </div>
+            </div>
+          )}
         </div>
-        <textarea value={checkInput} onChange={e => setCheckInput(e.target.value)}
-          placeholder={saved ? 'Yadda saxlanmış möhürlə müqayisə olunacaq (istəsən başqa SHA-256 kodu yapışdır)' : 'Əvvəlki SHA-256 kodunu bura yapışdır'}
-          style={{ width: '100%', minHeight: 56, border: '1.5px solid #d9e1ef', borderRadius: 10, padding: '10px 12px', fontFamily: 'Consolas, monospace', fontSize: 13, resize: 'vertical', marginBottom: 12 }} />
-        <button onClick={handleVerify} disabled={loading}
-          style={{ padding: '11px 22px', borderRadius: 10, border: 'none', background: '#2b579a', color: '#fff', fontWeight: 800, fontSize: 13.5, cursor: loading ? 'default' : 'pointer', opacity: loading ? .6 : 1 }}>
-          {loading ? 'Hesablanır…' : '✔️ Eyniliyi yoxla'}
-        </button>
 
-        {checkResult && (
-          <div style={{ marginTop: 16, borderRadius: 12, padding: 18, textAlign: 'center',
-            background: checkResult.same ? '#eafaf0' : '#fdeeec',
-            border: `2px solid ${checkResult.same ? '#7fd6a0' : '#f2a49c'}`,
-            color: checkResult.same ? '#147a44' : '#c0281a' }}>
-            <div style={{ fontSize: 18, fontWeight: 800 }}>
-              {checkResult.same ? '✓  EYNİDİR — baza dəyişməyib' : '✕  FƏRQLİDİR — bazada dəyişiklik olub'}
-            </div>
-            <div style={{ fontSize: 12.5, marginTop: 6, opacity: .85 }}>
-              {checkResult.same
-                ? 'Məlumatlar möhürləndiyi andakı ilə tam eynidir. Bütövlük təsdiqləndi.'
-                : `İndiki: ${checkResult.now.slice(0, 24)}…`}
-            </div>
+        {/* ── 2. YOXLA ── */}
+        <div className="card" style={{ padding: 18, marginBottom: 0 }}>
+          <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 4 }}>✔️ 2. Yoxla</div>
+          <div style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 14 }}>
+            Mənbəni seç, sonra əvvəlki möhürlə müqayisə et.
           </div>
-        )}
-      </div>
+          <SrcToggle value={verifySrc} onChange={setVerifySrc} />
+          {verifySrc === 'file' && <FilePick file={verifyFile} onPick={setVerifyFile} inputRef={verifyFileRef} />}
+          <textarea value={checkInput} onChange={e => setCheckInput(e.target.value)}
+            placeholder={saved ? 'Yadda saxlanmış möhürlə müqayisə olunacaq (istəsən başqa SHA-256 kodu yapışdır)' : 'Əvvəlki SHA-256 kodunu bura yapışdır'}
+            style={{ width: '100%', minHeight: 52, border: '1.5px solid #d9e1ef', borderRadius: 10, padding: '10px 12px', fontFamily: 'Consolas, monospace', fontSize: 13, resize: 'vertical', marginBottom: 12 }} />
+          <button onClick={handleVerify} disabled={loading}
+            style={{ padding: '11px 22px', borderRadius: 10, border: 'none', background: '#2b579a', color: '#fff', fontWeight: 800, fontSize: 13.5, cursor: loading ? 'default' : 'pointer', opacity: loading ? .6 : 1 }}>
+            {loading ? 'Hesablanır…' : '✔️ Eyniliyi yoxla'}
+          </button>
+
+          {checkResult && (
+            <div style={{ marginTop: 16, borderRadius: 12, padding: 18, textAlign: 'center',
+              background: checkResult.same ? '#eafaf0' : '#fdeeec',
+              border: `2px solid ${checkResult.same ? '#7fd6a0' : '#f2a49c'}`,
+              color: checkResult.same ? '#147a44' : '#c0281a' }}>
+              <div style={{ fontSize: 18, fontWeight: 800 }}>
+                {checkResult.same ? '✓  EYNİDİR — dəyişməyib' : '✕  FƏRQLİDİR — dəyişiklik olub'}
+              </div>
+              <div style={{ fontSize: 12.5, marginTop: 6, opacity: .85 }}>
+                {checkResult.same
+                  ? 'Möhürləndiyi andakı ilə tam eynidir. Bütövlük təsdiqləndi.'
+                  : `İndiki: ${checkResult.now.slice(0, 24)}…`}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )
