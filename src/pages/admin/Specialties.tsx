@@ -1595,7 +1595,7 @@ export default function Specialties() {
                     </button>
                     )}
                     {can('tree.delete') && (
-                    <button className="btn btn-danger btn-sm" style={{ padding: '4px 10px' }}
+                    <button className="btn btn-danger btn-sm" style={{ border: '1.5px solid transparent' }}
                       onClick={() => deleteTree(t.id)}>🗑</button>
                     )}
                   </div>

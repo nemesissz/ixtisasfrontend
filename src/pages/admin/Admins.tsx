@@ -1068,6 +1068,7 @@ export default function Admins() {
                               padding: "4px 10px",
                               background: "#f8f4ff",
                               fontSize: 13,
+                              whiteSpace: "nowrap",
                             }}
                           >
                             🛡️ {(a.permissions || []).length}
