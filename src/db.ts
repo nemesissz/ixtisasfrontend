@@ -459,6 +459,12 @@ export const systemSettingsDb = {
   reset: async () => { await http.post('/api/systemsettings/reset') },
 }
 
+// Bazanın bütövlük möhürü (SHA-256)
+export interface IntegritySeal { hash: string; students: number; submissions: number; at: string; algorithm: string }
+export const integrityDb = {
+  seal: async (): Promise<IntegritySeal> => await http.get<IntegritySeal>('/api/integrity/seal'),
+}
+
 // Təhsilalan sahə sütunları
 export const STUDENT_COLUMNS = [
   { key: 'fin',        label: 'FİN Kodu' },

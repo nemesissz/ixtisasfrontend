@@ -31,7 +31,7 @@ export default function AdminLogin() {
       addLog('admin', 'success', `Admin daxil oldu: ${admin.name}`, `@${admin.username}`, admin.name)
       // İcazəsi olduğu ilk səhifəyə yönləndir
       const firstPage = admin.role === 'superadmin' ? '/admin/dashboard'
-        : (['/admin/dashboard','/admin/users','/admin/specialties','/admin/selections','/admin/distribution','/admin/results','/admin/archive','/admin/logs','/admin/admins']
+        : (['/admin/dashboard','/admin/users','/admin/specialties','/admin/selections','/admin/distribution','/admin/results','/admin/archive','/admin/logs','/admin/integrity','/admin/admins']
             .find(p => pathAllowed({ role: admin.role, permissions: admin.permissions || [] }, p)) || '/admin/dashboard')
       navigate(firstPage)
     } catch (err: any) {

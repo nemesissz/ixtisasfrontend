@@ -18,6 +18,7 @@ const NAV = [
   { section: 'Sistem' },
   { to: '/admin/archive',      icon: '🗄️', label: 'Arxiv',      badgeKey: 'archive' },
   { to: '/admin/logs',         icon: '📋', label: 'Loglar' },
+  { to: '/admin/integrity',    icon: '🛡️', label: 'Bütövlük möhürü' },
   { to: '/admin/admins',       icon: '🔐', label: 'Adminlər' },
 ]
 
@@ -33,6 +34,7 @@ const PAGE_META: Record<string, { title: string; sub: string }> = {
   '/admin/admins':      { title: 'Adminlər',             sub: 'Sistem administratorları' },
   '/admin/archive':     { title: 'Arxiv',               sub: 'Arxivlənmiş seçimlər və nəticələr' },
   '/admin/logs':        { title: 'Sistem Logları',      sub: 'Admin hərəkətləri və sistem hadisələri' },
+  '/admin/integrity':   { title: 'Bütövlük Möhürü',     sub: 'Bazanın SHA-256 möhürü və dəyişiklik yoxlaması' },
 }
 
 function AdminLayoutInner() {

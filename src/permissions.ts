@@ -59,6 +59,7 @@ export const PERM_GROUPS: PermGroup[] = [
       { code: 'archive.view',    label: 'Arxivə baxış' },
       { code: 'archive.restore', label: 'Arxivdən bərpa' },
       { code: 'logs.view',       label: 'Loglara baxış' },
+      { code: 'integrity.view',  label: 'Bütövlük möhürü' },
       { code: 'admins.manage',   label: 'Adminlərin idarəsi' },
     ],
   },
@@ -77,6 +78,7 @@ export const PATH_PERM: Record<string, string> = {
   '/admin/results':      'results.view',
   '/admin/archive':      'archive.view',
   '/admin/logs':         'logs.view',
+  '/admin/integrity':    'integrity.view',
   '/admin/admins':       'admins.manage',
 }
 

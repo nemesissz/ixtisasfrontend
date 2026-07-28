@@ -15,6 +15,7 @@ import Distribution  from './pages/admin/Distribution'
 import Redistribute  from './pages/admin/Redistribute'
 import Archive       from './pages/admin/Archive'
 import Logs          from './pages/admin/Logs'
+import Integrity     from './pages/admin/Integrity'
 
 import StudentLayout    from './layouts/StudentLayout'
 import Landing          from './pages/student/Landing'
@@ -53,6 +54,7 @@ export default function App() {
         <Route path="redistribute"        element={<Redistribute />} />
         <Route path="archive"             element={<Archive />} />
         <Route path="logs"                element={<Logs />} />
+        <Route path="integrity"           element={<Integrity />} />
       </Route>
 
       {/* ── Student panel ── */}
