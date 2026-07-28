@@ -68,9 +68,9 @@ export default function Integrity() {
   if (!canView) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted)' }}>İcazəniz yoxdur.</div>
 
   return (
-    <div className="page-body" style={{ maxWidth: 760 }}>
-      <div className="card" style={{ padding: 22 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6 }}>
+    <div className="page-body" style={{ maxWidth: 1080 }}>
+      <div className="card" style={{ padding: '14px 18px', marginBottom: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <div style={{ fontSize: 30 }}>🛡️</div>
           <div>
             <div style={{ fontSize: 16, fontWeight: 800 }}>SHA-256</div>
@@ -87,8 +87,9 @@ export default function Integrity() {
         </div>
       )}
 
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(340px,1fr))', gap: 16, alignItems: 'start' }}>
       {/* ── 1. MÖHÜRLƏ ── */}
-      <div className="card" style={{ padding: 22 }}>
+      <div className="card" style={{ padding: 18, marginBottom: 0 }}>
         <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 4 }}>🔒 1. Möhürlə</div>
         <div style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 14 }}>
           Tədbirin sonunda bir dəfə bas — bazanın hazırkı vəziyyətini möhürlə.
@@ -115,7 +116,7 @@ export default function Integrity() {
       </div>
 
       {/* ── 2. YOXLA ── */}
-      <div className="card" style={{ padding: 22 }}>
+      <div className="card" style={{ padding: 18, marginBottom: 0 }}>
         <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 4 }}>✔️ 2. Yoxla</div>
         <div style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 14 }}>
           Sonra istənilən vaxt bas — indiki baza möhürlənmiş vəziyyətlə müqayisə olunur.
@@ -144,6 +145,7 @@ export default function Integrity() {
             </div>
           </div>
         )}
+      </div>
       </div>
     </div>
   )
