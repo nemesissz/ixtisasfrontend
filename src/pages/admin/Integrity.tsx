@@ -149,18 +149,6 @@ export default function Integrity() {
 
   return (
     <div className="page-body" style={{ maxWidth: 1080 }}>
-      <div className="card" style={{ padding: '14px 18px', marginBottom: 14 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{ fontSize: 30 }}>🛡️</div>
-          <div>
-            <div style={{ fontSize: 16, fontWeight: 800 }}>SHA-256</div>
-            <div style={{ fontSize: 12.5, color: 'var(--muted)' }}>
-              Hazırkı bazanın və ya seçdiyin faylın SHA-256 barmaq izini çıxar, sonra dəyişmədiyini yoxla.
-            </div>
-          </div>
-        </div>
-      </div>
-
       {err && (
         <div className="card" style={{ padding: 14, background: '#fdeeec', border: '1.5px solid #f2a49c', color: '#c0281a', fontSize: 13, marginBottom: 14 }}>
           {err}
