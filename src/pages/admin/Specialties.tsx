@@ -842,12 +842,12 @@ function NodeRow({ node, depth, onAdd, onEdit, onDelete, onPriority, onDeactivat
 
         {/* Əməliyyatlar — yalnız tree.edit icazəsi ilə */}
         {can('tree.edit') && (
-        <div className="spec-node-actions" style={{ display: 'flex', gap: 4 }} onClick={e => e.stopPropagation()}>
+        <div className="spec-node-actions" style={{ display: 'flex', gap: 6, alignItems: 'center' }} onClick={e => e.stopPropagation()}>
           <div style={{ display: 'flex', gap: 2 }}>
             <button
               onClick={() => onPriority(node)}
               style={{
-                fontSize: 11, padding: '2px 10px',
+                fontSize: 11, padding: '5px 11px',
                 borderRadius: (node.tiebreaker || node.groupTiebreakers) ? '6px 0 0 6px' : '6px',
                 border: `1.5px solid ${(node.tiebreaker || node.groupTiebreakers) ? '#f5a623' : '#dde'}`,
                 background: (node.tiebreaker || node.groupTiebreakers) ? '#fffbe6' : '#f8f9fd',
@@ -865,7 +865,7 @@ function NodeRow({ node, depth, onAdd, onEdit, onDelete, onPriority, onDeactivat
               <button
                 onClick={() => onDeactivatePriority(node.id)}
                 style={{
-                  fontSize: 11, padding: '2px 7px', borderRadius: '0 6px 6px 0',
+                  fontSize: 11, padding: '5px 8px', borderRadius: '0 6px 6px 0',
                   border: '1.5px solid #f5a623', borderLeft: 'none',
                   background: '#fff1e6', color: '#d46b08',
                   fontWeight: 700, cursor: 'pointer',
@@ -880,7 +880,7 @@ function NodeRow({ node, depth, onAdd, onEdit, onDelete, onPriority, onDeactivat
             <button
               onClick={() => onGroup(node)}
               style={{
-                fontSize: 11, padding: '2px 10px',
+                fontSize: 11, padding: '5px 11px',
                 borderRadius: node.groups?.length ? '6px 0 0 6px' : '6px',
                 border: `1.5px solid ${node.groups?.length ? '#52c41a' : '#dde'}`,
                 background: node.groups?.length ? '#f0fff4' : '#f8f9fd',
@@ -894,7 +894,7 @@ function NodeRow({ node, depth, onAdd, onEdit, onDelete, onPriority, onDeactivat
               <button
                 onClick={() => onDeactivateGroup(node.id)}
                 style={{
-                  fontSize: 11, padding: '2px 7px', borderRadius: '0 6px 6px 0',
+                  fontSize: 11, padding: '5px 8px', borderRadius: '0 6px 6px 0',
                   border: '1.5px solid #52c41a', borderLeft: 'none',
                   background: '#f0fff4', color: '#237804',
                   fontWeight: 700, cursor: 'pointer',
@@ -910,7 +910,7 @@ function NodeRow({ node, depth, onAdd, onEdit, onDelete, onPriority, onDeactivat
               <button
                 onClick={() => setGenderModal(true)}
                 style={{
-                  fontSize: 11, padding: '2px 10px', borderRadius: 6,
+                  fontSize: 11, padding: '5px 11px', borderRadius: 6,
                   border: `1.5px solid ${restricted ? '#c41d7f' : '#dde'}`,
                   background: restricted ? '#fff0f6' : '#f8f9fd',
                   color: restricted ? '#c41d7f' : '#bbb',
