@@ -73,7 +73,7 @@ export default function Integrity() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6 }}>
           <div style={{ fontSize: 30 }}>🛡️</div>
           <div>
-            <div style={{ fontSize: 16, fontWeight: 800 }}>Bazanın bütövlük möhürü</div>
+            <div style={{ fontSize: 16, fontWeight: 800 }}>SHA-256</div>
             <div style={{ fontSize: 12.5, color: 'var(--muted)' }}>
               Bazanın SHA-256 barmaq izini çıxarır. Sonra yenidən yoxlayıb məlumatların dəyişmədiyini sübut edirsən.
             </div>

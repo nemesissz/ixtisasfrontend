@@ -59,7 +59,7 @@ export const PERM_GROUPS: PermGroup[] = [
       { code: 'archive.view',    label: 'Arxivə baxış' },
       { code: 'archive.restore', label: 'Arxivdən bərpa' },
       { code: 'logs.view',       label: 'Loglara baxış' },
-      { code: 'integrity.view',  label: 'Bütövlük möhürü' },
+      { code: 'integrity.view',  label: 'SHA-256' },
       { code: 'admins.manage',   label: 'Adminlərin idarəsi' },
     ],
   },
