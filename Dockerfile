@@ -4,8 +4,11 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
-# Brauzer backend-ə host üzərindən çıxır — API ünvanı build zamanı daxil edilir
-ARG VITE_API_URL=http://localhost:5199
+# API ünvanı: default olaraq BOŞ saxlanılır — bu, nisbi ünvan deməkdir və
+# sorğular eyni mənşədən gedir, nginx onları backend konteynerinə ötürür.
+# Yalnız frontend backend-dən AYRI hostda dursa konkret ünvan verilir:
+#   docker build --build-arg VITE_API_URL=http://baska-host:5199 .
+ARG VITE_API_URL=
 ENV VITE_API_URL=$VITE_API_URL
 RUN npm run build
 

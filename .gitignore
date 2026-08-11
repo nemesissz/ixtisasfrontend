@@ -12,6 +12,11 @@ dist
 dist-ssr
 *.local
 
+# İstehsal sirləri (DB parolu, JWT açarı, superadmin parolu) — heç vaxt git-ə düşməsin
+.env
+deploy/.env
+!deploy/.env.example
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

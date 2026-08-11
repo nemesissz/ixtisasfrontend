@@ -2,11 +2,17 @@
 import { getToken, clearAdminSession, clearStudentSession } from './auth'
 
 // VITE_API_URL:
-//   - təyin olunmayıb (dev rejimi)  → http://localhost:5199
-//   - boş string "" (Docker build)  → nisbi ünvan: eyni mənşə, nginx /api-ni backend-ə ötürür.
-//     Beləliklə tətbiq istənilən IP/hostname üzərindən işləyir.
+//   - konkret ünvan verilib        → həmin ünvan işlənir
+//   - verilməyib/boş + dev rejimi  → http://localhost:5199 (lokal backend)
+//   - verilməyib/boş + prod build  → nisbi ünvan: eyni mənşə, nginx /api-ni backend-ə
+//     ötürür. Beləliklə tətbiq istənilən IP/hostname üzərindən işləyir.
+//
+// ⚠ Boş dəyər üzərindən şərt qurmaq olmaz: Vite boş env dəyişənini "təyin olunmayıb"
+//   kimi qəbul edir, ona görə `VITE_API_URL=""` ötürmək nisbi ünvan vermir.
+//   Buna görə istehsal build-i üçün nisbi ünvan DEFAULT davranışdır.
 const _env = (import.meta as any).env?.VITE_API_URL
-const BASE_URL: string = _env !== undefined ? _env : 'http://localhost:5199'
+const _isDev = (import.meta as any).env?.DEV === true
+const BASE_URL: string = _env ? _env : (_isDev ? 'http://localhost:5199' : '')
 
 export class ApiError extends Error {
   status: number
