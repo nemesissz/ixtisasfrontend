@@ -20,6 +20,8 @@ const NAV = [
   { to: '/admin/logs',         icon: '📋', label: 'Loglar' },
   { to: '/admin/integrity',    icon: '🛡️', label: 'SHA-256' },
   { to: '/admin/admins',       icon: '🔐', label: 'Adminlər' },
+  { to: '/admin/super-settings', icon: '⚙️', label: 'Superadmin parametrləri', superOnly: true },
+  { to: '/admin/live',         icon: '📡', label: 'Canlı nəzarət', superOnly: true },
 ]
 
 const PAGE_META: Record<string, { title: string; sub: string }> = {
@@ -35,6 +37,8 @@ const PAGE_META: Record<string, { title: string; sub: string }> = {
   '/admin/archive':     { title: 'Arxiv',               sub: 'Arxivlənmiş seçimlər və nəticələr' },
   '/admin/logs':        { title: 'Sistem Logları',      sub: 'Admin hərəkətləri və sistem hadisələri' },
   '/admin/integrity':   { title: 'SHA-256',             sub: 'Bazanın SHA-256 möhürü və dəyişiklik yoxlaması' },
+  '/admin/super-settings': { title: 'Superadmin parametrləri', sub: 'Təhsilalan girişi, təsdiq elanı və canlı nəzarət — yalnız baş admin' },
+  '/admin/live':        { title: 'Canlı nəzarət',       sub: 'Hazırda seçim edən təhsilalanlar və seans müddəti' },
 }
 
 function AdminLayoutInner() {
@@ -76,6 +80,8 @@ function AdminLayoutInner() {
   const visibleNav = (() => {
     const items = NAV.filter(item => {
       if ('section' in item) return true
+      // Yalnız baş admin üçün olan bölmələr
+      if ((item as any).superOnly && session?.role !== 'superadmin') return false
       const perm = PATH_PERM[(item as any).to]
       return !perm || hasPerm(session, perm)
     })

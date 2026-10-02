@@ -2,6 +2,13 @@ import { useState, useRef } from 'react'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 export interface SpecEntry  { specId: string; specName: string; quota: number }
+// Brauzerin kursor yanında göstərdiyi yarımşəffaf "kölgə" sətri gizlədilir —
+// sətrin özü onsuz da siyahıda yer dəyişir.
+const EMPTY_IMG = typeof Image !== 'undefined' ? Object.assign(new Image(), { src: 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7' }) : null
+export function hideGhost(e: React.DragEvent) {
+  if (EMPTY_IMG) { try { e.dataTransfer.setDragImage(EMPTY_IMG, 0, 0) } catch {} }
+}
+
 export interface SubEntry   { subId: string; subName: string; specialties: SpecEntry[] }
 export interface GroupEntry { groupId: string; groupName: string; subgroups: SubEntry[] }
 export interface FlatRow    {
@@ -109,14 +116,24 @@ export function FlatView({ flat, onChange, submitted = false, levelNames }: {
   // 2 səviyyəli ağac (məs. qoşun növü əvvəlcədən təyin edilib yığışdırılanda):
   // treeToNested alt qrupu sintetik "__sub_" id ilə doldurur — o sütun gizlədilir
   const twoLevel = flat.length > 0 && flat.every(r => String(r.subId).startsWith('__sub_'))
-  const gridCols = twoLevel
+  // 1 səviyyəli ağac (yalnız yarpaqlar, məs. ancaq qoşun növləri): sintetik "Ümumi" sütunu gizlədilir
+  const oneLevel = twoLevel && flat.every(r => r.groupId === '__root__')
+  const gridCols = oneLevel
+    ? '40px minmax(0,1fr) 44px'
+    : twoLevel
     ? '40px minmax(0,1fr) minmax(0,1fr) 44px'
     : '40px minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) 44px'
-  const headCells: Array<[string, string, string, string]> = twoLevel
+  const headCells: Array<[string, string, string, string]> = oneLevel
+    ? [['№','center','#f3e3b8','#5a4a12'], [lv[0] || 'Səviyyə 1','left','#fff4ef','#8c3a1f'], ['','center','#f3e3b8','#5a4a12']]
+    : twoLevel
     ? [['№','center','#f3e3b8','#5a4a12'], [lv[0] || 'Səviyyə 1','left','#f3e3b8','#5a4a12'], [lv[1] || 'Səviyyə 2','left','#fff4ef','#8c3a1f'], ['','center','#f3e3b8','#5a4a12']]
     : [['№','center','#f3e3b8','#5a4a12'], [lv[0] || 'Səviyyə 1','left','#f3e3b8','#5a4a12'], [lv[1] || 'Səviyyə 2','left','#f7eccf','#6a4a12'], [lv[2] || 'Səviyyə 3','left','#fff4ef','#8c3a1f'], ['','center','#f3e3b8','#5a4a12']]
 
-  function onDragStart(i: number) { if (!interactive) return; dragIdx.current = i; setDragging(i) }
+  function onDragStart(e: React.DragEvent, i: number) {
+    if (!interactive) return
+    hideGhost(e)
+    dragIdx.current = i; setDragging(i)
+  }
   function onDragOver(e: React.DragEvent, i: number) {
     if (!interactive) return
     e.preventDefault()
@@ -159,12 +176,14 @@ export function FlatView({ flat, onChange, submitted = false, levelNames }: {
           const isDrag  = dragging === i
           const isOver  = overIdx === i
           const isFlash = flashedId === row.specId
+          // Seçilmiş/sürüklənən sətir bütövlükdə rənglənsin — sütunların öz fonu örtməsin
+          const hl = isDrag || isFlash
 
           return (
             <div
               key={row.specId}
               draggable={interactive}
-              onDragStart={() => onDragStart(i)}
+              onDragStart={e => onDragStart(e, i)}
               onDragOver={e => onDragOver(e, i)}
               onDragEnd={onDragEnd}
               style={{
@@ -173,28 +192,31 @@ export function FlatView({ flat, onChange, submitted = false, levelNames }: {
                 borderBottom: i < flat.length - 1 ? '1.5px solid #eef0f8' : 'none',
                 background: isFlash ? '#fffbe6' : isDrag ? '#fbeec4' : '#fff',
                 opacity: 1,
-                boxShadow: isFlash
-                  ? 'inset 0 0 0 2px #f5a623'
-                  : isDrag ? 'inset 0 0 0 2px #c9962a'
-                  : isOver ? 'inset 0 2px 0 #c9962a, inset 0 -2px 0 #c9962a' : 'none',
-                position: isDrag ? 'relative' : undefined,
+                position: 'relative',
                 zIndex: isDrag ? 2 : undefined,
                 cursor: interactive ? (isDrag ? 'grabbing' : 'grab') : 'default',
                 userSelect: 'none',
                 transition: isFlash ? 'background 1.8s ease, box-shadow 1.8s ease' : 'background .1s',
               }}
             >
+              {/* Haşiyə üst qatda çəkilir — xanaların fonu onu örtməsin, bütün sətir işarələnsin */}
+              {(isFlash || isDrag || isOver) && <div style={{
+                position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 1,
+                boxShadow: isFlash ? 'inset 0 0 0 2px #f5a623'
+                  : isDrag ? 'inset 0 0 0 2px #c9962a'
+                  : 'inset 0 2px 0 #c9962a, inset 0 -2px 0 #c9962a',
+              }} />}
               {/* Sıra # */}
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#c9962a', color: '#fff', fontWeight: 800, fontSize: 12, borderRight: '2px solid #ecd9a0' }}>
                 {i + 1}
               </div>
-              {/* Ana Qrup */}
-              <div style={{ padding: '9px 12px', display: 'flex', alignItems: 'center', minWidth: 0, overflowWrap: 'anywhere', wordBreak: 'break-word', fontSize: 12, fontWeight: 500, color: '#5a4a12', background: '#f8f9ff', borderRight: '2px solid #dde2f5' }}>
+              {/* Ana Qrup — 1 səviyyəli rejimdə gizlidir */}
+              {!oneLevel && <div style={{ padding: '9px 12px', display: 'flex', alignItems: 'center', minWidth: 0, overflowWrap: 'anywhere', wordBreak: 'break-word', fontSize: 12, fontWeight: 500, color: '#5a4a12', background: hl ? 'transparent' : '#f8f9ff', borderRight: '2px solid #dde2f5' }}>
                 {row.groupName}
-              </div>
+              </div>}
               {/* Alt Qrup — 2 səviyyəli rejimdə gizlidir */}
               {!twoLevel && (
-                <div style={{ padding: '9px 12px', display: 'flex', alignItems: 'center', minWidth: 0, overflowWrap: 'anywhere', wordBreak: 'break-word', fontSize: 12, fontWeight: 500, color: '#5a4a12', background: '#faf8ff', borderRight: '1.5px solid #ece8ff' }}>
+                <div style={{ padding: '9px 12px', display: 'flex', alignItems: 'center', minWidth: 0, overflowWrap: 'anywhere', wordBreak: 'break-word', fontSize: 12, fontWeight: 500, color: '#5a4a12', background: hl ? 'transparent' : '#faf8ff', borderRight: '1.5px solid #ece8ff' }}>
                   {row.subName}
                 </div>
               )}

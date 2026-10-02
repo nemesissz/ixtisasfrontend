@@ -1,359 +1,14 @@
-import { useState, useMemo, useEffect, useRef } from 'react'
+import { useState, useMemo, useEffect, useRef, Fragment } from 'react'
+import { useActiveInst } from '../../activeInst'
 import * as XLSX from 'xlsx'
-import { userDb, submissionDb, selectionDb, treeDb, institutionDb, useLocalState, addLog } from '../../db'
+import { userDb, submissionDb, selectionDb, treeDb, institutionDb, useLocalState, addLog, selectionParticipants } from '../../db'
 import InstIcon from '../../components/InstIcon'
 import InstTabs from '../../components/InstTabs'
 import { can } from '../../permissions'
-
-// ── Tiebreaker: təhsilalanı sıralamaq üçün bal massivi ──────────────────────────
-const UMUMI_KEY = 'Ümumi imtahan nəticəsi'
-
-function getTiebreakerSubjects(specId: string, userGroup: string | null, pathMap: Record<string, any[]>): string[] {
-  const path = pathMap[specId] || []
-  // Yarpaqdan kökə qədər tiebreaker axtarırıq
-  for (let i = path.length - 1; i >= 0; i--) {
-    const node = path[i]
-    if (node.groupTiebreakers && userGroup && node.groupTiebreakers[String(userGroup)]) {
-      return node.groupTiebreakers[String(userGroup)]
-    }
-    if (node.tiebreaker?.length) return node.tiebreaker
-  }
-  return []
-}
-
-function studentSortScore(user: any, tiebreakers: string[]): number[] {
-  const primary = user.score || 0
-  const extras  = tiebreakers.map(subj => {
-    if (subj === UMUMI_KEY) return user.score || 0
-    return (user.subjects?.[subj] ?? -1)
-  })
-  return [primary, ...extras]
-}
-
-function compareStudents(a: any, b: any, tiebreakers: string[]): number {
-  const sa = studentSortScore(a, tiebreakers)
-  const sb = studentSortScore(b, tiebreakers)
-  for (let i = 0; i < Math.max(sa.length, sb.length); i++) {
-    const diff = (sb[i] ?? -1) - (sa[i] ?? -1)
-    if (diff !== 0) return diff
-  }
-  return 0
-}
-
-// ── Yarpaqları əcdad zənciri ilə topla ────────────────────────────────────────
-function getLeavesWithPath(nodes: any[], anc: any[] = []): Array<{ leaf: any; path: any[] }> {
-  const res: Array<{ leaf: any; path: any[] }> = []
-  for (const n of nodes) {
-    if (!n.children?.length) res.push({ leaf: n, path: [...anc, n] })
-    else res.push(...getLeavesWithPath(n.children, [...anc, n]))
-  }
-  return res
-}
-
-// ── Cinsə görə məhdudiyyət köməkçiləri (leaf node-da allowFemale/allowMale/maxFemale/maxMale) ──
-function genderAllowed(leaf: any, gender: any): boolean {
-  if (!leaf) return true
-  if (gender === 'qadın' && leaf.allowFemale === false) return false
-  if (gender === 'kişi'  && leaf.allowMale   === false) return false
-  return true
-}
-function genderCapReached(leaf: any, gender: any, femCount: number, malCount: number): boolean {
-  if (!leaf) return false
-  if (gender === 'qadın' && leaf.maxFemale != null && femCount >= leaf.maxFemale) return true
-  if (gender === 'kişi'  && leaf.maxMale   != null && malCount >= leaf.maxMale)   return true
-  return false
-}
-
-// ── Yenidən-tarazlama (balı qoruyan): boş yer + yerləşməyən eyni anda qalmasın ──
-// Greedy nəticəsi saxlanılır (bal ədaləti), üstündən cins-qapılı MAX-AXIN (max-flow)
-// tətbiq olunur. Greedy yerləşdirmələri başlanğıc axın kimi qoyulur; yalnız yerləşməyənlər
-// üçün artırıcı yollar axtarılır. Beləcə kvotanı aşmadan, cins məhdudiyyətlərini pozmadan
-// mümkün olan maksimum təhsilalan yerləşir və boş yer kənarda qalanla yanaşı qalmır.
-function rebalanceUnplaced(opts: {
-  users: any[]; subs: any[];
-  leafById: Record<string, any>;
-  quotas: Record<string, number>;
-  pathMap: Record<string, any[]>;
-  placed: Record<string, number>;
-  femP: Record<string, number>;
-  malP: Record<string, number>;
-  assignments: Record<string, { specId: string; choiceNum: number }>;
-}) {
-  const { users, subs, leafById, quotas, placed, femP, malP, assignments } = opts
-  const specs = Object.keys(quotas)
-  const hasEmpty = specs.some(sid => (quotas[sid] || 0) - (placed[sid] || 0) > 0)
-  const hasUnplaced = users.some(u => !assignments[u.id])
-  if (!hasEmpty || !hasUnplaced) return  // boş yer və ya yerləşməyən yoxdursa, iş yoxdur
-
-  const rankingOf = (uid: string): string[] => subs.find((s: any) => s.userId === uid)?.ranking || []
-
-  // ── Şəbəkə qur: S=0, T=1, sonra təhsilalan / femGate / malGate / spec node-ları ──
-  let n = 2; const S = 0, T = 1
-  const uNode: Record<string, number> = {}, fg: Record<string, number> = {}, mg: Record<string, number> = {}, sp: Record<string, number> = {}
-  for (const u of users) uNode[u.id] = n++
-  for (const sid of specs) { fg[sid] = n++; mg[sid] = n++; sp[sid] = n++ }
-  const cap: Array<Record<number, number>> = Array.from({ length: n }, () => ({}))
-  const adj: number[][] = Array.from({ length: n }, () => [])
-  const addEdge = (a: number, b: number, c: number) => {
-    if (cap[a][b] === undefined) { adj[a].push(b); cap[a][b] = 0 }
-    if (cap[b][a] === undefined) { adj[b].push(a); cap[b][a] = 0 }
-    cap[a][b] += c
-  }
-  for (const u of users) addEdge(S, uNode[u.id], 1)
-  for (const sid of specs) {
-    const leaf = leafById[sid], q = quotas[sid] || 0
-    const maxF = (leaf?.allowFemale === false) ? 0 : (leaf?.maxFemale != null ? Math.min(leaf.maxFemale, q) : q)
-    const maxM = (leaf?.allowMale === false) ? 0 : (leaf?.maxMale != null ? Math.min(leaf.maxMale, q) : q)
-    addEdge(fg[sid], sp[sid], maxF)
-    addEdge(mg[sid], sp[sid], maxM)
-    addEdge(sp[sid], T, q)
-  }
-  // gender null/digər → birbaşa spec node-a (tavansız, yalnız ümumi kvota)
-  const gateOf = (g: any, sid: string) => g === 'qadın' ? fg[sid] : g === 'kişi' ? mg[sid] : sp[sid]
-  for (const u of users) for (const sid of rankingOf(u.id)) {
-    if (quotas[sid] === undefined) continue
-    addEdge(uNode[u.id], gateOf(u.gender, sid), 1)
-  }
-
-  // ── Greedy nəticəsini başlanğıc axın kimi qoy (mövcud yerləşmələr saxlanılsın) ──
-  const pushFlow = (a: number, b: number) => { cap[a][b] -= 1; cap[b][a] += 1 }
-  for (const u of users) {
-    const a = assignments[u.id]; if (!a) continue
-    const sid = a.specId; if (quotas[sid] === undefined) continue
-    const gate = gateOf(u.gender, sid)
-    pushFlow(S, uNode[u.id]); pushFlow(uNode[u.id], gate); pushFlow(gate, sp[sid]); pushFlow(sp[sid], T)
-  }
-
-  // ── Edmonds-Karp: qalan boş yerlərə yerləşməyənlər üçün artırıcı yollar ──
-  const bfs = (): number[] | null => {
-    const par = new Array(n).fill(-1); par[S] = S
-    const queue = [S]
-    while (queue.length) {
-      const v = queue.shift()!
-      for (const w of adj[v]) if (par[w] < 0 && cap[v][w] > 0) { par[w] = v; if (w === T) return par; queue.push(w) }
-    }
-    return null
-  }
-  let par: number[] | null
-  while ((par = bfs())) {
-    for (let v = T; v !== S; v = par[v]) { cap[par[v]][v] -= 1; cap[v][par[v]] += 1 }
-  }
-
-  // ── Nəticəni oxu və placed/femP/malP/assignments-i yenilə ──
-  for (const sid of specs) { placed[sid] = 0; femP[sid] = 0; malP[sid] = 0 }
-  for (const uid of Object.keys(assignments)) delete assignments[uid]
-  for (const u of users) {
-    const g = u.gender
-    for (const sid of rankingOf(u.id)) {
-      if (quotas[sid] === undefined) continue
-      const gate = gateOf(g, sid)
-      // bu təhsilalandan həmin spec-ə axın varsa (reverse residual > 0)
-      if (cap[gate][uNode[u.id]] > 0) {
-        const i = rankingOf(u.id).indexOf(sid)
-        assignments[u.id] = { specId: sid, choiceNum: i >= 0 ? i + 1 : 0 }
-        placed[sid] = (placed[sid] || 0) + 1
-        if (g === 'qadın') femP[sid] = (femP[sid] || 0) + 1
-        else if (g === 'kişi') malP[sid] = (malP[sid] || 0) + 1
-        break
-      }
-    }
-  }
-}
-
-// ── Paket-daxili yerləşdirmə (hər paket müstəqil işləyir) ────────────────────
-function runPacketPlacement(
-  packetStudents: any[],
-  allSubs: any[],
-  packetSpecs: Array<{ id: string; quota: number; mülkiQuota?: number; liseyQuota?: number; path: any[] }>,
-  sourceProportional = false
-) {
-  const pathMap: Record<string, any[]> = {}
-  const leafById: Record<string, any> = {}
-  for (const spec of packetSpecs) {
-    pathMap[spec.id] = spec.path
-    leafById[spec.id] = spec.path?.[spec.path.length - 1]
-  }
-
-  const placed: Record<string, number> = {}
-  const femP: Record<string, number> = {}
-  const malP: Record<string, number> = {}
-  const assignments: Record<string, { specId: string; choiceNum: number }> = {}
-
-  function tryPlace(students: any[], availQuota: Record<string, number>) {
-    const sorted = [...students].sort((a, b) => {
-      const aSub = allSubs.find((s: any) => s.userId === a.id)
-      const bSub = allSubs.find((s: any) => s.userId === b.id)
-      const aSid = aSub?.ranking?.find((sid: string) => availQuota[sid] !== undefined) || ''
-      const bSid = bSub?.ranking?.find((sid: string) => availQuota[sid] !== undefined) || ''
-      const aTb  = getTiebreakerSubjects(aSid, a.group, pathMap)
-      const bTb  = getTiebreakerSubjects(bSid, b.group, pathMap)
-      const tb   = aTb.length >= bTb.length ? aTb : bTb
-      return compareStudents(a, b, tb)
-    })
-    for (const user of sorted) {
-      if (assignments[user.id]) continue
-      const sub = allSubs.find((s: any) => s.userId === user.id)
-      if (!sub?.ranking) continue
-      for (let ci = 0; ci < sub.ranking.length; ci++) {
-        const sid = sub.ranking[ci]
-        if (availQuota[sid] === undefined) continue
-        if (availQuota[sid] > 0) {
-          const leaf = leafById[sid]
-          const g = user.gender
-          if (!genderAllowed(leaf, g)) continue
-          if (genderCapReached(leaf, g, femP[sid] || 0, malP[sid] || 0)) continue
-          availQuota[sid]--
-          placed[sid] = (placed[sid] || 0) + 1
-          if (g === 'qadın') femP[sid] = (femP[sid] || 0) + 1
-          else if (g === 'kişi') malP[sid] = (malP[sid] || 0) + 1
-          assignments[user.id] = { specId: sid, choiceNum: ci + 1 }
-          break
-        }
-      }
-    }
-  }
-
-  if (sourceProportional) {
-    // ── Mülki kvotaları
-    const mülkiQ: Record<string, number> = {}
-    const liseyQ: Record<string, number> = {}
-    const deficitQ: Record<string, number> = {}
-    for (const spec of packetSpecs) {
-      mülkiQ[spec.id]  = spec.mülkiQuota ?? 0
-      liseyQ[spec.id]  = spec.liseyQuota ?? 0
-      deficitQ[spec.id] = 0  // sonra doldurulacaq
-    }
-
-    const mülki = packetStudents.filter((u: any) => u.source === 'mülki')
-    const lisey = packetStudents.filter((u: any) => u.source === 'lisey')
-    const other = packetStudents.filter((u: any) => !u.source)
-
-    // Mərhələ 1: Mülki təhsilalanlar mülki slotlar üçün
-    tryPlace(mülki, mülkiQ)
-    // Mərhələ 2: Lisey təhsilalanlar lisey slotlar üçün
-    tryPlace(lisey, liseyQ)
-
-    // Mərhələ 3: Deficit filling — qalan slotlar hər iki mənbənin
-    //            yerləşdirilməmiş təhsilalanlarına verilir
-    for (const spec of packetSpecs) {
-      deficitQ[spec.id] = mülkiQ[spec.id] + liseyQ[spec.id]  // qalan slotlar
-    }
-    const unplaced = [...mülki, ...lisey, ...other].filter((u: any) => !assignments[u.id])
-    tryPlace(unplaced, deficitQ)
-
-  } else {
-    // ── Adi yerləşdirmə
-    const quotas: Record<string, number> = {}
-    for (const spec of packetSpecs) quotas[spec.id] = spec.quota
-    tryPlace(packetStudents, quotas)
-  }
-
-  // Boş yer + yerləşməyən eyni anda qalmasın deyə balı qoruyan yenidən-tarazlama
-  const totalQuotas: Record<string, number> = {}
-  for (const spec of packetSpecs) totalQuotas[spec.id] = spec.quota
-  rebalanceUnplaced({ users: packetStudents, subs: allSubs, leafById, quotas: totalQuotas, pathMap, placed, femP, malP, assignments })
-
-  return { assignments, placed, pathMap }
-}
-
-// ── Yerləşdirmə alqoritmi ─────────────────────────────────────────────────────
-function runPlacement(users: any[], subs: any[], tree: any, sourceProportional = false, instCounts?: { total: number; mülki: number }) {
-  const leavesWithPath = getLeavesWithPath(tree?.nodes || [])
-  const quotas: Record<string, number> = {}
-  const pathMap: Record<string, any[]> = {}
-  const leafById: Record<string, any> = {}
-  for (const { leaf, path } of leavesWithPath) {
-    quotas[leaf.id]  = leaf.quota || 0
-    pathMap[leaf.id] = path
-    leafById[leaf.id] = leaf
-  }
-  const placed: Record<string, number> = {}
-  const femP: Record<string, number> = {}   // leaf üzrə yerləşən qadın sayı
-  const malP: Record<string, number> = {}   // leaf üzrə yerləşən kişi sayı
-  const assignments: Record<string, { specId: string; choiceNum: number }> = {}
-
-  function tryPlace(students: any[], availQuota: Record<string, number>) {
-    // Hər təhsilalan üçün birinci əlçatan ixtisasın tiebreaker-ına görə sırala
-    const sorted = [...students].sort((a, b) => {
-      const aSub = subs.find((s: any) => s.userId === a.id)
-      const bSub = subs.find((s: any) => s.userId === b.id)
-      const aSid = aSub?.ranking?.find((sid: string) => availQuota[sid] !== undefined) || ''
-      const bSid = bSub?.ranking?.find((sid: string) => availQuota[sid] !== undefined) || ''
-      const aTb  = getTiebreakerSubjects(aSid, a.group, pathMap)
-      const bTb  = getTiebreakerSubjects(bSid, b.group, pathMap)
-      // Hər ikisinin tiebreaker-ını birləşdir (uzunluq üzrə max)
-      const tb   = aTb.length >= bTb.length ? aTb : bTb
-      return compareStudents(a, b, tb)
-    })
-    for (const user of sorted) {
-      if (assignments[user.id]) continue
-      const sub = subs.find((s: any) => s.userId === user.id)
-      if (!sub?.ranking) continue
-      for (let ci = 0; ci < sub.ranking.length; ci++) {
-        const sid = sub.ranking[ci]
-        if (availQuota[sid] === undefined) continue
-        if (availQuota[sid] > 0) {
-          const leaf = leafById[sid]
-          const g = user.gender
-          if (!genderAllowed(leaf, g)) continue
-          if (genderCapReached(leaf, g, femP[sid] || 0, malP[sid] || 0)) continue
-          availQuota[sid]--
-          placed[sid] = (placed[sid] || 0) + 1
-          if (g === 'qadın') femP[sid] = (femP[sid] || 0) + 1
-          else if (g === 'kişi') malP[sid] = (malP[sid] || 0) + 1
-          assignments[user.id] = { specId: sid, choiceNum: ci + 1 }
-          break
-        }
-      }
-    }
-  }
-
-  if (sourceProportional) {
-    // ── Mülki / lisey nisbətini hesabla (bütün müəssisəyə görə, seçim göndərənlərə görə deyil)
-    const total      = instCounts ? instCounts.total : users.length
-    const mülkiTotal = instCounts ? instCounts.mülki : users.filter((u: any) => u.source === 'mülki').length
-
-    const mülkiQ: Record<string, number>  = {}
-    const liseyQ: Record<string, number>  = {}
-    const deficitQ: Record<string, number> = {}
-    for (const { leaf } of leavesWithPath) {
-      const sid = leaf.id
-      const q   = leaf.quota || 0
-      if (leaf.quotaMode === 'manual' && leaf.mülkiQuota != null && leaf.liseyQuota != null) {
-        // Node üçün manual kvota təyin edilib
-        mülkiQ[sid]  = leaf.mülkiQuota
-        liseyQ[sid]  = leaf.liseyQuota
-      } else {
-        // Avtomatik: müəssisə nisbəti
-        mülkiQ[sid]  = total > 0 ? Math.round(q * mülkiTotal / total) : q
-        liseyQ[sid]  = q - mülkiQ[sid]
-      }
-      deficitQ[sid] = 0
-    }
-
-    const mülki = users.filter((u: any) => u.source === 'mülki')
-    const lisey = users.filter((u: any) => u.source === 'lisey')
-    const other = users.filter((u: any) => !u.source)
-
-    // Mərhələ 1: mülki
-    tryPlace(mülki, mülkiQ)
-    // Mərhələ 2: lisey
-    tryPlace(lisey, liseyQ)
-    // Mərhələ 3: deficit — qalan slotlar hər iki qrupun yerləşdirilməmiş təhsilalanlarına
-    for (const sid of Object.keys(quotas)) deficitQ[sid] = mülkiQ[sid] + liseyQ[sid]
-    tryPlace([...mülki, ...lisey, ...other].filter((u: any) => !assignments[u.id]), deficitQ)
-
-  } else {
-    // ── Adi yerləşdirmə
-    const availQuota = { ...quotas }
-    tryPlace(users, availQuota)
-  }
-
-  // Boş yer + yerləşməyən eyni anda qalmasın deyə balı qoruyan yenidən-tarazlama
-  rebalanceUnplaced({ users, subs, leafById, quotas, pathMap, placed, femP, malP, assignments })
-
-  return { assignments, placed, quotas, pathMap }
-}
+import { poolCounts, autoSplit, globalSourceSplitCached } from '../../quota-pool'
+import { allocatePacketSpecs, splitPacketStudents } from '../../packet-alloc'
+import { UMUMI_KEY, critValue, isSumCrit } from '../../tiebreak'
+import { getTiebreakerSubjects, studentSortScore, compareStudents, getLeavesWithPath, genderAllowed, genderCapReached, rebalanceUnplaced, runPacketPlacement, runPlacement } from '../../placement'
 
 // ── Gale-Shapley (Deferred Acceptance) alqoritmi ─────────────────────────────
 function runGaleShapley(users: any[], subs: any[], tree: any) {
@@ -471,7 +126,20 @@ const PACK_COLORS = [
 ]
 
 // ── İzahlı (hekayə) simulyasiya — Sadə və Paket üsulu üçün ──────────────────────
-function StorySim({ students, packets, subs, tree, onClose }: { students?: any[]; packets?: any[]; subs: any[]; tree: any; onClose: () => void }) {
+function StorySim({ students, packets, subs, tree, poolUsers, preAssignLevel, finalAssignments, onClose }: {
+  students?: any[]; packets?: any[]; subs: any[]; tree: any
+  /** mənbə nisbətinin hesablandığı tam siyahı — runPlacement ilə eyni olmalıdır */
+  poolUsers?: any[]
+  preAssignLevel?: number | null
+  /**
+   * "Yerləşdir" düyməsinin işlətdiyi mühərrikin YEKUN nəticəsi.
+   * Simulyasiya gedişatı öz addımlarını göstərir, amma son söz bu nəticənindir —
+   * əks halda tarazlama mərhələsindəki kiçik fərqlər ucbatından iki ekran
+   * fərqli adam üçün "kənarda qaldı" yazırdı.
+   */
+  finalAssignments?: Record<string, { specId: string; choiceNum: number }>
+  onClose: () => void
+}) {
   const [idx, setIdx] = useState(-1)
   const [playing, setPlaying] = useState(false)
   const [speed, setSpeed] = useState(1200)
@@ -484,7 +152,7 @@ function StorySim({ students, packets, subs, tree, onClose }: { students?: any[]
     leaves.forEach(({ leaf, path }) => { pathMap[leaf.id] = path; leafName[leaf.id] = leaf.name; leafPath[leaf.id] = path.slice(0, -1).map((n: any) => n.name).join(' › ') })
     // Paketlər: verilmişsə onlar, yoxsa hamısı bir "paket" (sadə üsul)
     const pkts = (packets && packets.length)
-      ? packets.map((p: any) => ({ num: p.num, students: p.students || [], specs: (p.specs || []).map((s: any) => ({ id: s.id, quota: s.quota })) }))
+      ? packets.map((p: any) => ({ num: p.num, students: p.students || [], specs: (p.specs || []).map((s: any) => ({ id: s.id, quota: s.quota, mülkiQuota: s.mülkiQuota, liseyQuota: s.liseyQuota })) }))
       : [{ num: 1, students: students || [], specs: leaves.map(({ leaf }) => ({ id: leaf.id, quota: leaf.quota || 0 })) }]
 
     const leafById: Record<string, any> = {}
@@ -508,7 +176,66 @@ function StorySim({ students, packets, subs, tree, onClose }: { students?: any[]
       const assignments: Record<string, { specId: string; choiceNum: number }> = {}
       const lastInLeaf: Record<string, { name: string; score: number; user: any }> = {}
       const stepStart = steps.length
-      for (const u of sorted) {
+
+      // ── Mənbə nisbəti aktivdirsə real yerləşdirmə kimi 3 mərhələ işləyir:
+      //    1) mülki öz payı üzrə · 2) lisey öz payı üzrə · 3) qalan yerlər hamıya.
+      //    Simulyasiya bunu etmədiyi üçün "Yerləşdir" ilə fərqli nəticə verirdi.
+      const spActive = !!(tree?.sourceProportional)
+      const mQ: Record<string, number> = {}, lQ: Record<string, number> = {}
+      if (spActive) {
+        const base = (poolUsers && poolUsers.length ? poolUsers : (students || pk.students)) as any[]
+        const simTable = globalSourceSplitCached(base, tree?.nodes || [], { preAssignLevel })
+        const pkSpec: Record<string, any> = {}; pk.specs.forEach((s: any) => { pkSpec[s.id] = s })
+        for (const sid of Object.keys(quota)) {
+          const leaf = leafById[sid]
+          const q = quota[sid]
+          // Paket üsulu: paketin öz mənbə payları hazırdır (packet-alloc) — onlar
+          // götürülür. Əks halda ixtisasın BÜTÜN mülki/lisey yerləri paketə
+          // yazılırdı (məs. paketdə 3 yer, simulyasiyada 9 nəfər yerləşirdi).
+          if (pkSpec[sid]?.mülkiQuota != null && pkSpec[sid]?.liseyQuota != null) {
+            mQ[sid] = pkSpec[sid].mülkiQuota
+            lQ[sid] = pkSpec[sid].liseyQuota
+          } else if (leaf?.quotaMode === 'manual' && leaf?.mülkiQuota != null && leaf?.liseyQuota != null) {
+            const orig = leaf.quota || 0
+            const r = orig > 0 ? q / orig : 0
+            mQ[sid] = Math.round(leaf.mülkiQuota * r)
+            lQ[sid] = q - mQ[sid]
+          } else {
+            const sp = autoSplit(leaf, poolCounts(base, pathMap[sid] || [], { preAssignLevel }), simTable)
+            mQ[sid] = sp.mülki
+            lQ[sid] = sp.lisey
+          }
+        }
+      }
+      // 3-cü mərhələnin növbəsi runPlacement-dəki ilə eyni qurulur:
+      // [mülki, lisey, mənbəsiz] ardıcıllığı, sonra eyni müqayisə ilə sıralama.
+      // Bərabər ballılarda sıra məhz bundan asılıdır — fərqli olsa, kənarda
+      // qalanlar simulyasiya ilə real yerləşdirmədə fərqlənirdi.
+      const byScore = (a: any, b: any) => {
+        const aTb = getTiebreakerSubjects(subs.find((s: any) => s.userId === a.id)?.ranking?.[0] || '', a.group, pathMap)
+        const bTb = getTiebreakerSubjects(subs.find((s: any) => s.userId === b.id)?.ranking?.[0] || '', b.group, pathMap)
+        return compareStudents(a, b, aTb.length >= bTb.length ? aTb : bTb)
+      }
+      const rest = [
+        ...withSub.filter((u: any) => u.source === 'mülki'),
+        ...withSub.filter((u: any) => u.source === 'lisey'),
+        ...withSub.filter((u: any) => !u.source),
+      ].sort(byScore)
+
+      const stages: { key: string; pool: any[]; av: Record<string, number> }[] = spActive
+        ? [
+            { key: 'mülki',  pool: withSub.filter((u: any) => u.source === 'mülki').sort(byScore), av: mQ },
+            { key: 'lisey',  pool: withSub.filter((u: any) => u.source === 'lisey').sort(byScore), av: lQ },
+            { key: 'qalıq',  pool: rest, av: avail },
+          ]
+        : [{ key: '', pool: sorted, av: avail }]
+
+      for (const stage of stages) {
+        // 3-cü mərhələnin tutumu — əvvəlki iki mərhələdən qalanların cəmi
+        if (stage.key === 'qalıq') for (const sid of Object.keys(quota)) avail[sid] = (mQ[sid] || 0) + (lQ[sid] || 0)
+        const av = stage.av
+      for (const u of stage.pool) {
+        if (assignments[u.id]) continue
         const ranking = (subs.find((s: any) => s.userId === u.id)?.ranking || []).filter((id: string) => quota[id] !== undefined)
         const attempts: { id: string; full: boolean; tie?: boolean; rival?: string; blocked?: 'gender' | 'cap' }[] = []
         let placed: string | null = null
@@ -517,11 +244,11 @@ function StorySim({ students, packets, subs, tree, onClose }: { students?: any[]
         for (const sid of ranking) {
           const leaf = leafById[sid]
           if (!genderAllowed(leaf, g)) { attempts.push({ id: sid, full: true, blocked: 'gender' }); continue }
-          if (avail[sid] > 0 && !genderCapReached(leaf, g, femP[sid] || 0, malP[sid] || 0)) {
-            avail[sid]--; placed = sid
+          if (av[sid] > 0 && !genderCapReached(leaf, g, femP[sid] || 0, malP[sid] || 0)) {
+            av[sid]--; placed = sid
             if (g === 'qadın') femP[sid] = (femP[sid] || 0) + 1; else if (g === 'kişi') malP[sid] = (malP[sid] || 0) + 1
             attempts.push({ id: sid, full: false }); lastInLeaf[sid] = { name: u.name, score: sc, user: u }; break
-          } else if (avail[sid] > 0) {
+          } else if (av[sid] > 0) {
             attempts.push({ id: sid, full: true, blocked: 'cap' })
           } else {
             const last = lastInLeaf[sid]
@@ -532,23 +259,38 @@ function StorySim({ students, packets, subs, tree, onClose }: { students?: any[]
               const tbs = getTiebreakerSubjects(sid, u.group, pathMap)
               let dec: { subject?: string; rivalSubjScore?: number; mySubjScore?: number } = {}
               for (const subj of tbs) {
-                const w = subj === UMUMI_KEY ? (last!.user.score || 0) : (last!.user.subjects?.[subj] ?? -1)
-                const l = subj === UMUMI_KEY ? (u.score || 0)          : (u.subjects?.[subj] ?? -1)
-                if (w !== l) { dec = { subject: subj === UMUMI_KEY ? 'Ümumi bal' : subj, rivalSubjScore: w, mySubjScore: l }; break }
+                const w = critValue(last!.user, subj)
+                const l = critValue(u, subj)
+                if (w !== l) {
+                  const lbl = subj === UMUMI_KEY ? 'Ümumi bal' : isSumCrit(subj) ? 'Σ ' + subj : subj
+                  dec = { subject: lbl, rivalSubjScore: w, mySubjScore: l }; break
+                }
               }
               tieRivals.push({ id: sid, rival: last!.name, score: sc, ...dec })
             }
           }
         }
         if (placed) assignments[u.id] = { specId: placed, choiceNum: ranking.indexOf(placed) + 1 }
-        steps.push({ packetNum: pk.num, u, ranking, attempts, placed, choiceNum: placed ? ranking.indexOf(placed) + 1 : 0, tieRivals })
+        steps.push({ packetNum: pk.num, u, ranking, attempts, placed, choiceNum: placed ? ranking.indexOf(placed) + 1 : 0, tieRivals, stage: stage.key })
+      }
       }
       // ── Yenidən-tarazlama (real yerləşdirmə ilə eyni) ──
       const greedyAssign: Record<string, string> = {}
       for (const uid of Object.keys(assignments)) greedyAssign[uid] = assignments[uid].specId
       const placedMap: Record<string, number> = {}
       for (const uid of Object.keys(assignments)) { const s = assignments[uid].specId; placedMap[s] = (placedMap[s] || 0) + 1 }
-      rebalanceUnplaced({ users: pk.students, subs, leafById, quotas: quota, pathMap, placed: placedMap, femP, malP, assignments })
+      // Yekun mənzərə: real yerləşdirmə mühərrikinin nəticəsi varsa o götürülür,
+      // yoxdursa (məs. paket önizləməsi) eyni tarazlama burada işlədilir.
+      const useReal = !!finalAssignments && Object.keys(finalAssignments).length > 0
+      if (useReal) {
+        for (const uid of Object.keys(assignments)) delete assignments[uid]
+        for (const u of pk.students) {
+          const a = finalAssignments![u.id]
+          if (a) assignments[u.id] = a
+        }
+      } else {
+        rebalanceUnplaced({ users: pk.students, subs, leafById, quotas: quota, pathMap, placed: placedMap, femP, malP, assignments })
+      }
       // Hər addıma yekun (tarazlamadan sonrakı) vəziyyəti yaz
       for (let i = stepStart; i < steps.length; i++) {
         const st = steps[i]; const fin = assignments[st.u.id]
@@ -558,10 +300,15 @@ function StorySim({ students, packets, subs, tree, onClose }: { students?: any[]
         if (st.rebalanced) rebalanced.push({ name: st.u.name, score: st.u.score || 0, fromSpec: greedyAssign[st.u.id] || null, toSpec: fin.specId, packetNum: pk.num })
       }
     }
-    const greedyPlaced = steps.filter(s => s.placed).length
-    const finalPlaced = steps.filter(s => s.finalSpec).length
-    return { steps, leafName, leafPath, pkMeta, multiPacket: pkts.length > 1, rebalanced, greedyPlaced, finalPlaced }
-  }, [students, packets, subs, tree])
+    // Mərhələli rejimdə bir təhsilalan iki addımda görünə bilər — say təkrarlanmasın
+    const greedyPlaced = new Set(steps.filter(s => s.placed).map(s => s.u.id)).size
+    const finalPlaced = new Set(steps.filter(s => s.finalSpec).map(s => s.u.id)).size
+    // Mərhələli (proporsional) rejimdə bir təhsilalan iki addımda görünə bilər —
+    // ona görə "təhsilalan sayı" addım sayından ayrıca hesablanır.
+    const studentCount = new Set(steps.map(s => s.u.id)).size
+    const staged = steps.some(s => s.stage)
+    return { steps, leafName, leafPath, pkMeta, multiPacket: pkts.length > 1, rebalanced, greedyPlaced, finalPlaced, studentCount, staged }
+  }, [students, packets, subs, tree, poolUsers, preAssignLevel, finalAssignments])
 
   const total = data.steps.length
   useEffect(() => {
@@ -581,6 +328,15 @@ function StorySim({ students, packets, subs, tree, onClose }: { students?: any[]
   const curPk = cur ? cur.packetNum : (data.pkMeta[0]?.num ?? 1)
   const curMeta = data.pkMeta.find(m => m.num === curPk) || data.pkMeta[0]
   const pkIndex = data.pkMeta.findIndex(m => m.num === curPk)
+  // Simulyasiya bitəndə ixtisaslar BÜTÜN paketlər üzrə yekunla göstərilir —
+  // yoxsa sonda yalnız son (ən aşağı ballı) paketin adamları görünürdü.
+  const showAll = data.multiPacket && total > 0 && idx >= total - 1
+  const viewMeta = useMemo(() => {
+    const quota: Record<string, number> = {}, ids: string[] = []
+    for (const m of data.pkMeta) for (const id of m.specIds) { if (quota[id] === undefined) { quota[id] = 0; ids.push(id) }; quota[id] += m.quota[id] || 0 }
+    return { specIds: ids, quota }
+  }, [data])
+  const inView = (pn: number) => showAll || pn === curPk
   const filled: Record<string, number> = {}        // cari paket üzrə
   const cutoff: Record<string, number> = {}         // cari paket üzrə keçid balı
   let placedTotal = 0, firstChoice = 0              // ümumi (bütün paketlər)
@@ -588,7 +344,7 @@ function StorySim({ students, packets, subs, tree, onClose }: { students?: any[]
     const s = data.steps[i]
     if (s.placed) {
       placedTotal++; if (s.choiceNum === 1) firstChoice++
-      if (s.packetNum === curPk) {
+      if (inView(s.packetNum)) {
         filled[s.placed] = (filled[s.placed] || 0) + 1
         const sc = s.u.score || 0
         if (cutoff[s.placed] === undefined || sc < cutoff[s.placed]) cutoff[s.placed] = sc
@@ -598,7 +354,8 @@ function StorySim({ students, packets, subs, tree, onClose }: { students?: any[]
   const queue = data.steps.slice(idx + 1, idx + 5)
   // cari paketin daxili gedişatı
   const pkProcessed = idx >= 0 ? data.steps.slice(0, idx + 1).filter(s => s.packetNum === curPk).length : 0
-  const pkPlaced = Object.values(filled).reduce((a, b) => a + b, 0)
+  // yalnız cari paket (son addımda filled bütün paketləri saxlayır)
+  const pkPlaced = idx >= 0 ? data.steps.slice(0, idx + 1).filter(s => s.placed && s.packetNum === curPk).length : 0
   const pkQuota = curMeta ? Object.values(curMeta.quota).reduce((a, b) => a + b, 0) : 0
   const pkTotal = curMeta?.count ?? 0
   const pkSteps = data.steps.map((s, i) => ({ s, i })).filter(x => x.s.packetNum === curPk)   // cari paketin təhsilalanları (sıra ilə)
@@ -606,7 +363,12 @@ function StorySim({ students, packets, subs, tree, onClose }: { students?: any[]
   const narration = (() => {
     if (!cur) return 'Başlamaq üçün “Növbəti addım” və ya “Avtomatik” düyməsini seçin. Təhsilalanlar bala görə ardıcıl yerləşdiriləcək.'
     const nm = cur.u.name, sc = Number(cur.u.score).toFixed(1)
-    if (!cur.placed) return `${nm} (${sc} bal): bütün seçdiyi ixtisaslar dolu olduğu üçün bu təhsilalan yerləşdirilmədi (əl ilə baxılmalıdır).`
+    if (!cur.placed) {
+      // Bu addımda yer tapılmadı — amma sonrakı tarazlama mərhələsi onu
+      // yerləşdirmiş ola bilər. Yekun nəticəni gizlətməmək üçün qeyd edilir.
+      if (cur.finalSpec) return `${nm} (${sc} bal): bu addımda seçdiyi ixtisaslar dolu idi, lakin tarazlama mərhələsində “${data.leafName[cur.finalSpec] || ''}” ixtisasına yerləşdirildi.`
+      return `${nm} (${sc} bal): bütün seçdiyi ixtisaslar dolu olduğu üçün bu təhsilalan yerləşdirilmədi (əl ilə baxılmalıdır).`
+    }
     const fulls = cur.attempts.filter(a => a.full)
     const tr0 = cur.tieRivals[0]
     const tieDecide = tr0 && tr0.subject
@@ -639,6 +401,9 @@ function StorySim({ students, packets, subs, tree, onClose }: { students?: any[]
           style={{ padding: '8px 16px', borderRadius: 9, border: '1.5px solid #e0e4f0', background: playing ? '#f5a623' : '#fff', color: playing ? '#fff' : '#5a6070', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>{playing ? '⏸ Dayandır' : '⏵ Avtomatik'}</button>
         <button onClick={() => setSpeed(s => s === 1200 ? 500 : s === 500 ? 150 : 1200)}
           style={{ padding: '8px 12px', borderRadius: 9, border: '1.5px solid #e0e4f0', background: '#fff', color: '#8a909c', fontSize: 12, cursor: 'pointer' }}>{speed === 1200 ? '1×' : speed === 500 ? '2×' : '5×'}</button>
+        <button onClick={() => { setPlaying(false); setIdx(total - 1) }} disabled={idx >= total - 1}
+          title="Sona keç — yekun nəticəni göstər"
+          style={{ padding: '8px 12px', borderRadius: 9, border: '1.5px solid #e0e4f0', background: '#fff', color: '#5a6070', fontWeight: 700, fontSize: 13, cursor: idx >= total - 1 ? 'not-allowed' : 'pointer', opacity: idx >= total - 1 ? .4 : 1 }}>⏭ Sona</button>
         <button onClick={() => { setIdx(-1); setPlaying(false) }} title="Başa qayıt" style={{ padding: '8px 12px', borderRadius: 9, border: '1.5px solid #e0e4f0', background: '#fff', color: '#8a909c', fontSize: 13, cursor: 'pointer' }}>↺</button>
         <div style={{ flex: 1 }} />
         <div style={{ display: 'flex', alignItems: 'center', gap: 4, paddingLeft: 6, borderLeft: '1px solid #e7eaf0' }}>
@@ -660,9 +425,9 @@ function StorySim({ students, packets, subs, tree, onClose }: { students?: any[]
         : '260px minmax(0,1fr) 230px', overflow: 'hidden', transition: 'grid-template-columns .25s' }}>
         {/* SOL: ixtisaslar dolur */}
         <div style={{ overflowY: 'auto', borderRight: '1px solid #e7eaf0', padding: '12px 12px' }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: '#9aa0ac', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>📚 İxtisaslar dolur{data.multiPacket ? ` · Paket ${curPk}` : ''}</div>
-          {(curMeta?.specIds || []).map((id: string) => {
-            const q = curMeta.quota[id], f = filled[id] || 0, isFull = f >= q && q > 0
+          <div style={{ fontSize: 10, fontWeight: 700, color: '#9aa0ac', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>📚 İxtisaslar dolur{data.multiPacket ? (showAll ? ' · Bütün paketlər (yekun)' : ` · Paket ${curPk}`) : ''}</div>
+          {((showAll ? viewMeta : curMeta)?.specIds || []).map((id: string) => {
+            const q = (showAll ? viewMeta : curMeta).quota[id], f = filled[id] || 0, isFull = f >= q && q > 0
             const justPlaced = cur?.placed === id
             return (
               <div key={id} onClick={() => setSelLeaf(id)} title="Yerləşən təhsilalanları gör"
@@ -726,7 +491,14 @@ function StorySim({ students, packets, subs, tree, onClose }: { students?: any[]
           ) : (
             <div style={{ textAlign: 'center', color: '#8a909c', marginTop: 60 }}>
               <div style={{ fontSize: 40, marginBottom: 12 }}>🎬</div>
-              <div style={{ fontSize: 16, fontWeight: 700, color: '#2b2f3a' }}>{total} təhsilalan bala görə sıralandı</div>
+              <div style={{ fontSize: 16, fontWeight: 700, color: '#2b2f3a' }}>{data.studentCount} təhsilalan bala görə sıralandı</div>
+              {data.staged && (
+                <div style={{ fontSize: 11.5, color: '#8a909c', marginTop: 6, lineHeight: 1.6 }}>
+                  Mənbə nisbəti aktivdir — yerləşdirmə 3 mərhələdə gedir:
+                  <b> 1) mülki payı</b> · <b>2) lisey payı</b> · <b>3) qalan yerlər hamıya</b>.
+                  Bir təhsilalan öz mərhələsində yer tapmasa, 3-cü mərhələdə yenidən cəhd edir.
+                </div>
+              )}
               <div style={{ fontSize: 13, marginTop: 6 }}>Addım-addım izləmək üçün “Növbəti addım”, ardıcıl izləmək üçün “Avtomatik” istifadə edin.</div>
             </div>
           )}
@@ -805,7 +577,7 @@ function StorySim({ students, packets, subs, tree, onClose }: { students?: any[]
           </div>}
           <div style={{ background: '#fff', border: '1px solid #e7eaf0', borderRadius: 10, padding: '12px' }}>
             <div style={{ fontSize: 11, color: '#8a909c' }}>Yerləşən</div>
-            <div style={{ fontSize: 24, fontWeight: 900, color: '#2faf5f' }}>{placedTotal}<span style={{ fontSize: 12, color: '#aab0bd', fontWeight: 500 }}> / {total}</span></div>
+            <div style={{ fontSize: 24, fontWeight: 900, color: '#2faf5f' }}>{placedTotal}<span style={{ fontSize: 12, color: '#aab0bd', fontWeight: 500 }}> / {data.studentCount}</span></div>
           </div>
           <div style={{ background: '#fff', border: '1px solid #e7eaf0', borderRadius: 10, padding: '12px' }}>
             <div style={{ fontSize: 11, color: '#8a909c' }}>1-ci seçiminə düşən</div>
@@ -838,17 +610,42 @@ function StorySim({ students, packets, subs, tree, onClose }: { students?: any[]
       </div>
 
       {selLeaf && (() => {
-        const list = data.steps.slice(0, idx + 1).filter(s => s.placed === selLeaf && s.packetNum === curPk).map(s => ({ u: s.u, choiceNum: s.choiceNum })).sort((a, b) => (b.u.score || 0) - (a.u.score || 0))
-        const q = curMeta?.quota[selLeaf] ?? 0
+        // Mənbə sırası: əvvəl mülki, sonra lisey (hər qrup öz içində bala görə)
+        const srcRank = (s?: string) => s === 'mülki' ? 0 : s === 'lisey' ? 1 : 2
+        const list = data.steps.slice(0, idx + 1).filter(s => s.placed === selLeaf && inView(s.packetNum)).map(s => ({ u: s.u, choiceNum: s.choiceNum, packetNum: s.packetNum as number })).sort((a, b) => (srcRank(a.u.source) - srcRank(b.u.source)) || ((b.u.score || 0) - (a.u.score || 0)))
+        const q = (showAll ? viewMeta : curMeta)?.quota[selLeaf] ?? 0
         const fillP = q ? Math.round((list.length / q) * 100) : 0
         const isFull = list.length >= q && q > 0
         const minS = list.length ? Math.min(...list.map(it => it.u.score || 0)) : 0
         const maxS = list.length ? Math.max(...list.map(it => it.u.score || 0)) : 0
         const avgS = list.length ? list.reduce((a, it) => a + (it.u.score || 0), 0) / list.length : 0
+        // keçid balı mənbə üzrə ayrı — hər iki mənbə varsa iki sətir göstərilir
+        const srcMin = (src: string) => {
+          const ss = list.filter(it => it.u.source === src).map(it => it.u.score || 0)
+          return ss.length ? Math.min(...ss) : null
+        }
+        const minMülki = srcMin('mülki'), minLisey = srcMin('lisey')
+        const splitPass = minMülki != null && minLisey != null
         const stat = (label: string, val: string, color: string) => (
           <div style={{ flex: 1, textAlign: 'center', padding: '10px 4px', background: '#f7f8fc', borderRadius: 10 }}>
             <div style={{ fontSize: 18, fontWeight: 900, color }}>{val}</div>
             <div style={{ fontSize: 10.5, color: '#8892b0', marginTop: 2 }}>{label}</div>
+          </div>
+        )
+        const passStat = () => (
+          <div style={{ flex: 1, textAlign: 'center', padding: '10px 4px', background: '#f7f8fc', borderRadius: 10 }}>
+            <div style={{ display: 'flex', justifyContent: 'center', gap: 10, lineHeight: 1.15 }}>
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 900, color: '#1677ff' }}>{minMülki!.toFixed(2)}</div>
+                <div style={{ fontSize: 9.5, color: '#1677ff', opacity: 0.75 }}>mülki</div>
+              </div>
+              <div style={{ width: 1, background: '#e4e7f2' }} />
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 900, color: '#531dab' }}>{minLisey!.toFixed(2)}</div>
+                <div style={{ fontSize: 9.5, color: '#531dab', opacity: 0.75 }}>lisey</div>
+              </div>
+            </div>
+            <div style={{ fontSize: 10.5, color: '#8892b0', marginTop: 3 }}>Keçid balı</div>
           </div>
         )
         return (
@@ -858,7 +655,7 @@ function StorySim({ students, packets, subs, tree, onClose }: { students?: any[]
               <div style={{ background: 'linear-gradient(135deg,#b8860b,#e0a92e)', padding: '20px 24px', color: '#fff', flexShrink: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 11, color: '#ffffff99', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>İxtisasa yerləşənlər{data.multiPacket ? ` · Paket ${curPk}` : ''}</div>
+                    <div style={{ fontSize: 11, color: '#ffffff99', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>İxtisasa yerləşənlər{data.multiPacket ? (showAll ? ' · Bütün paketlər' : ` · Paket ${curPk}`) : ''}</div>
                     <div style={{ fontSize: 19, fontWeight: 900 }}>{data.leafName[selLeaf]}</div>
                     {data.leafPath[selLeaf] && <div style={{ fontSize: 12, color: '#ffffffaa', marginTop: 3 }}>{data.leafPath[selLeaf]}</div>}
                   </div>
@@ -877,7 +674,7 @@ function StorySim({ students, packets, subs, tree, onClose }: { students?: any[]
               {list.length > 0 && (
                 <div style={{ display: 'flex', gap: 10, padding: '14px 24px 4px', flexShrink: 0 }}>
                   {stat('Yerləşən', String(list.length), '#1a1a2e')}
-                  {stat('Keçid balı', minS.toFixed(2), isFull ? '#237804' : '#722ed1')}
+                  {splitPass ? passStat() : stat('Keçid balı', minS.toFixed(2), isFull ? '#237804' : '#722ed1')}
                   {stat('Orta bal', avgS.toFixed(2), '#c9962a')}
                   {stat('Ən yüksək', maxS.toFixed(2), '#d46b08')}
                 </div>
@@ -888,16 +685,28 @@ function StorySim({ students, packets, subs, tree, onClose }: { students?: any[]
                 {list.length === 0 ? (
                   <div style={{ padding: 40, textAlign: 'center', color: '#8892b0', fontSize: 14 }}>Bu addıma qədər bu ixtisasa heç kim yerləşməyib.</div>
                 ) : list.map((it, i) => (
-                  <div key={it.u.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 10px', borderRadius: 10, background: i % 2 ? '#fafbff' : '#fff', borderBottom: '1px solid #f4f5fb' }}>
+                  <Fragment key={it.u.id}>
+                  {i > 0 && srcRank(it.u.source) !== srcRank(list[i - 1].u.source) && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '10px 2px 8px' }}>
+                      <div style={{ flex: 1, height: 2, background: 'linear-gradient(90deg,#1677ff33,#531dab55)' }} />
+                      <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: .6, textTransform: 'uppercase', color: '#531dab', background: '#f6f0ff', border: '1px solid #d9c7f5', borderRadius: 12, padding: '3px 10px', whiteSpace: 'nowrap' }}>
+                        {it.u.source === 'lisey' ? 'Lisey' : it.u.source === 'mülki' ? 'Mülki' : 'Digər'}
+                      </span>
+                      <div style={{ flex: 1, height: 2, background: 'linear-gradient(90deg,#531dab55,#1677ff33)' }} />
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 10px', borderRadius: 10, background: i % 2 ? '#fafbff' : '#fff', borderBottom: '1px solid #f4f5fb' }}>
                     <span style={{ width: 26, color: '#aab', fontWeight: 800, fontSize: 13, textAlign: 'center', flexShrink: 0 }}>{i + 1}</span>
                     <div style={{ width: 38, height: 38, borderRadius: '50%', background: '#fbf1d6', color: '#b8860b', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 13, flexShrink: 0 }}>{(it.u.name || '?').split(' ').map((x: string) => x[0]).slice(0, 2).join('')}</div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 14, fontWeight: 700, color: '#1a1a2e', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.u.name}</div>
                       <div style={{ fontSize: 11, color: '#8892b0', fontFamily: 'monospace' }}>{it.u.fin || '—'}</div>
                     </div>
+                    {showAll && <span title="Paket" style={{ fontSize: 11.5, fontWeight: 800, color: '#4a5fc1', background: '#eef1ff', border: '1px solid #d0d8f8', padding: '3px 10px', borderRadius: 14, whiteSpace: 'nowrap', flexShrink: 0 }}>📦 Paket {it.packetNum}</span>}
                     <span style={{ fontSize: 11.5, fontWeight: 700, color: it.choiceNum === 1 ? '#237804' : '#b8860b', background: it.choiceNum === 1 ? '#f6ffed' : '#fbf1d6', border: `1px solid ${it.choiceNum === 1 ? '#b7eb8f' : '#ecd9a0'}`, padding: '3px 10px', borderRadius: 14, whiteSpace: 'nowrap', flexShrink: 0 }}>{it.choiceNum}-ci seçim</span>
                     <span style={{ fontSize: 15, fontWeight: 900, color: '#c9962a', minWidth: 52, textAlign: 'right', flexShrink: 0 }}>{Number(it.u.score).toFixed(2)}</span>
                   </div>
+                  </Fragment>
                 ))}
               </div>
             </div>
@@ -926,7 +735,7 @@ export default function Distribution() {
   }, [])
 
   // ── Əsas state ───────────────────────────────────────────────────────────
-  const [instId,   setInstId]   = useState<string>('')
+  const [instId,   setInstId]   = useActiveInst(institutions)
   const [selId,    setSelId]    = useState<string>('')
   // İlk yüklənmədə default institution/selection seç
   useEffect(() => {
@@ -1002,8 +811,11 @@ export default function Distribution() {
     return () => { cancelled = true }
   }, [sel?.id])
 
-  // Bütün müəssisə təhsilalanları (seçim etmiş-etməmiş)
-  const allInstUsers   = (users ?? []).filter((u: any) => u.institution === instId)
+  // Seçimin iştirakçıları (seçim etmiş-etməmiş). Qrup seçimin öz parametri
+  // deyil — seçdiyi strukturdan (tree.cohort) gəlir.
+  const allInstUsers   = sel
+    ? selectionParticipants(sel, tree, users ?? [])
+    : (users ?? []).filter((u: any) => u.institution === instId)
   const submittedUsers = allInstUsers.filter(u => sels.find((s: any) => s.userId === u.id))
 
   // ── Ağacın ən az kvotalı yarpağı → maks paket sayı ───────────────────────
@@ -1060,6 +872,8 @@ export default function Distribution() {
   }, [simRunning, simSpeed])
 
 
+  // Bal/mənbə/qrup/cins dəyişəndə paketlər yenidən qurulmalıdır (say eyni qalsa belə)
+  const usersKey = allInstUsers.map((u: any) => `${u.id}:${u.score}:${u.source}:${u.group}:${u.gender}`).join("|")
   // ── Paketlər ──────────────────────────────────────────────────────────────
   const packets = useMemo(() => {
     if (!packetsReady || method !== 'packet') return []
@@ -1067,94 +881,20 @@ export default function Distribution() {
     const leaves = getLeavesWithPath(tree?.nodes || [])
     const P = packetCount
 
-    // ── Addım 1: təhsilalan sayını hesabla (dəyişməz qayda) ─────────────────
-    const total   = allInstUsers.length
-    const stuBase = Math.floor(total / P)
-    const stuRem  = total % P
-    const stuCount = Array.from({ length: P }, (_, i) => i < stuRem ? stuBase + 1 : stuBase)
-    // stuCount = [34, 33, 33] (100 təhsilalan, 3 paket üçün)
+    // ── Addım 1: təhsilalanları paketlərə böl ────────────────────────────
+    // Proporsional rejimdə mülki və lisey AYRICA bölünür (bax: splitPacketStudents)
+    const pkUsers = splitPacketStudents(allInstUsers, P, !!(tree?.sourceProportional))
 
-    // ── Addım 2: deficit-filling alqoritmi ilə kvota bölgüsü ─────────────
-    // Zəmanət: hər paketin toplam kvotası = stuCount[i] → heç bir təhsilalan boşda qalmır
-    // Hər ixtisasın kvotası bütün paketlərə bölünür, hər paket öz payı üzrə mübarizə aparır
-    const perPacketSpecs: Array<Array<{ id: string; name: string; path: any[]; quota: number; origQuota: number }>> =
-      Array.from({ length: P }, () => [])
-
-    if (leaves.length > 0) {
-      // Base paylar
-      const baseAlloc: number[][] = leaves.map(({ leaf }) =>
-        Array(P).fill(Math.floor((leaf.quota || 0) / P))
-      )
-
-      // Hər paketin cari cəmi
-      const packetTotals = Array.from({ length: P }, (_, i) =>
-        baseAlloc.reduce((s, row) => s + row[i], 0)
-      )
-
-      // Deficit: hər paketin hələ nə qədər kvotaya ehtiyacı var
-      const deficit = stuCount.map((sc, i) => sc - packetTotals[i])
-
-      // Kopyala, sonra remainder slotları deficitə görə paylaşdır
-      const alloc = baseAlloc.map(row => [...row])
-
-      for (let j = 0; j < leaves.length; j++) {
-        const rem = (leaves[j].leaf.quota || 0) % P
-        for (let k = 0; k < rem; k++) {
-          let maxI = 0
-          for (let i = 1; i < P; i++) {
-            if (deficit[i] > deficit[maxI]) maxI = i
-          }
-          alloc[j][maxI]++
-          deficit[maxI]--
-        }
-      }
-
-      // ── Mənbə nisbəti (sourceProportional aktiv olduqda) ─────────────────
-      const spActive    = !!(tree?.sourceProportional)
-      const totalUsers  = allInstUsers.length
-      const mülkiTotal  = allInstUsers.filter((u: any) => u.source === 'mülki').length
-      const liseyTotal  = allInstUsers.filter((u: any) => u.source === 'lisey').length
-
-      // perPacketSpecs-ə yaz
-      for (let j = 0; j < leaves.length; j++) {
-        const { leaf, path } = leaves[j]
-        const origQuota = leaf.quota || 0
-        for (let i = 0; i < P; i++) {
-          if (alloc[j][i] > 0) {
-            const q = alloc[j][i]
-            let mülkiQuota: number | undefined
-            let liseyQuota: number | undefined
-            if (spActive) {
-              if (leaf.quotaMode === 'manual' && leaf.mülkiQuota != null && leaf.liseyQuota != null) {
-                // Node üçün manual kvota — proporsional böl
-                const ratio = origQuota > 0 ? q / origQuota : 0
-                mülkiQuota = Math.round(leaf.mülkiQuota * ratio)
-                liseyQuota = q - mülkiQuota
-              } else if (totalUsers > 0) {
-                mülkiQuota = Math.round(q * mülkiTotal / totalUsers)
-                liseyQuota = q - mülkiQuota
-              }
-            }
-            perPacketSpecs[i].push({
-              id: leaf.id, name: leaf.name, path,
-              quota: q, origQuota,
-              ...(spActive ? { mülkiQuota, liseyQuota } : {}),
-            })
-          }
-        }
-      }
-    }
-
-    // ── Addım 3: təhsilalanları bala görə sırala, stuCount-a görə böl ──────
-    const sorted = [...allInstUsers].sort((a: any, b: any) => (b.score || 0) - (a.score || 0))
+    // ── Addım 2: kvotanın paketlərə bölgüsü ─────────────────────────────
+    // Yerlər HƏR MƏNBƏ ÜZRƏ AYRICA paylanır: paketə düşən mülki yer = paketdəki
+    // mülki təhsilalan sayı, lisey yer = lisey sayı. Hər ixtisas üzrə paketlərin
+    // cəmi sadə üsulun bölgüsünə dəqiq bərabərdir.
+    const perPacketSpecs = allocatePacketSpecs(leaves, allInstUsers, pkUsers, tree, sel?.preAssignLevel ?? null)
 
     const result = []
-    let cursor = 0
     for (let i = 0; i < P; i++) {
-      const size = stuCount[i]
-      if (size === 0) continue
-      const studs = sorted.slice(cursor, cursor + size)
-      cursor += size
+      const studs = pkUsers[i]
+      if (studs.length === 0) continue
       result.push({
         num:        i + 1,
         students:   studs,
@@ -1166,7 +906,7 @@ export default function Distribution() {
       })
     }
     return result
-  }, [packetsReady, packetCount, allInstUsers.length, treeKey, tree?.sourceProportional])
+  }, [packetsReady, packetCount, usersKey, treeKey, tree?.sourceProportional, sel?.preAssignLevel])
 
   // ── Hər paketin müstəqil yerləşdirməsi (simulyasiya üçün) ────────────────────
   const packetPlacements = useMemo(() => {
@@ -1175,7 +915,7 @@ export default function Distribution() {
     return (packets as any[]).map((p: any) =>
       runPacketPlacement(p.students, sels, p.specs || [], spActive)
     )
-  }, [packets, sels])
+  }, [packets, sels, tree?.sourceProportional])
 
   // ── Paket sim üçün addım-addım animasiya sırası ───────────────────────────
   const animSteps = useMemo(() => {
@@ -1211,7 +951,11 @@ export default function Distribution() {
 
   // ── Yerləşdirmə nəticəsi ──────────────────────────────────────────────────
   const placement = useMemo(() => {
-    if (!mode || !tree) return null
+    // Qeyd: əvvəl burada `!mode` yoxlaması vardı və nəticə yalnız "Yerləşdir"
+    // basıldıqdan sonra hesablanırdı. İzahlı simulyasiya bu nəticəyə söykəndiyi
+    // üçün (yekun söz onundur) hesablama daha erkən aparılır — nəticə panelləri
+    // onsuz da `mode === 'distribute'` şərti ilə göstərilir.
+    if (!tree) return null
 
     // Paket üsulunda hər paketin öz kvotası tətbiq edilir
     if (method === 'packet' && packets.length > 0 && packetPlacements.length > 0) {
@@ -1235,10 +979,8 @@ export default function Distribution() {
     }
 
     if (algorithm === 'gale-shapley') return runGaleShapley(submittedUsers, sels, tree)
-    return runPlacement(submittedUsers, sels, tree, !!(tree?.sourceProportional), {
-      total: allInstUsers.length,
-      mülki: allInstUsers.filter((u: any) => u.source === 'mülki').length,
-    })
+    return runPlacement(submittedUsers, sels, tree, !!(tree?.sourceProportional),
+      allInstUsers, sel?.preAssignLevel ?? null)
   }, [mode, method, selId, treeKey, (users ?? []).length, packets, packetPlacements, tree?.sourceProportional, algorithm])
 
   const placedCount   = placement ? Object.keys(placement.assignments).length : 0
@@ -1395,6 +1137,15 @@ export default function Distribution() {
       if (step >= packetCount) clearInterval(interval)
     }, 220)
   }
+
+  // Nəticə paneli ekranda paket kartlarının altında qalır — modal bağlananda
+  // avtomatik ora sürüşdürülür, yoxsa istifadəçi "nəticə yoxdur" zənn edir.
+  const resultRef = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    if (running || mode !== 'distribute') return
+    const t = setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80)
+    return () => clearTimeout(t)
+  }, [running, mode, method])
 
   // ── Yerləşdir ──────────────────────────────────────────────────────────────
   function handleDistribute() {
@@ -2112,7 +1863,7 @@ export default function Distribution() {
           </div>
 
           {storyOpen && tree && (
-            <StorySim students={submittedUsers} subs={sels} tree={tree} onClose={() => setStoryOpen(false)} />
+            <StorySim students={submittedUsers} subs={sels} tree={tree} poolUsers={allInstUsers} preAssignLevel={sel?.preAssignLevel ?? null} finalAssignments={placement?.assignments} onClose={() => setStoryOpen(false)} />
           )}
 
           {/* Nəticə — Simulyasiya animasiyalı, Yerləşdir adi */}
@@ -2242,7 +1993,7 @@ export default function Distribution() {
           </div>
 
           {storyOpen && tree && (
-            <StorySim packets={packets} subs={sels} tree={tree} onClose={() => setStoryOpen(false)} />
+            <StorySim packets={packets} subs={sels} tree={tree} poolUsers={allInstUsers} preAssignLevel={sel?.preAssignLevel ?? null} onClose={() => setStoryOpen(false)} />
           )}
 
           {/* SimControls — simulyasiya rejimində paketlərin üstündə */}
@@ -2306,7 +2057,7 @@ export default function Distribution() {
 
 
           {/* Nəticə — Yerləşdir adi, Simulyasiya paket animasiyalı */}
-          {mode === 'distribute' && placement && <PlacementResult
+          {mode === 'distribute' && placement && <div ref={resultRef}><PlacementResult
             mode={mode} saved={saved} placement={placement}
             submittedUsers={submittedUsers} studentRows={studentRows}
             placedCount={placedCount} unplacedCount={unplacedCount}
@@ -2316,7 +2067,7 @@ export default function Distribution() {
             nameQ={nameQ} setNameQ={setNameQ}
             onExport={exportExcel}
             onSave={() => setShowConf(true)}
-          />}
+          /></div>}
 
         </>
       )}

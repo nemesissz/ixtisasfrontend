@@ -52,6 +52,7 @@ export const PERM_GROUPS: PermGroup[] = [
     group: 'Nəticələr', icon: '📋', perms: [
       { code: 'results.view',   label: 'Nəticələrə baxış' },
       { code: 'results.export', label: 'Excel ixrac' },
+      { code: 'results.reset',  label: 'Nəticələri sıfırlama' },
     ],
   },
   {
@@ -80,6 +81,10 @@ export const PATH_PERM: Record<string, string> = {
   '/admin/logs':         'logs.view',
   '/admin/integrity':    'integrity.view',
   '/admin/admins':       'admins.manage',
+  // Superadmin parametrləri: heç bir adi icazə ilə açılmır — superadmin şərti
+  // hasPerm() içində ayrıca yoxlanılır.
+  '/admin/super-settings': '__superadmin__',
+  '/admin/live': '__superadmin__',
 }
 
 // Cari admin sessiyasını oxu

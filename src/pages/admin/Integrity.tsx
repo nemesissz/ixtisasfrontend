@@ -111,6 +111,8 @@ export default function Integrity() {
       `${r.label} · Cari: ${r.hash.slice(0, 16)}… · Möhür: ${expected.slice(0, 16)}…`)
   }
 
+  const [copied, setCopied] = useState<'ok' | 'fail' | null>(null)
+
   function downloadSeal() {
     if (!saved) return
     const content = `${saved.hash}\r\nMənbə: ${saved.label}\r\nTarix: ${saved.at}\r\nAlqoritm: SHA-256\r\n`
@@ -119,7 +121,30 @@ export default function Integrity() {
     a.download = `sha256-mohur-${new Date().toISOString().slice(0, 10)}.seal.txt`
     a.click()
   }
-  function copyHash(h: string) { navigator.clipboard?.writeText(h).catch(() => {}) }
+  // navigator.clipboard yalnız təhlükəsiz kontekstdə (https / localhost) mövcuddur.
+  // Şəbəkədən http://IP:5174 ilə girildikdə o, undefined olur — ona görə köhnə
+  // execCommand üsulu ehtiyat variant kimi saxlanılır.
+  async function copyHash(h: string) {
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(h)
+      } else {
+        const ta = document.createElement('textarea')
+        ta.value = h
+        ta.style.position = 'fixed'
+        ta.style.opacity = '0'
+        document.body.appendChild(ta)
+        ta.focus(); ta.select()
+        const ok = document.execCommand('copy')
+        document.body.removeChild(ta)
+        if (!ok) throw new Error('execCommand uğursuz')
+      }
+      setCopied('ok')
+    } catch {
+      setCopied('fail')
+    }
+    setTimeout(() => setCopied(null), 2500)
+  }
 
   if (!canView) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted)' }}>İcazəniz yoxdur.</div>
 
@@ -176,8 +201,16 @@ export default function Integrity() {
               <div style={{ fontSize: 12, color: 'var(--muted)' }}>{saved.label} · {saved.at}</div>
               <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
                 <button onClick={downloadSeal} style={btnGhost}>💾 Möhürü yüklə</button>
-                <button onClick={() => copyHash(saved.hash)} style={btnGhost}>📋 Kopyala</button>
+                <button onClick={() => copyHash(saved.hash)} style={btnGhost}>
+                  {copied === 'ok' ? '✅ Kopyalandı' : copied === 'fail' ? '⚠️ Alınmadı' : '📋 Kopyala'}
+                </button>
               </div>
+              {copied === 'fail' && (
+                <div style={{ fontSize: 11.5, color: '#c0392b', marginTop: 8 }}>
+                  Brauzer kopyalamağa icazə vermədi. Yuxarıdakı kodu siçanla seçib
+                  <strong> Ctrl+C</strong> et, ya da “💾 Möhürü yüklə” düyməsini işlət.
+                </div>
+              )}
               <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 10, lineHeight: 1.5 }}>
                 ⚠ Möhürü təhlükəsiz yerə də köçür (yüklə / kopyala / foto).
               </div>

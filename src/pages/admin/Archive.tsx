@@ -1,9 +1,11 @@
 import { useState, useMemo, useEffect } from 'react'
+import { useActiveInst } from '../../activeInst'
 import * as XLSX from 'xlsx'
-import { selectionDb, treeDb, userDb, submissionDb, userArchiveDb, treeArchiveDb, institutionDb, useLocalState, buildNameMap, addLog } from '../../db'
+import { selectionDb, treeDb, userDb, submissionDb, userArchiveDb, institutionDb, useLocalState, buildNameMap, addLog } from '../../db'
 import { AppDialog, useDialog } from '../../components/AppDialog'
 import { useTopbar } from '../../contexts/TopbarContext'
 import InstIcon from '../../components/InstIcon'
+import { formatDate } from '../../utils-date'
 
 function getLeavesWithPath(nodes: any[], anc: any[] = []): Array<{ leaf: any; path: any[] }> {
   const res: Array<{ leaf: any; path: any[] }> = []
@@ -23,15 +25,15 @@ const SECTIONS = [
 export default function Archive() {
   const [selList,   refreshSels]  = useLocalState(selectionDb.getArchived)
   const [userArcs,  refreshUArcs] = useLocalState(userArchiveDb.getAll)
-  const [treeArcs,  refreshTArcs] = useLocalState(treeArchiveDb.getAll)
+  const [treeArcs,  refreshTArcs] = useLocalState(treeDb.getArchived)
   const [users]                   = useLocalState(userDb.getAll)
 
   const [section,    setSection]    = useState('selections')
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [instFlt,    setInstFlt]    = useState<Record<string, string>>({})
   const [search,     setSearch]     = useState<Record<string, string>>({})
-  const [activeInst, setActiveInst] = useState<string>('')
   const [instList]                  = useLocalState(institutionDb.getAll)
+  const [activeInst, setActiveInst] = useActiveInst(instList as any[])
   const { dialog, showConfirm, showInfo, closeDialog } = useDialog()
   const { setSlot, clearSlot } = useTopbar()
 
@@ -72,21 +74,33 @@ export default function Archive() {
     showConfirm({
       icon: '👥', iconBg: '#fbf1d6', iconColor: '#c9962a',
       title: 'Təhsilalanları bərpa et',
-      message: `"${arc.label}" arxivindəki ${arc.snapshot?.length ?? 0} təhsilalan aktiv siyahıya əlavə ediləcək.`,
+      message: `"${arc.label}" arxivindəki ${arc.snapshot?.length ?? 0} təhsilalan aktiv siyahıya əlavə ediləcək.`
+        + (arc.submissions?.length ? ` Yerləşdirmə nəticələri və ${arc.submissions.length} göndərilmiş seçim də geri qaytarılır.` : ' Yerləşdirmə nəticələri də geri qaytarılır.'),
       confirmLabel: 'Bərpa et', confirmColor: '#c9962a',
       onConfirm: async () => {
         const existing  = await userDb.getAll()
         const existFins = new Set(existing.map((u: any) => u.fin).filter(Boolean))
-        const toAdd     = (arc.snapshot || []).filter((u: any) => !existFins.has(u.fin))
-        await userDb.bulkCreate(toAdd.map((u: any) => { const { id, ...rest } = u; return rest }))
+        const existIds  = new Set(existing.map((u: any) => u.id))
+        const toAdd     = (arc.snapshot || []).filter((u: any) => !existFins.has(u.fin) && !existIds.has(u.id))
+        // ID SAXLANILIR: arxivdəki seçimlər (Submission.userId) məhz bu ID-lərə bağlıdır.
+        // Əvvəl id atılırdı → yeni ID yaranırdı → seçimlər və nəticələr qopurdu.
+        await userDb.bulkCreate(toAdd)
+        // Göndərilmiş seçimləri də geri yaz (yalnız bərpa olunanlar üçün)
+        const addedIds = new Set(toAdd.map((u: any) => u.id))
+        const subs = (arc.submissions || []).filter((s: any) => addedIds.has(s.userId))
+        let subOk = 0
+        for (const s of subs) {
+          try { await submissionDb.save({ userId: s.userId, userName: s.userName ?? null, selectionId: s.selectionId, ranking: s.ranking || [] }); subOk++ }
+          catch { /* seçimi silinmiş/əlçatmaz olan sətir bərpanı dayandırmamalıdır */ }
+        }
         const skipped = (arc.snapshot?.length ?? 0) - toAdd.length
         await userArchiveDb.delete(arc.id)
-        addLog('user', 'success', `Təhsilalanlar arxivdən bərpa edildi: "${arc.label}"`, `${toAdd.length} bərpa${skipped ? ` · ${skipped} mövcud idi` : ''}`)
+        addLog('user', 'success', `Təhsilalanlar arxivdən bərpa edildi: "${arc.label}"`, `${toAdd.length} bərpa${subOk ? ` · ${subOk} seçim` : ''}${skipped ? ` · ${skipped} mövcud idi` : ''}`)
         await refreshUArcs()
         showInfo({
           icon: '✅', iconBg: '#f0fff4', iconColor: '#52c41a',
           title: 'Bərpa tamamlandı',
-          message: `${toAdd.length} təhsilalan bərpa edildi.${skipped ? ` ${skipped} təhsilalan artıq mövcud idi.` : ''} Arxivdən silindi.`,
+          message: `${toAdd.length} təhsilalan bərpa edildi.${subOk ? ` ${subOk} göndərilmiş seçim və yerləşdirmə nəticələri ilə birlikdə.` : ''}${skipped ? ` ${skipped} təhsilalan artıq mövcud idi.` : ''} Arxivdən silindi.`,
           confirmLabel: 'Bağla',
         })
       },
@@ -96,17 +110,18 @@ export default function Archive() {
     showConfirm({
       icon: '🎓', iconBg: '#fbf1d6', iconColor: '#c9962a',
       title: 'Strukturu bərpa et',
-      message: `"${arc.name}" ixtisas strukturu Müəssisə/İxtisaslar bölməsinə yeni struktur kimi əlavə ediləcək.`,
+      message: `"${arc.name}" ixtisas strukturu və onunla birlikdə arxivə düşmüş seçimlər geri qaytarılacaq. Eyni struktur bərpa olunur — nəticələr də yenidən işlək olur. (Əvvəllər əl ilə arxivlənmiş seçimlərə toxunulmur.)`,
       confirmLabel: 'Bərpa et', confirmColor: '#c9962a',
       onConfirm: async () => {
-        await treeDb.create({ name: arc.name + ' (bərpa)', year: arc.year || '', icon: arc.icon || '', nodes: arc.nodes || [] })
-        await treeArchiveDb.delete(arc.id)
+        // Nüsxə yaradılmır: eyni sətir yenidən aktiv edilir, ona görə
+        // Selection.TreeId bağlantıları və nəticələr qırılmır.
+        await treeDb.restore(arc.id)
         addLog('system', 'success', `İxtisas strukturu arxivdən bərpa edildi: "${arc.name}"`)
         await refreshTArcs()
         showInfo({
           icon: '✅', iconBg: '#f0fff4', iconColor: '#52c41a',
           title: 'Bərpa tamamlandı',
-          message: 'Struktur Müəssisə/İxtisaslar bölməsinə uğurla əlavə edildi. Arxivdən silindi.',
+          message: 'Struktur Müəssisə/İxtisaslar bölməsinə, onunla birlikdə arxivlənmiş seçimlər isə Seçimlər bölməsinə qaytarıldı.',
           confirmLabel: 'Bağla',
         })
       },
@@ -116,9 +131,24 @@ export default function Archive() {
     showConfirm({
       icon: '🗑️', iconBg: '#fff0f0', iconColor: '#ff4d4f',
       title: 'İxtisas arxivini sil',
-      message: 'Bu ixtisas strukturu arxivdən tamamilə silinəcək. Əməliyyat geri alına bilməz.',
+      message: 'Bu ixtisas strukturu bazadan tamamilə silinəcək. Əməliyyat geri alına bilməz. Ona bağlı seçim varsa silinmə mümkün olmayacaq.',
       confirmLabel: 'Sil', confirmColor: '#ff4d4f',
-      onConfirm: async () => { const a = tarcs.find((x: any) => x.id === id); await treeArchiveDb.delete(id); addLog('system', 'error', `İxtisas arxivi silindi: "${a?.name || id}"`); await refreshTArcs() },
+      onConfirm: async () => {
+        const a = tarcs.find((x: any) => x.id === id)
+        try {
+          await treeDb.delete(id)
+        } catch (e: any) {
+          let msg = String(e?.message ?? e ?? '')
+          try { const j = JSON.parse(msg); if (j?.message) msg = j.message } catch { /* JSON deyil */ }
+          showInfo({
+            icon: '⚠️', iconBg: '#fdecea', iconColor: '#c0392b',
+            title: 'Struktur silinmədi', message: msg, confirmLabel: 'Bağla',
+          })
+          return
+        }
+        addLog('system', 'error', `İxtisas strukturu silindi: "${a?.name || id}"`)
+        await refreshTArcs()
+      },
     })
   }
 
@@ -208,7 +238,7 @@ export default function Archive() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 {shown.map((sel: any, idx: number) => (
                   <ArchiveCard
-                    key={sel.id} sel={sel} idx={idx} allUsers={allUsers}
+                    key={sel.id} sel={sel} idx={idx} allUsers={allUsers} insts={insts}
                     expanded={expandedId === sel.id}
                     instFlt={instFlt[sel.id] || 'all'}
                     searchQ={search[sel.id] || ''}
@@ -236,7 +266,7 @@ export default function Archive() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 {shown.map((arc: any, idx: number) => (
                   <UserArchiveCard
-                    key={arc.id} arc={arc} idx={idx}
+                    key={arc.id} arc={arc} idx={idx} insts={insts}
                     expanded={expandedId === arc.id}
                     searchQ={search[arc.id] || ''}
                     onToggle={() => setExpandedId(expandedId === arc.id ? null : arc.id)}
@@ -342,15 +372,18 @@ function EmptyState({ icon, text, sub }: { icon: string; text: string; sub: stri
 }
 
 // ── Təhsilalan Arxiv Kartı ───────────────────────────────────────────────────────
-function UserArchiveCard({ arc, idx, expanded, searchQ, onToggle, onSearch, onDelete, onRestore }: any) {
+function UserArchiveCard({ arc, idx, insts, expanded, searchQ, onToggle, onSearch, onDelete, onRestore }: any) {
   const snapshot: any[] = arc.snapshot || []
 
-  const instColor = arc.institution === 'kollec' ? '#c9962a' : '#b8860b'
-  const instBg    = arc.institution === 'kollec' ? '#fbf1d6' : '#fbf1d6'
-  const instLabel = arc.institution === 'kollec' ? '🎓 Hərbi Kollec' : '🏛️ AHM'
+  // Müəssisə adı siyahıdan götürülür (köhnə 'kollec'/'ahm' sabitləri deyil)
+  const inst      = (insts || []).find((i: any) => i.id === arc.institution)
+  const instColor = '#b8860b'
+  const instBg    = '#fbf1d6'
+  const instIcon  = inst?.icon
+  const instLabel = inst?.label || arc.institution || '—'
 
   const archivedDate = arc.archivedAt
-    ? new Date(arc.archivedAt).toLocaleDateString('az-AZ', { day: '2-digit', month: 'long', year: 'numeric' })
+    ? formatDate(arc.archivedAt)
     : '—'
 
   const rows = useMemo(() => {
@@ -407,9 +440,10 @@ function UserArchiveCard({ arc, idx, expanded, searchQ, onToggle, onSearch, onDe
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
             <span style={{ fontWeight: 800, fontSize: 14, color: 'var(--text)' }}>{arc.label}</span>
             <span style={{
+              display: 'inline-flex', alignItems: 'center', gap: 4,
               fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 6,
               background: instBg, color: instColor, border: `1px solid ${instColor}33`,
-            }}>{instLabel}</span>
+            }}><InstIcon icon={instIcon} size={11} />{instLabel}</span>
             <span style={{
               fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 6,
               background: '#f5f5f5', color: '#888', border: '1px solid #e8e8e8',
@@ -565,7 +599,7 @@ function UserArchiveCard({ arc, idx, expanded, searchQ, onToggle, onSearch, onDe
 }
 
 // ── Seçim Arxiv Kartı ─────────────────────────────────────────────────────────
-function ArchiveCard({ sel, idx, allUsers, expanded, instFlt, searchQ,
+function ArchiveCard({ sel, idx, allUsers, insts, expanded, instFlt, searchQ,
   onToggle, onInstFlt, onSearch, onRestore, onDelete }: any) {
 
   const [tree,   setTree]   = useState<any>(null)
@@ -586,22 +620,11 @@ function ArchiveCard({ sel, idx, allUsers, expanded, instFlt, searchQ,
   const leaves   = getLeavesWithPath(tree?.nodes || [])
   const totalQuota = leaves.reduce((s, { leaf }) => s + (leaf.quota || 0), 0)
 
-  if (!loaded) {
-    return (
-      <div style={{
-        background: '#fff', border: '1.5px solid var(--border)',
-        borderRadius: 16, padding: '18px 22px', color: 'var(--muted)', fontSize: 13,
-      }}>Yüklənir...</div>
-    )
-  }
-
-  const instUsers = allUsers.filter((u: any) => u.institution === sel.institution)
+  // DİQQƏT: bütün hook-lar erkən `return`-dən ƏVVƏL çağırılmalıdır,
+  // yoxsa React "Rendered more hooks than during the previous render" xətası verir.
+  const instUsers = sel ? allUsers.filter((u: any) => u.institution === sel.institution) : []
   const submitted = instUsers.filter((u: any) => subs.find((s: any) => s.userId === u.id))
   const placed    = instUsers.filter((u: any) => u.placedSpecialty)
-
-  const instColor = sel.institution === 'kollec' ? '#c9962a' : '#b8860b'
-  const instBg    = sel.institution === 'kollec' ? '#fbf1d6' : '#fbf1d6'
-  const instLabel = sel.institution === 'kollec' ? '🎓 Hərbi Kollec' : '🏛️ AHM'
 
   const rows = useMemo(() => {
     return submitted
@@ -614,11 +637,27 @@ function ArchiveCard({ sel, idx, allUsers, expanded, instFlt, searchQ,
       .sort((a: any, b: any) => (b.score || 0) - (a.score || 0))
   }, [submitted.length, searchQ, instFlt])
 
+  if (!loaded) {
+    return (
+      <div style={{
+        background: '#fff', border: '1.5px solid var(--border)',
+        borderRadius: 16, padding: '18px 22px', color: 'var(--muted)', fontSize: 13,
+      }}>Yüklənir...</div>
+    )
+  }
+
+  // Müəssisə adı siyahıdan götürülür (köhnə 'kollec'/'ahm' sabitləri deyil)
+  const inst      = (insts || []).find((i: any) => i.id === sel.institution)
+  const instColor = '#b8860b'
+  const instBg    = '#fbf1d6'
+  const instIcon  = inst?.icon
+  const instLabel = inst?.label || sel.institution || '—'
+
   function exportExcel() {
     const data = rows.map((u: any, i: number) => ({
       '№': i + 1, 'Təhsilalan': u.name, 'FİN': u.fin || '—',
       'İş nömrəsi': u.workNumber || '—',
-      'Müəssisə': u.institution === 'kollec' ? 'Hərbi Kollec' : 'AHM',
+      'Müəssisə': (insts || []).find((i: any) => i.id === u.institution)?.label || u.institution || '—',
       'Bal': Number(u.score).toFixed(2), 'Qrup': u.group || '—',
       'Yerləşdiyi ixtisas': u.placedSpecialty ? (nameMap[u.placedSpecialty] || u.placedSpecialty) : '—',
     }))
@@ -631,7 +670,7 @@ function ArchiveCard({ sel, idx, allUsers, expanded, instFlt, searchQ,
   }
 
   const archivedDate = sel.archivedAt
-    ? new Date(sel.archivedAt).toLocaleDateString('az-AZ', { day: '2-digit', month: 'long', year: 'numeric' })
+    ? formatDate(sel.archivedAt)
     : '—'
 
   return (
@@ -662,9 +701,10 @@ function ArchiveCard({ sel, idx, allUsers, expanded, instFlt, searchQ,
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
             <span style={{ fontWeight: 800, fontSize: 14, color: 'var(--text)' }}>{sel.name}</span>
             <span style={{
+              display: 'inline-flex', alignItems: 'center', gap: 4,
               fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 6,
               background: instBg, color: instColor, border: `1px solid ${instColor}33`,
-            }}>{instLabel}</span>
+            }}><InstIcon icon={instIcon} size={11} />{instLabel}</span>
             <span style={{
               fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 6,
               background: '#f5f5f5', color: '#888', border: '1px solid #e8e8e8',
@@ -753,8 +793,7 @@ function ArchiveCard({ sel, idx, allUsers, expanded, instFlt, searchQ,
             />
             <select className="filter-select" value={instFlt} onChange={e => onInstFlt(e.target.value)}>
               <option value="all">Bütün müəssisələr</option>
-              <option value="kollec">🎓 Hərbi Kollec</option>
-              <option value="ahm">🏛️ AHM</option>
+              {(insts || []).map((i: any) => <option key={i.id} value={i.id}>{i.label}</option>)}
             </select>
             <button onClick={exportExcel} style={{
               padding: '8px 16px', borderRadius: 8, border: 'none',
@@ -785,10 +824,9 @@ function ArchiveCard({ sel, idx, allUsers, expanded, instFlt, searchQ,
                   </tr>
                 )}
                 {rows.map((u: any, i: number) => {
-                  const instOpt = u.institution === 'kollec'
-                    ? { label: '🎓 Hərbi Kollec', color: '#c9962a', bg: '#fbf1d6' }
-                    : u.institution === 'ahm'
-                    ? { label: '🏛️ AHM', color: '#b8860b', bg: '#fbf1d6' }
+                  const uInst = (insts || []).find((i: any) => i.id === u.institution)
+                  const instOpt = uInst
+                    ? { label: uInst.label, icon: uInst.icon, color: '#b8860b', bg: '#fbf1d6' }
                     : null
                   return (
                     <tr key={u.id}>
@@ -805,7 +843,7 @@ function ArchiveCard({ sel, idx, allUsers, expanded, instFlt, searchQ,
                       </td>
                       <td>
                         {instOpt
-                          ? <span style={{ display: 'inline-block', padding: '4px 12px', borderRadius: 8, background: instOpt.bg, color: instOpt.color, fontWeight: 700, fontSize: 12 }}>{instOpt.label}</span>
+                          ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 12px', borderRadius: 8, background: instOpt.bg, color: instOpt.color, fontWeight: 700, fontSize: 12 }}><InstIcon icon={instOpt.icon} size={13} />{instOpt.label}</span>
                           : <span style={{ fontSize: 12, color: '#ccc' }}>—</span>}
                       </td>
                       <td style={{ textAlign: 'center', fontWeight: 700, color: 'var(--muted)', fontSize: 13 }}>{u.group || '—'}</td>
@@ -945,7 +983,7 @@ function TreeArchiveCard({ arc, idx, expanded, onToggle, onDelete, onRestore }: 
   const isImage = arc.icon?.startsWith('data:')
 
   const archivedDate = arc.archivedAt
-    ? new Date(arc.archivedAt).toLocaleDateString('az-AZ', { day: '2-digit', month: 'long', year: 'numeric' })
+    ? formatDate(arc.archivedAt)
     : '—'
 
   return (

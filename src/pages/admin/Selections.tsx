@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useActiveInst } from '../../activeInst'
 import { useNavigate } from 'react-router-dom'
 import { selectionDb, institutionDb, useLocalState, addLog } from '../../db'
 import { AppDialog, useDialog } from '../../components/AppDialog'
@@ -21,11 +22,11 @@ export default function Selections() {
   const navigate = useNavigate()
   const [list, refresh]           = useLocalState(selectionDb.getAll)
   const [institutions]            = useLocalState(institutionDb.getAll)
-  const [tab, setTab]             = useState<string>('')
+  const [tab, setTab]             = useActiveInst(institutions as any[])
   const [filter, setFilter]       = useState('all')
 
   // resolve active tab (default to first institution)
-  const { dialog, showConfirm, closeDialog } = useDialog()
+  const { dialog, showConfirm, showInfo, closeDialog } = useDialog()
 
   if (!list || !institutions) return <div className="empty-state">Yüklənir...</div>
 
@@ -56,7 +57,25 @@ export default function Selections() {
       title: 'Seçimi yayımla',
       message: `"${s.name}" seçimi yayımlanacaq. Təhsilalanlar öz seçimlərini edə biləcək.`,
       confirmLabel: 'Yayımla', confirmColor: '#52c41a',
-      onConfirm: async () => { await selectionDb.publish(s.id); await refresh(); addLog('selection', 'success', `Seçim yayımlandı: "${s.name}"`, `id: ${s.id}`) },
+      onConfirm: async () => {
+        try {
+          await selectionDb.publish(s.id)
+        } catch (err: any) {
+          // Server mənbə balansı pozulanda 409 qaytarır — səbəbi olduğu kimi göstər
+          const raw = String(err?.message ?? err ?? '')
+          const m = raw.match(/\{[\s\S]*\}/)
+          let text = raw
+          try { if (m) text = JSON.parse(m[0])?.message || raw } catch { /* mətn olduğu kimi qalsın */ }
+          showInfo({
+            icon: '⚖️', iconBg: '#fff2f0', iconColor: '#cf1322',
+            title: 'Yayım mümkün deyil',
+            message: text || 'Seçimi yayımlamaq alınmadı.',
+          })
+          return
+        }
+        await refresh()
+        addLog('selection', 'success', `Seçim yayımlandı: "${s.name}"`, `id: ${s.id}`)
+      },
     })
   }
 

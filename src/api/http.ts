@@ -12,7 +12,7 @@ import { getToken, clearAdminSession, clearStudentSession } from './auth'
 //   Buna görə istehsal build-i üçün nisbi ünvan DEFAULT davranışdır.
 const _env = (import.meta as any).env?.VITE_API_URL
 const _isDev = (import.meta as any).env?.DEV === true
-const BASE_URL: string = _env ? _env : (_isDev ? 'http://localhost:5199' : '')
+export const BASE_URL: string = _env ? _env : (_isDev ? 'http://localhost:5199' : '')
 
 export class ApiError extends Error {
   status: number

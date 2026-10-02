@@ -31,7 +31,7 @@ function read<T>(key: string): T | null {
 
 export function getAdminSession(): AdminSession | null { return read<AdminSession>(KEYS.admin) }
 export function setAdminSession(session: AdminSession) { sessionStorage.setItem(KEYS.admin, JSON.stringify(session)) }
-export function clearAdminSession() { sessionStorage.removeItem(KEYS.admin) }
+export function clearAdminSession() { sessionStorage.removeItem(KEYS.admin); sessionStorage.removeItem('mmu_active_inst') }
 
 export function getStudentSession(): StudentSession | null { return read<StudentSession>(KEYS.student) }
 export function setStudentSession(session: StudentSession) { sessionStorage.setItem(KEYS.student, JSON.stringify(session)) }

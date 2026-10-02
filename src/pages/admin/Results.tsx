@@ -1,8 +1,11 @@
 import { useState, useMemo, useEffect, useCallback, Fragment } from 'react'
+import { readActiveInst, writeActiveInst } from '../../activeInst'
 import * as XLSX from 'xlsx'
 import { selectionDb, treeDb, userDb, submissionDb, buildNameMap, institutionDb, addLog, usePoll } from '../../db'
 import InstIcon from '../../components/InstIcon'
+import { AppDialog, useDialog } from '../../components/AppDialog'
 import { can } from '../../permissions'
+import { today } from '../../utils-date'
 
 const pct = (a: number, b: number) => (b > 0 ? Math.round((a / b) * 100) : 0)
 
@@ -45,7 +48,12 @@ export default function Results() {
 
   const [selId, setSelId]   = useState<string>('')
   useEffect(() => {
-    if (!selId && allSelections.length > 0) setSelId(allSelections[0].id)
+    if (!selId && allSelections.length > 0) {
+      // Son seçilmiş müəssisənin ilk seçimi — yoxdursa ümumi birinci
+      const last = readActiveInst()
+      const first = allSelections.find((s: any) => (s.institutionId || s.institution) === last) || allSelections[0]
+      setSelId(first.id)
+    }
   }, [allSelections])
   const [search, setSearch] = useState('')
   const [aktMenu, setAktMenu] = useState(false)
@@ -56,6 +64,11 @@ export default function Results() {
   const toggleExpand = (id: string) => setExpanded(p => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n })
 
   const sel  = allSelections.find((s: any) => s.id === selId)
+  // Müəssisə → seçim iki pilləli keçid
+  const selInsts: string[] = []
+  for (const s of allSelections) { const k = s.institutionId || s.institution || ''; if (!selInsts.includes(k)) selInsts.push(k) }
+  const curInst = (sel?.institutionId || sel?.institution || '') as string
+  const instSelections = allSelections.filter((s: any) => (s.institutionId || s.institution || '') === curInst)
 
   const [tree, setTree] = useState<any>(null)
   const [subs, setSubs] = useState<any[]>([])
@@ -85,6 +98,51 @@ export default function Results() {
   const showGroup = submittedUsers.some((u: any) => u.group)
   const isPlaced = (u: any) => !!(u.placedSpecialtyId || u.placedSpecialty)
   const specName = (u: any) => (u.placedSpecialty ? (nameMap[u.placedSpecialty] || u.placedSpecialty) : '')
+
+  const { dialog, showConfirm, showInfo, closeDialog } = useDialog()
+  const [resetDone, setResetDone] = useState(false)
+
+  // Bu seçimə aid yerləşdirmə nəticələrini təmizləyir.
+  // Yalnız 4 yerləşdirmə sahəsi sıfırlanır — təhsilalanın seçim sıralaması (submission),
+  // balı və statusu toxunulmur, yəni yenidən yerləşdirmə dərhal aparıla bilər.
+  // Ekranda "Yerləşdi" kimi görünən dəstənin eyniə — bu seçimdə sıralama göndərmiş və
+  // yerləşdirilmiş təhsilalanlar. (Seçim silinib yenidən yaradılıbsa PlacedSelectionId
+  //  boş qala bilər, ona görə təkcə o sahəyə güvənilmir.)
+  const placedHere = submittedUsers.filter(isPlaced)
+
+  function handleResetResults() {
+    showConfirm({
+      icon: '🗑️', iconBg: '#fff0f0', iconColor: '#ff4d4f',
+      title: 'Nəticələri sıfırla',
+      message: `"${sel?.name}" seçimi üzrə ${placedHere.length} təhsilalanın yerləşdirmə nəticəsi silinəcək. `
+        + `Təhsilalanların seçim sıralamasına və ballarına toxunulmayacaq — yerləşdirməni yenidən apara bilərsiniz. `
+        + `Bu əməliyyat geri alına bilməz.`,
+      confirmLabel: 'Sıfırla', confirmColor: '#ff4d4f',
+      onConfirm: async () => {
+        const n = placedHere.length
+        await userDb.bulkUpdate(placedHere.map((u: any) => ({
+          id: u.id, placedSpecialty: null, choiceNum: null,
+          placedSpecialtyId: null, placedSelectionId: null,
+        })), 'reset')
+        // Paket bölgüsü qeydi də silinir — statistika köhnə bölgünü göstərməsin
+        try {
+          const store = JSON.parse(localStorage.getItem('dist_packet_alloc') || '{}')
+          delete store[selId]
+          localStorage.setItem('dist_packet_alloc', JSON.stringify(store))
+        } catch { /* localStorage əlçatmazdırsa sıfırlamaya mane olma */ }
+        addLog('distribution', 'warning', `Yerləşdirmə nəticələri sıfırlandı: "${sel?.name}"`,
+          `${n} təhsilalanın yerləşdirməsi silindi`)
+        loadBase()
+        setResetDone(true)
+        setTimeout(() => setResetDone(false), 4000)
+        showInfo({
+          icon: '🗑️', iconBg: '#fff0f0', iconColor: '#ff4d4f',
+          title: 'Nəticələr sıfırlandı',
+          message: `${n} təhsilalanın yerləşdirmə nəticəsi silindi. Yerləşdirməni yenidən apara bilərsiniz.`,
+        })
+      },
+    })
+  }
 
   // ── Statistika ──
   const stats = useMemo(() => {
@@ -125,7 +183,7 @@ export default function Results() {
     ws['!cols'] = [{ wch: 4 }, { wch: 22 }, { wch: 10 }, { wch: 12 }, { wch: 14 }, { wch: 8 }, ...(showGroup ? [{ wch: 6 }] : []), { wch: 11 }, { wch: 32 }, { wch: 12 }]
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, 'Nəticələr')
-    XLSX.writeFile(wb, `Neticeler_${new Date().toLocaleDateString('az-AZ').replace(/\./g, '-')}.xlsx`)
+    XLSX.writeFile(wb, `Neticeler_${fileDate()}.xlsx`)
     addLog('distribution', 'info', `Nəticələr Excel-ə ixrac edildi`, `${data.length} təhsilalan · ${sel?.name || ''}`)
   }
 
@@ -186,7 +244,8 @@ export default function Results() {
     }
   }
 
-  const nowStr = () => new Date().toLocaleDateString('az-AZ', { day: '2-digit', month: 'long', year: 'numeric' })
+  const nowStr = () => today()          // 01.09.2026
+  const fileDate = () => today('-')     // fayl adı: 01-09-2026
 
   // Rəsmi akt HTML-i (kargüzarlıq rekvizitləri ilə) — həm çap, həm Word üçün.
   // Word uyğunluğu üçün layout cədvəl-əsaslıdır (grid/flex yerinə).
@@ -194,7 +253,6 @@ export default function Results() {
     const d = buildActData()
     const esc = (s: any) => String(s ?? '').replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]!))
     const f2 = (n: number) => Number(n).toFixed(2)
-    const BL = (w = 180) => `<span class="bl" style="min-width:${w}px"></span>`
 
     const specSections = d.perSpec.map((s, si) => `
       <div class="spec">
@@ -239,16 +297,8 @@ export default function Results() {
     <style>
       * { box-sizing: border-box; }
       body { font-family: 'Times New Roman', serif; color: #000; margin: 0; padding: 30px 40px; font-size: 12pt; line-height: 1.4; }
-      .approve { width: 100%; border: none; }
-      .approve td { border: none; vertical-align: top; padding: 0; }
-      .approve .g { text-align: center; font-size: 11pt; }
       .center { text-align: center; }
-      .org { font-weight: bold; font-size: 12pt; text-transform: uppercase; margin-top: 6px; }
       .akt-title { font-size: 17pt; font-weight: bold; letter-spacing: 6px; margin: 12px 0 4px; }
-      .reqs { width: 100%; border: none; margin: 6px 0 14px; }
-      .reqs td { border: none; font-size: 11pt; }
-      .subject { text-align: center; font-weight: bold; font-size: 12.5pt; margin: 10px 0 12px; }
-      .bl { display: inline-block; border-bottom: 1px solid #000; height: 1em; vertical-align: baseline; }
       h2 { font-size: 12pt; text-transform: uppercase; letter-spacing: .5px; border-bottom: 1px solid #000; padding-bottom: 4px; margin: 20px 0 10px; }
       p { margin: 0 0 12px; text-align: justify; }
       table.tbl { width: 100%; border-collapse: collapse; margin-bottom: 6px; }
@@ -264,45 +314,24 @@ export default function Results() {
       .spec-path { font-weight: normal; color: #333; font-size: 10pt; }
       .spec-fill { float: right; font-weight: bold; }
       .empty { border: 1px solid #000; border-top: none; padding: 6px 8px; font-style: italic; }
-      .copies { margin: 14px 0; }
-      .comm { margin-top: 26px; page-break-inside: avoid; }
-      .comm .row { margin-bottom: 20px; }
-      .comm .role { display: inline-block; width: 200px; }
-      .my { margin-top: 30px; font-weight: bold; }
       @media print { body { padding: 14mm 16mm; } .noprint { display: none; } }
       .noprint { text-align: center; margin-bottom: 18px; }
       .noprint button { font-family: sans-serif; font-size: 13px; padding: 9px 22px; border-radius: 8px; border: none; background: #1d6f42; color: #fff; font-weight: 700; cursor: pointer; }
     </style></head><body>
       ${printBtn}
 
-      <!-- ── TƏSDİQ EDİRƏM grifi (yuxarı sağ) ── -->
-      <table class="approve"><tr>
-        <td style="width:52%"></td>
-        <td class="g">
-          <b>TƏSDİQ EDİRƏM</b><br>
-          ${BL(200)}<br><span style="font-size:9pt">(vəzifə, hərbi rütbə)</span><br>
-          ${BL(200)}<br><span style="font-size:9pt">(ad, soyad, imza)</span><br>
-          «___» ____________ 20__
-        </td>
-      </tr></table>
-
-      <!-- ── Başlıq (mətn) ── -->
+      <!-- Məzmun Excel ixracı ilə eyni saxlanılır: başlıq + Müəssisə/Seçim/Tarix,
+           xülasə, bölgülər, ixtisas üzrə siyahı. Rəsmi kargüzarlıq elementləri
+           (təsdiq grifi, «Əsas:», nüsxə sətri, komissiya imzaları) qəsdən yoxdur. -->
       <div class="center">
-        <div class="org">${esc(d.instLabel)}</div>
-        <div class="akt-title">A K T</div>
+        <div class="akt-title">YERLƏŞDİRMƏ AKTI</div>
       </div>
 
-      <!-- ── Rekvizitlər: № / şəhər / tarix ── -->
-      <table class="reqs"><tr>
-        <td style="text-align:left">№ ${BL(90)}</td>
-        <td style="text-align:right">${BL(120)} ş.&nbsp;&nbsp;&nbsp; ${nowStr()}</td>
-      </tr></table>
-
-      <div class="subject">«${esc(d.instLabel)} üzrə ixtisas seçimi və yerləşdirmə nəticələri haqqında»</div>
-
-      <p><b>Əsas:</b> ${BL(120)} №-li, «___» ____________ 20__ tarixli əmr (protokol).</p>
-
-      <p><b>${esc(d.instLabel)}</b> müəssisəsində ixtisas seçimi və yerləşdirmə prosesi yekunlaşdırılmış; təhsilalanların topladıqları ballara və seçim üstünlüklərinə əsasən, kvotalar çərçivəsində aşağıdakı bölgü aparılmışdır:</p>
+      <table class="sum" style="margin-bottom:14px">
+        <tr><td class="lab">Müəssisə</td><td>${esc(d.instLabel)}</td></tr>
+        <tr><td class="lab">Seçim</td><td>${esc(d.selName || '—')}</td></tr>
+        <tr><td class="lab">Tarix</td><td>${nowStr()}</td></tr>
+      </table>
 
       <h2>Ümumi xülasə</h2>
       <table class="sum">
@@ -318,18 +347,6 @@ export default function Results() {
       <h2>İxtisas üzrə yerləşdirmə siyahısı</h2>
       ${specSections || '<div class="empty">Yerləşdirmə aparılmayıb.</div>'}
 
-      <p class="copies">Akt ${BL(50)} nüsxədə tərtib edilmişdir.</p>
-
-      <!-- ── Komissiya (boş imza sətirləri) ── -->
-      <div class="comm">
-        <div style="font-weight:bold; margin-bottom:14px">Komissiya:</div>
-        <div class="row"><span class="role">Komissiya sədri:</span> ${BL(150)} / ${BL(200)} /</div>
-        <div class="row"><span class="role">Komissiya üzvü:</span> ${BL(150)} / ${BL(200)} /</div>
-        <div class="row"><span class="role">Komissiya üzvü:</span> ${BL(150)} / ${BL(200)} /</div>
-        <div class="row"><span class="role">Komissiya üzvü:</span> ${BL(150)} / ${BL(200)} /</div>
-        <div style="font-size:9pt; color:#333">(imza)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(ad, soyad)</div>
-        <div class="my">M.Y.</div>
-      </div>
     </body></html>`
   }
 
@@ -348,7 +365,7 @@ export default function Results() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `Yerlesdirme_Akti_${d.instLabel}_${new Date().toLocaleDateString('az-AZ').replace(/\./g, '-')}.doc`
+    a.download = `Yerlesdirme_Akti_${d.instLabel}_${fileDate()}.doc`
     a.click()
     URL.revokeObjectURL(url)
     addLog('distribution', 'info', 'Yerləşdirmə aktı (Word) ixrac edildi', `${d.instLabel} · ${d.placed}/${d.total} yerləşdi`)
@@ -395,7 +412,7 @@ export default function Results() {
     ws2['!cols'] = [{ wch: 6 }, { wch: 40 }, { wch: 12 }, { wch: 10 }, { wch: 8 }, { wch: 9 }]
     XLSX.utils.book_append_sheet(wb, ws2, 'İxtisas üzrə siyahı')
 
-    XLSX.writeFile(wb, `Yerlesdirme_Akti_${d.instLabel}_${new Date().toLocaleDateString('az-AZ').replace(/\./g, '-')}.xlsx`)
+    XLSX.writeFile(wb, `Yerlesdirme_Akti_${d.instLabel}_${fileDate()}.xlsx`)
     addLog('distribution', 'info', 'Yerləşdirmə aktı (Excel) ixrac edildi', `${d.instLabel} · ${d.placed}/${d.total} yerləşdi`)
   }
 
@@ -419,10 +436,29 @@ export default function Results() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      {/* Seçim keçiricisi */}
-      {allSelections.length > 1 && (
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          {allSelections.map((s: any) => (
+      {dialog && <AppDialog cfg={dialog} onClose={closeDialog} />}
+      {/* Müəssisə keçiricisi */}
+      {selInsts.length > 1 && (
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text2, #888)', marginRight: 2 }}>🏛️ Müəssisə:</span>
+          {selInsts.map(iid => {
+            const active = iid === curInst
+            const first = allSelections.find((s: any) => (s.institutionId || s.institution || '') === iid)
+            return (
+              <button key={iid || '_'} onClick={() => { if (first) { setSelId(first.id); writeActiveInst(iid) } }}
+                style={{ padding: '8px 18px', borderRadius: 9, border: `1.5px solid ${active ? '#2b2f3a' : 'var(--border)'}`, cursor: 'pointer', fontWeight: 700, fontSize: 13,
+                  background: active ? '#2b2f3a' : '#fff', color: active ? '#fff' : 'var(--text)' }}>
+                {(iid && instMap[iid]?.label) || 'Digər'}
+              </button>
+            )
+          })}
+        </div>
+      )}
+      {/* Seçim (qrup) keçiricisi — seçilmiş müəssisə daxilində */}
+      {instSelections.length > 1 && (
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text2, #888)', marginRight: 2 }}>📋 Qrup:</span>
+          {instSelections.map((s: any) => (
             <button key={s.id} onClick={() => setSelId(s.id)}
               style={{ padding: '8px 18px', borderRadius: 9, border: `1.5px solid ${selId === s.id ? 'var(--blue)' : 'var(--border)'}`, cursor: 'pointer', fontWeight: 700, fontSize: 13,
                 background: selId === s.id ? 'var(--blue)' : '#fff', color: selId === s.id ? '#fff' : 'var(--text)' }}>
@@ -495,6 +531,18 @@ export default function Results() {
                 </>
               )}
             </div>
+            )}
+            {can('results.reset') && (
+              <button onClick={handleResetResults} disabled={placedHere.length === 0}
+                title={placedHere.length === 0 ? 'Bu seçim üzrə yerləşdirmə nəticəsi yoxdur' : 'Yerləşdirmə nəticələrini sil'}
+                style={{ padding: '8px 16px', borderRadius: 9, fontWeight: 700, fontSize: 12.5, whiteSpace: 'nowrap',
+                  border: `1.5px solid ${resetDone ? '#b7eb8f' : '#ffccc7'}`,
+                  background: resetDone ? '#f0fff4' : '#fff0f0',
+                  color: resetDone ? '#237804' : '#cf1322',
+                  cursor: placedHere.length === 0 ? 'not-allowed' : 'pointer',
+                  opacity: placedHere.length === 0 ? .5 : 1 }}>
+                {resetDone ? '✅ Sıfırlandı!' : `🗑 Nəticələri sıfırla${placedHere.length ? ` (${placedHere.length})` : ''}`}
+              </button>
             )}
           </div>
         </div>

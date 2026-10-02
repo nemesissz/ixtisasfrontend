@@ -11,6 +11,8 @@ import Specialties   from './pages/admin/Specialties'
 import Users         from './pages/admin/Users'
 import Results       from './pages/admin/Results'
 import Admins        from './pages/admin/Admins'
+import SuperSettings from './pages/admin/SuperSettings'
+import LiveMonitor from './pages/admin/LiveMonitor'
 import Distribution  from './pages/admin/Distribution'
 import Redistribute  from './pages/admin/Redistribute'
 import Archive       from './pages/admin/Archive'
@@ -50,6 +52,8 @@ export default function App() {
         <Route path="users"               element={<Users />} />
         <Route path="results"             element={<Results />} />
         <Route path="admins"              element={<Admins />} />
+        <Route path="super-settings"      element={<SuperSettings />} />
+        <Route path="live"                element={<LiveMonitor />} />
         <Route path="distribution"        element={<Distribution />} />
         <Route path="redistribute"        element={<Redistribute />} />
         <Route path="archive"             element={<Archive />} />

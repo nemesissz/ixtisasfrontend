@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { selectionDb, institutionDb, systemSettingsDb, addLog, DEFAULT_INST_CONFIG, type InstLoginConfig } from '../../db'
 import { authDb } from '../../db'
-import { getStudentSession, setStudentSession } from '../../api/auth'
+import { getStudentSession, setStudentSession, clearStudentSession } from '../../api/auth'
 
 export default function Landing() {
   const navigate     = useNavigate()
@@ -24,6 +24,10 @@ export default function Landing() {
   const [error,   setError]   = useState('')
   const [loading, setLoading] = useState(false)
 
+  // Seçim səhifəsindən "artıq göndərilib" səbəbi ilə qaytarılıbsa izah göstəririk
+  const location = useLocation()
+  const [doneMsg, setDoneMsg] = useState((location.state as any)?.alreadySubmitted ? true : false)
+
   // Artıq session varsa birbaşa müəssisəyə uyğun seçimə yönləndir
   useEffect(() => {
     const s = getStudentSession()
@@ -32,10 +36,16 @@ export default function Landing() {
     if (mySelection) navigate(`/student/${mySelection.id}`, { replace: true })
   }, [allPublished])
 
+  // Məcburi olmayan sahə formada göstərilmir — istifadəçi onsuz da boş buraxacaq.
+  // Hər ikisi məcburi deyilsə heç olmasa biri qalmalıdır, yoxsa forma boş olardı.
+  const show1 = cfg.field1.required || !cfg.field2.required
+  const show2 = cfg.field2.required || !cfg.field1.required
+
   async function login() {
     setError('')
-    const finT = fin.trim().replace(/İ/g,'I').replace(/ı/g,'I').toUpperCase()
-    const wT   = wNum.trim().replace(/İ/g,'I').replace(/ı/g,'I').toUpperCase()
+    setDoneMsg(false)
+    const finT = show1 ? fin.trim().replace(/İ/g,'I').replace(/ı/g,'I').toUpperCase() : ''
+    const wT   = show2 ? wNum.trim().replace(/İ/g,'I').replace(/ı/g,'I').toUpperCase() : ''
 
     // Məcburi sahə + uzunluq yoxlamaları
     if (cfg.field1.required && !finT) { setError(`${cfg.field1.label} daxil edin`); return }
@@ -49,8 +59,21 @@ export default function Landing() {
     try {
       const found = await authDb.studentLogin(finT, wT)
       if (!found) {
-        setError(`${cfg.field1.label} və ya ${cfg.field2.label} yanlışdır`)
+        setError(show1 && show2
+          ? `${cfg.field1.label} və ya ${cfg.field2.label} yanlışdır`
+          : `${(show1 ? cfg.field1 : cfg.field2).label} yanlışdır`)
         addLog('user', 'warning', `Uğursuz təhsilalan girişi`, `${cfg.field1.label}: ${finT} · ${cfg.field2.label}: ${wT}`)
+        return
+      }
+
+      // Seçimini artıq göndərmiş təhsilalan təkrar girə bilməz — eyni
+      // kompüterdə növbəti təhsilalanın onun səhifəsi ilə qarşılaşmasının
+      // qarşısını alır.
+      if (found.status === 'submitted') {
+        clearStudentSession()
+        setDoneMsg(true)
+        addLog('user', 'warning', 'Təkrar giriş cəhdi (seçim artıq göndərilib)',
+          `${found.name} · FİN: ${found.fin || '—'}`, found.name)
         return
       }
 
@@ -95,9 +118,7 @@ export default function Landing() {
         <div style={{ fontSize: 30, fontWeight: 800, color: '#2b2f3a', letterSpacing: 0.2 }}>
           İxtisas Seçim Proqramı
         </div>
-        <div style={{ fontSize: 15, color: '#8a909c', marginTop: 2, marginBottom: 18 }}>
-          İxtisas Seçimi Formu
-        </div>
+        <div style={{ height: 18 }} />
 
         {/* Mərhələ göstəricisi */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 0, marginBottom: 4 }}>
@@ -124,7 +145,8 @@ export default function Landing() {
           padding: '26px 30px',
         }}>
           {/* FİN */}
-          <div style={{ marginBottom: 18 }}>
+          {show1 && (
+          <div style={{ marginBottom: show2 ? 18 : (error ? 16 : 22) }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 13, fontWeight: 600, color: '#5a6070', marginBottom: 7 }}>
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#8a909c" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
               {cfg.field1.label}{cfg.field1.required ? ' *' : ''}
@@ -137,21 +159,36 @@ export default function Landing() {
               maxLength={cfg.field1.max}
             />
           </div>
+          )}
 
           {/* İş nömrəsi */}
+          {show2 && (
           <div style={{ marginBottom: error ? 16 : 22 }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 13, fontWeight: 600, color: '#5a6070', marginBottom: 7 }}>
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#8a909c" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 0 1 12 0v1"/></svg>
               {cfg.field2.label}{cfg.field2.required ? ' *' : ''}
             </label>
             <input
-              style={inputStyle} onFocus={onFocus} onBlur={onBlur}
+              style={inputStyle} onFocus={onFocus} onBlur={onBlur} autoFocus={!show1}
               value={wNum}
               onChange={e => { setWNum(e.target.value.toUpperCase()); setError('') }}
               onKeyDown={e => e.key === 'Enter' && login()}
               maxLength={cfg.field2.max}
             />
           </div>
+          )}
+
+          {/* Seçimi artıq göndərilmiş təhsilalan — təkrar giriş bağlıdır */}
+          {doneMsg && (
+            <div style={{ background: '#f6ffed', border: '1.5px solid #b7eb8f', borderRadius: 8, padding: '12px 14px', fontSize: 13, color: '#237804', marginBottom: 18, display: 'flex', alignItems: 'flex-start', gap: 8, lineHeight: 1.6 }}>
+              <span>✅</span>
+              <span>
+                <b>Seçiminiz artıq göndərilib.</b><br />
+                Sıra bir dəfə təsdiqləndiyi üçün təkrar giriş mümkün deyil.
+                Sualınız varsa bizə müraciət edin.
+              </span>
+            </div>
+          )}
 
           {error && (
             <div style={{ background: '#fff2f0', border: '1.5px solid #ffccc7', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#cf1322', marginBottom: 18, display: 'flex', alignItems: 'center', gap: 8 }}>

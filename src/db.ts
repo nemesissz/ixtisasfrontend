@@ -44,11 +44,21 @@ function utc(ts: any): any {
 function mapInstitution(a: any) {
   return { id: a.id, label: a.label, icon: a.icon, year: a.year }
 }
+function mapCohort(a: any) {
+  return {
+    id: a.id, institution: a.institutionId, label: a.label, icon: a.icon, year: a.year,
+    sortOrder: a.sortOrder ?? 0, isArchived: !!a.isArchived,
+    archivedAt: utc(a.archivedAt), createdAt: utc(a.createdAt),
+  }
+}
 function mapTree(a: any) {
   return {
     id: a.id, name: a.name, institution: a.institutionId,
+    // Bu struktur hansı təhsilalan qrupu üçündür (null = bütün müəssisə)
+    cohort: a.cohortId ?? null,
     levelNames: a.levelNames || [], icon: a.icon, year: a.year,
     sourceProportional: !!a.sourceProportional, createdAt: utc(a.createdAt),
+    isArchived: !!a.isArchived, archivedAt: utc(a.archivedAt),
     nodes: a.nodes || [],
   }
 }
@@ -66,11 +76,14 @@ function mapStudent(a: any) {
   return {
     id: a.id, institution: a.institutionId, name: a.name, parentName: a.parentName,
     workNumber: a.workNumber, fin: a.fin, score: a.score, group: a.group,
+    cohort: a.cohortId ?? null,
     source: a.source, gender: a.gender, packet: a.packet, status: a.status,
     printStatus: a.printStatus, year: a.year,
     placedSpecialty: a.placedSpecialty, placedSpecialtyId: a.placedSpecialtyId,
     placedSelectionId: a.placedSelectionId, choiceNum: a.choiceNum,
     subjects: a.subjects || {}, branchByLevel: a.branchByLevel || {},
+    // Sərbəst mətn sütunları (məs. {"dil":"ingilis"})
+    extraFields: a.extraFields || {},
   }
 }
 function mapAdmin(a: any) {
@@ -136,7 +149,7 @@ export const treeDb = {
   },
   create: async (data: any) => {
     const created = await http.post<any>('/api/specialtytrees', {
-      name: data.name, institutionId: data.institution, levelNames: data.levelNames || [],
+      name: data.name, institutionId: data.institution, cohortId: data.cohort ?? null, levelNames: data.levelNames || [],
       icon: data.icon ?? null, year: data.year ?? null, sourceProportional: !!data.sourceProportional,
     })
     return mapTree(created)
@@ -148,6 +161,9 @@ export const treeDb = {
       name: merged.name, levelNames: merged.levelNames || [],
       icon: merged.icon ?? null, year: merged.year ?? null,
       sourceProportional: !!merged.sourceProportional,
+      // data frontend şəklindədir (cohort), current backend şəklində (cohortId).
+      // 'cohort' acıq verilibsə — null olsa belə — o qalib gəlir.
+      cohortId: ('cohort' in data ? data.cohort : current.cohortId) ?? null,
     })
     if (data.nodes) {
       await http.put(`/api/specialtytrees/${id}/nodes`, data.nodes)
@@ -155,6 +171,11 @@ export const treeDb = {
     return treeDb.get(id)
   },
   delete: async (id: string) => { await http.delete(`/api/specialtytrees/${id}`) },
+  // Arxivləmə silmə deyil: struktur bazada qalır, sadəcə gizlədilir. Ona bağlı
+  // seçimlər toxunulmaz qalır, bərpa ediləndə nəticələr də geri qayıdır.
+  getArchived: async () => (await http.get<any[]>('/api/specialtytrees?archived=true')).map(mapTree),
+  archive: async (id: string) => { await http.post(`/api/specialtytrees/${id}/archive`) },
+  restore: async (id: string) => { await http.post(`/api/specialtytrees/${id}/restore`) },
   countSpecialties: (tree: any) => getLeaves(tree.nodes || []).length,
   totalQuota:       (tree: any) => getLeaves(tree.nodes || []).reduce((s: number, n: any) => s + (n.quota || 0), 0),
 }
@@ -186,11 +207,13 @@ export const userDb = {
       placedSpecialty: merged.placedSpecialty, placedSpecialtyId: merged.placedSpecialtyId,
       placedSelectionId: merged.placedSelectionId, choiceNum: merged.choiceNum,
       subjects: merged.subjects || {}, branchByLevel: merged.branchByLevel || {},
+      extraFields: merged.extraFields || {},
     })
   },
   // Distribution/Redistribute: N tələbənin yerləşdirmə sahələrini bir sorğuda yeniləyir
-  bulkUpdate: async (patches: Array<{ id: string; placedSpecialty?: string | null; placedSpecialtyId?: string | null; placedSelectionId?: string | null; choiceNum?: number | null; status?: string }>, method?: 'simple' | 'packet') => {
-    // method verilibsə backend uyğun icazəni (dist.simple / dist.packet) yoxlayır
+  bulkUpdate: async (patches: Array<{ id: string; placedSpecialty?: string | null; placedSpecialtyId?: string | null; placedSelectionId?: string | null; choiceNum?: number | null; status?: string }>, method?: 'simple' | 'packet' | 'reset') => {
+    // method verilibsə backend uyğun icazəni yoxlayır:
+    // simple → dist.simple · packet → dist.packet · reset → results.reset
     await http.post(`/api/students/bulk-update${method ? `?method=${method}` : ''}`, patches)
   },
   deleteMany: async (ids: string[]) => { await http.post('/api/students/delete-many', ids) },
@@ -203,9 +226,16 @@ function toStudentDto(data: any) {
     institutionId: data.institution ?? data.institutionId,
     name: data.name, parentName: data.parentName ?? null, workNumber: data.workNumber ?? null,
     fin: data.fin ?? null, score: data.score ?? null, group: data.group ?? null,
+    cohortId: data.cohort ?? data.cohortId ?? null,
     source: data.source ?? null, gender: data.gender ?? null, year: data.year ?? null,
     packet: data.packet ?? null, status: data.status ?? 'pending', printStatus: data.printStatus ?? 'not_printed',
     subjects: data.subjects || {}, branchByLevel: data.branchByLevel || {},
+    extraFields: data.extraFields || {},
+    // Arxivdən bərpada yerləşdirmə nəticəsi də göndərilir (adi idxalda null olur)
+    placedSpecialty: data.placedSpecialty ?? null,
+    placedSpecialtyId: data.placedSpecialtyId ?? null,
+    placedSelectionId: data.placedSelectionId ?? null,
+    choiceNum: data.choiceNum ?? null,
   }
 }
 
@@ -297,6 +327,38 @@ export const institutionDb = {
   delete: async (id: string) => { await http.delete(`/api/institutions/${id}`) },
   // Müəssisənin bütün tələbələrinin yerləşdirmə/statusunu sıfırlayır (yeni seçim dövrü üçün)
   resetStudents: async (id: string) => http.post<{ count: number }>(`/api/institutions/${id}/reset-students`),
+}
+
+// Seçimin iştirakçıları — backend-dəki SelectionsController.ParticipantsAsync
+// məntiqinin eynisi. Qrup seçimin öz parametri deyil, seçdiyi STRUKTURDAN gəlir:
+// struktur qrupsuzdursa müəssisənin bütün təhsilalanları iştirak edir.
+export function selectionParticipants(sel: any, tree: any, users: any[]): any[] {
+  const inInst = (users || []).filter((u: any) => u.institution === sel?.institution)
+  const cid = tree?.cohort || null
+  return cid ? inInst.filter((u: any) => u.cohort === cid) : inInst
+}
+
+// ── Təhsilalan qrupları (axınlar) ─────────────────────────────────────────
+// Qrup yalnız təhsilalanı əhatələyir; struktur və seçim qrupa bağlanmır.
+export const cohortDb = {
+  getAll: async (institutionId?: string) =>
+    (await http.get<any[]>(`/api/cohorts${institutionId ? `?institutionId=${encodeURIComponent(institutionId)}` : ''}`)).map(mapCohort),
+  create: async (data: { institution: string; label: string; icon?: string; year?: string; sortOrder?: number }) =>
+    mapCohort(await http.post<any>('/api/cohorts', {
+      institutionId: data.institution, label: data.label,
+      icon: data.icon ?? null, year: data.year ?? null, sortOrder: data.sortOrder ?? null,
+    })),
+  update: async (id: string, data: { institution?: string; label: string; icon?: string; year?: string; sortOrder?: number }) => {
+    await http.put(`/api/cohorts/${id}`, {
+      institutionId: data.institution ?? '', label: data.label,
+      icon: data.icon ?? null, year: data.year ?? null, sortOrder: data.sortOrder ?? null,
+    })
+  },
+  archive: async (id: string, value = true) => { await http.post(`/api/cohorts/${id}/archive?value=${value}`) },
+  delete: async (id: string) => { await http.delete(`/api/cohorts/${id}`) },
+  // Təhsilalanları toplu şəkildə qrupa köçürür; cohortId 'none' → qrupdan çıxarır
+  assign: async (cohortId: string, studentIds: string[]) =>
+    http.post<{ count: number }>(`/api/cohorts/${cohortId}/assign`, studentIds),
 }
 
 // ── User Archives ─────────────────────────────────────────────────────────
@@ -413,8 +475,30 @@ export async function addLog(
 }
 
 // ── Seçimi sıfırla + avtomatik seçim ─────────────────────────────────────────
-export async function resetAndAutoSeedSubmissions(selectionId: string): Promise<{ count: number }> {
-  return http.post<{ count: number }>(`/api/selections/${selectionId}/reset-and-autoseed`)
+export interface AutoSeedResult {
+  count: number      // yazılan sıralama sayı (created + updated)
+  created: number
+  updated: number
+  kept: number       // təhsilalanın öz göndərdiyi — toxunulmayıb
+  empty: number      // məhdudiyyətlərə görə uyğun ixtisas qalmayıb
+  total: number
+}
+
+// onlyMissing=true → yalnız seçim etməyənlər doldurulur (Doldur düyməsi)
+// onlyMissing=false → hamısı silinib yenidən yaradılır
+export async function resetAndAutoSeedSubmissions(
+  selectionId: string, onlyMissing = false,
+): Promise<AutoSeedResult> {
+  return http.post<AutoSeedResult>(
+    `/api/selections/${selectionId}/reset-and-autoseed?onlyMissing=${onlyMissing}`)
+}
+
+// Sıfırla düyməsi: sıralamalar silinir, yenisi YARADILMIR
+export async function clearSubmissions(
+  selectionId: string,
+): Promise<{ deleted: number; reverted: number }> {
+  return http.post<{ deleted: number; reverted: number }>(
+    `/api/selections/${selectionId}/reset-and-autoseed?seed=false`)
 }
 
 // ── Sistem Parametrləri ───────────────────────────────────────────────────
@@ -456,6 +540,16 @@ export const systemSettingsDb = {
   setPrioritySubjects: async (subjects: string[]) => {
     await http.put('/api/systemsettings/priority-subjects', subjects)
   },
+  // Təsdiqdən sonrakı elan — oxumaq hamıya açıq, yazmaq yalnız superadmin-ə
+  getSubmitNotice: async (): Promise<string> => {
+    try {
+      const r = await http.get<{ text: string }>('/api/systemsettings/submit-notice')
+      return String(r?.text ?? '')
+    } catch { return '' }
+  },
+  setSubmitNotice: async (text: string) => {
+    await http.put('/api/systemsettings/submit-notice', { text: text ?? '' })
+  },
   reset: async () => { await http.post('/api/systemsettings/reset') },
 }
 
@@ -480,4 +574,13 @@ export function studentColValue(u: any, key: string): string {
   if (key === 'firstName') return String(u?.name ?? '').trim().split(/\s+/)[0] || ''
   if (key === 'lastName')  return String(u?.name ?? '').trim().split(/\s+/).slice(1).join(' ')
   return String(u?.[key] ?? '')
+}
+
+// ── Canlı nəzarət (docs/PLAN-canli-nezaret.md) ──────────────────────────────
+export interface MonitorConfig { enabled: boolean; heartbeatSec: number; offlineSec: number; abandonMin: number }
+export const monitorDb = {
+  live:      () => http.get<any>('/api/monitor/live'),
+  getConfig: () => http.get<MonitorConfig>('/api/monitor/config'),
+  setConfig: (c: MonitorConfig) => http.put('/api/monitor/config', c),
+  session:   (op: 'pause' | 'resume' | 'end') => http.post(`/api/monitor/session/${op}`),
 }

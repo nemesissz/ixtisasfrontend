@@ -1,11 +1,12 @@
 import { useState, useMemo, useEffect } from 'react'
+import { useActiveInst } from '../../activeInst'
 import { userDb, submissionDb, selectionDb, treeDb, institutionDb, useLocalState, addLog } from '../../db'
 import InstTabs from '../../components/InstTabs'
 import { AppDialog, useDialog } from '../../components/AppDialog'
 import { can } from '../../permissions'
+import { critValue } from '../../tiebreak'
 
 // ── Tiebreaker köməkçiləri (Yerləşdirmə ilə eyni məntiq) ──────────────────────
-const UMUMI_KEY = 'Ümumi imtahan nəticəsi'
 function getLeavesWithPath(nodes: any[], anc: any[] = []): Array<{ leaf: any; path: any[] }> {
   const res: Array<{ leaf: any; path: any[] }> = []
   for (const n of nodes) {
@@ -36,7 +37,8 @@ function getTiebreakerSubjects(specId: string, userGroup: string | null, pathMap
   return []
 }
 function sortScore(u: any, tb: string[]): number[] {
-  return [u.score || 0, ...tb.map(s => s === UMUMI_KEY ? (u.score || 0) : (u.subjects?.[s] ?? -1))]
+  // Meyar tək sütun və ya sütunların cəmi ola bilər
+  return [u.score || 0, ...tb.map(c => critValue(u, c))]
 }
 function compareStudents(a: any, b: any, tb: string[]): number {
   const sa = sortScore(a, tb), sb = sortScore(b, tb)
@@ -121,7 +123,7 @@ export default function Redistribute() {
   }, [])
   const { dialog, showConfirm, showInfo, closeDialog } = useDialog()
 
-  const [instId, setInstId]   = useState<string>('')
+  const [instId, setInstId]   = useActiveInst(institutions)
   useEffect(() => { if (institutions.length && !instId) setInstId(institutions[0].id) }, [institutions])
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [preview, setPreview] = useState<Record<string, { specId: string; choiceNum: number }> | null>(null)

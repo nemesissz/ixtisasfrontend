@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { selectionDb, submissionDb, treeDb, buildNameMap } from '../../db'
+import { selectionDb, submissionDb, treeDb, institutionDb, buildNameMap } from '../../db'
 import { getStudentSession } from '../../api/auth'
+import InstIcon from '../../components/InstIcon'
 
 export default function ResultPage() {
   const navigate = useNavigate()
@@ -11,11 +12,13 @@ export default function ResultPage() {
   const [selections,  setSelections]  = useState<any[]>([])
   const [submissions, setSubmissions] = useState<any[]>([])
   const [nameMaps,    setNameMaps]    = useState<Record<string, Record<string, string>>>({})
+  const [insts,       setInsts]       = useState<any[]>([])
 
   useEffect(() => {
     if (!student) { navigate('/student', { replace: true }); return }
     (async () => {
-      const [allSels, allSubs] = await Promise.all([selectionDb.getAll(), submissionDb.getAll()])
+      const [allSels, allSubs, allInsts] = await Promise.all([selectionDb.getAll(), submissionDb.getAll(), institutionDb.getAll()])
+      setInsts(allInsts || [])
       const sels = allSels.filter((s: any) => s.status !== 'draft')
       const subs = allSubs.filter((s: any) => s.userId === student.id)
       setSelections(sels)
@@ -35,9 +38,9 @@ export default function ResultPage() {
   if (!student) return null
   if (!loaded) return null
 
-  const instLabel = student.institution === 'kollec' ? '🎓 Hərbi Kollec'
-                  : student.institution === 'ahm'    ? '🏛️ AHM'
-                  : null
+  // Müəssisə adı siyahıdan götürülür (köhnə 'kollec'/'ahm' sabitləri deyil)
+  const inst      = insts.find((i: any) => i.id === student.institution)
+  const instLabel = inst?.label || null
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -73,11 +76,10 @@ export default function ResultPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, borderTop: '1px solid var(--border)', paddingTop: 14 }}>
             <div style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 600 }}>Müəssisə</div>
             <span style={{
-              display: 'inline-block', padding: '6px 16px', borderRadius: 10,
-              background: student.institution === 'kollec' ? '#fbf1d6' : '#fbf1d6',
-              color:      student.institution === 'kollec' ? '#c9962a'  : '#b8860b',
+              display: 'inline-flex', alignItems: 'center', gap: 7, padding: '6px 16px', borderRadius: 10,
+              background: '#fbf1d6', color: '#b8860b',
               fontWeight: 800, fontSize: 14, width: 'fit-content',
-            }}>{instLabel}</span>
+            }}><InstIcon icon={inst?.icon} size={17} />{instLabel}</span>
 
             {/* Yerləşdiyi ixtisas (admin simulyasiya edib saxlayıbsa) */}
             {student.placedSpecialty && (

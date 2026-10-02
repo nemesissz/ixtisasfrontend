@@ -1,7 +1,9 @@
-import { useState, useEffect, useMemo } from 'react'
+import DragDemo from '../../components/DragDemo'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { selectionDb, treeDb, userDb, submissionDb, systemSettingsDb, addLog } from '../../db'
 import { getStudentSession, clearStudentSession } from '../../api/auth'
+import { BASE_URL } from '../../api/http'
 import {
   FlatView, NestedView,
   treeToNested, nestedToFlat, flatToNested,
@@ -27,7 +29,7 @@ function filterTreeByGroup(tree: any, studentGroup: string | null | undefined): 
 
 // ── Əvvəlcədən bölgü səviyyəsinə görə ağacı filtrə et ────────────────────────
 // preAssignLevel-dəki node adı təhsilalanın branch dəyəri ilə uyğun gələn alt ağac saxlanılır
-function filterTreeByBranch(tree: any, branchName: string | null | undefined, level: number | null | undefined): any {
+export function filterTreeByBranch(tree: any, branchName: string | null | undefined, level: number | null | undefined): any {
   if (!tree || level == null || !branchName) return tree
   const target = String(branchName).trim().toLowerCase()
   function walk(nodes: any[], depth: number): any[] {
@@ -47,7 +49,7 @@ function filterTreeByBranch(tree: any, branchName: string | null | undefined, le
 // ── Təyin edilmiş səviyyəni ağacdan yığışdır ─────────────────────────────────
 // Qoşun növü seçimdə əvvəlcədən təyin edilibsə, kursant onu görməməlidir —
 // həmin səviyyənin node-ları silinir, uşaqları bir səviyyə yuxarı qaldırılır.
-function collapseLevel(tree: any, level: number): any {
+export function collapseLevel(tree: any, level: number): any {
   function walk(nodes: any[], depth: number): any[] {
     if (depth === level) return nodes.flatMap(n => n.children || [])
     return nodes.map(n => n.children?.length ? { ...n, children: walk(n.children, depth + 1) } : n)
@@ -74,6 +76,29 @@ function filterTreeByGender(tree: any, gender: string | null | undefined): any {
   return { ...tree, nodes: filterNodes(tree.nodes || []) }
 }
 
+// ── Canlı nəzarət siqnalı ────────────────────────────────────────────────────
+// Seçimi HEÇ VAXT bloklamır: gözlənilmir, 4 san timeout, xəta udulur, 401-də
+// yönləndirmə etmir (ümumi http helper-dən fərqli olaraq). Növbəti interval
+// serverdən gəlir — superadmin dəyişəndə açıq səhifələr özü uyğunlaşır.
+async function sendBeat(submitted: boolean): Promise<number | null> {
+  const token = getStudentSession()?.token
+  if (!token) return null
+  const ctl = new AbortController()
+  const to = setTimeout(() => ctl.abort(), 4000)
+  try {
+    const res = await fetch(`${BASE_URL}/api/monitor/beat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ submitted }),
+      signal: ctl.signal,
+      keepalive: submitted,
+    })
+    if (!res.ok) return null
+    const j = await res.json()
+    return Number(j?.nextBeatSec) || null
+  } catch { return null } finally { clearTimeout(to) }
+}
+
 export default function SelectionPage() {
   const { selId } = useParams<{ selId: string }>()
   const navigate  = useNavigate()
@@ -87,6 +112,8 @@ export default function SelectionPage() {
   const [selection, setSelection] = useState<any>(null)
   const [tree,      setTree]      = useState<any>(null)
   const [redirectSeconds, setRedirectSeconds] = useState(10)
+  // Təsdiqdən sonrakı elan — superadmin panelindən yazılır, boşdursa göstərilmir
+  const [submitNotice, setSubmitNotice] = useState('')
   const viewMode: 'list' | 'nested' = selection?.viewMode || 'list'
 
   // Kursanta göstərilən səviyyə adları — təyin edilmiş (yığışdırılmış) səviyyə çıxarılır
@@ -104,16 +131,22 @@ export default function SelectionPage() {
   const [isDirty,     setIsDirty]     = useState(false)
   const [submitted,   setSubmitted]   = useState(false)
   const [saving,      setSaving]      = useState(false)
+  // Təlimat paneli: yalnız əl ilə açılıb-bağlanır.
+  const [howToOpen,   setHowToOpen]   = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
   const [justSubmitted, setJustSubmitted] = useState(false)  // təzəcə göndərdi → təsdiq səhifəsi
+  // Effekt içində oxumaq üçün (state dəyəri köhnə qala bilər)
+  const justSubmittedRef = useRef(false)
   const [redirectIn,    setRedirectIn]    = useState(10)  // geri sayım (saniyə)
 
   useEffect(() => {
     (async () => {
       const sel = await selectionDb.get(selId!)
       const t   = sel ? await treeDb.get(sel.treeId) : null
-      const delay = await systemSettingsDb.getRedirectDelay()
+      const delay  = await systemSettingsDb.getRedirectDelay()
+      const notice = await systemSettingsDb.getSubmitNotice()
       setSelection(sel); setTree(t); setRedirectSeconds(delay); setRedirectIn(delay)
+      setSubmitNotice((notice || '').trim())
       setLoaded(true)
     })()
   }, [selId])
@@ -143,12 +176,34 @@ export default function SelectionPage() {
         setFlat(restored)
         setNested(flatToNested(restored))
         setSubmitted(true)
+        // Səhifə göndərilmiş seçimlə açılıb (təkrar giriş və ya brauzer keşi) —
+        // dərhal çıxış edirik ki, növbəti təhsilalan əvvəlkinin siyahısını
+        // görməsin. Təzəcə göndərən isə öz təsdiq ekranını görməlidir.
+        if (!justSubmittedRef.current) {
+          clearStudentSession()
+          navigate('/student', { replace: true, state: { alreadySubmitted: true } })
+          return
+        }
       } else {
         setFlat(initFlat)
         setNested(initNested)
       }
     })()
   }, [tree?.id])
+
+  // Seçim davam etdikcə siqnal — təsdiqdən sonra dayanır
+  useEffect(() => {
+    if (!loaded || submitted || !student) return
+    let stop = false
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const tick = async () => {
+      const next = await sendBeat(false)
+      if (stop) return
+      timer = setTimeout(tick, Math.min(600, Math.max(5, next ?? 30)) * 1000)
+    }
+    tick()
+    return () => { stop = true; if (timer) clearTimeout(timer) }
+  }, [loaded, submitted])
 
   if (!student) return null
 
@@ -162,11 +217,13 @@ export default function SelectionPage() {
     const ranking = viewMode === 'list' ? flat.map(r => r.specId) : nestedToFlat(nested).map(r => r.specId)
     await submissionDb.save({ selectionId: selId!, userId: student!.id, userName: student!.name, ranking })
     await userDb.update(student!.id, { status: 'submitted' })
+    void sendBeat(true)   // canlı nəzarət: siyahıdan çıxar (gözlənilmir)
     addLog('selection', 'success', `Təhsilalan seçimini göndərdi: ${student!.name}`,
       `FİN: ${student!.fin || '—'} · ${ranking.length} ixtisas sıralandı`, student!.name)
     setSaving(false)
     setSubmitted(true)
     setIsDirty(false)
+    justSubmittedRef.current = true
     setJustSubmitted(true)
     // Geri sayım → bitəndə login səhifəsinə qaytar (vaxt super admin paneldən)
     if (redirectSeconds <= 0) {
@@ -234,7 +291,7 @@ export default function SelectionPage() {
             style={{ width: 104, height: 104, objectFit: 'contain', marginBottom: 8, filter: 'drop-shadow(0 4px 10px #0002)' }}
             onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} />
           <div style={{ fontSize: 28, fontWeight: 800, color: '#2b2f3a', letterSpacing: 0.2 }}>İxtisas Seçim Proqramı</div>
-          <div style={{ fontSize: 15, color: '#8a909c', marginTop: 2, marginBottom: 16 }}>İxtisas Seçimi Formu</div>
+          <div style={{ height: 16 }} />
           {/* Mərhələ 3 / 3 */}
           <div style={{ display: 'flex', alignItems: 'center' }}>
             {[1, 2, 3].map((n, i) => (
@@ -252,6 +309,23 @@ export default function SelectionPage() {
               <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" />
             </svg>
             <div style={{ fontSize: 16, color: '#5a6070', marginBottom: 22 }}>Seçimləriniz uğurla qeyd olundu.</div>
+
+            {/* Superadmin elanı — geri sayım boyunca ekranda qalır.
+                whiteSpace: 'pre-wrap' sətir keçidlərini olduğu kimi saxlayır. */}
+            {submitNotice && (
+              <div style={{
+                textAlign: 'left', background: '#fffdf5',
+                border: `1.5px solid ${GOLD}55`,
+                borderLeft: `5px solid ${GOLD}`, borderRadius: 12,
+                padding: '14px 18px', marginBottom: 18,
+                display: 'flex', gap: 12, alignItems: 'flex-start',
+              }}>
+                <div style={{ fontSize: 19, lineHeight: 1.2 }}>📣</div>
+                <div style={{ fontSize: 14, color: '#4a5060', lineHeight: 1.7, whiteSpace: 'pre-wrap', flex: 1, minWidth: 0 }}>
+                  {submitNotice}
+                </div>
+              </div>
+            )}
 
             {/* Geri sayım proqres zolağı */}
             <div style={{ border: `1.5px solid ${GOLD}55`, background: '#fffdf5', borderRadius: 10, padding: '12px 16px' }}>
@@ -315,12 +389,15 @@ export default function SelectionPage() {
                   }}>
                     <div style={{
                       width: 26, height: 26, borderRadius: 8, flexShrink: 0,
-                      background: i === 0 ? '#e0a92e' : i === 1 ? '#caa23e' : i === 2 ? '#d8be7a' : '#c2c8d4',
-                      color: '#fff', fontWeight: 800, fontSize: 12,
+                      // Bütün nömrələr eyni görünür: fərqli rənglər "ilk üçü
+                      // qəbul olunub, qalanları yox" kimi oxunurdu. Üstünlük
+                      // sırasını rəng yox, sətirlərin ardıcıllığı bildirir.
+                      background: '#f0f2fa', border: '1.5px solid #e0e4f0',
+                      color: '#2b2f3a', fontWeight: 800, fontSize: 12,
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                     }}>{i + 1}</div>
                     <div style={{ fontSize: 13, color: '#1a1f3c', fontWeight: i === 0 ? 700 : 400 }}>
-                      <span style={{ color: '#888', fontSize: 11 }}>{r.groupName} → {r.subName} → </span>
+                      {(() => { const p = [r.groupId !== '__root__' ? r.groupName : null, !r.subId.startsWith('__sub_') ? r.subName : null].filter(Boolean); return p.length ? <span style={{ color: '#888', fontSize: 11 }}>{p.join(' → ')} → </span> : null })()}
                       {r.specName}
                     </div>
                   </div>
@@ -362,9 +439,7 @@ export default function SelectionPage() {
         <div style={{ fontSize: 22, fontWeight: 800, color: '#2b2f3a', letterSpacing: 0.2 }}>
           İxtisas Seçim Proqramı
         </div>
-        <div style={{ fontSize: 13, color: '#8a909c', marginTop: 1, marginBottom: 10 }}>
-          İxtisas Seçimi Formu
-        </div>
+        <div style={{ height: 10 }} />
         {/* Mərhələ 2 / 3 */}
         <div style={{ display: 'flex', alignItems: 'center' }}>
           {[
@@ -422,6 +497,62 @@ export default function SelectionPage() {
         </div>
       </div>
 
+
+      {/* ── Təlimat ────────────────────────────────────────────────────────
+          Təhsilalanlar "ixtisası necə seçim edim?" deyə soruşurdu: sətirlər
+          sürüşdürülərək sıralanır, ayrıca "seç" düyməsi yoxdur. Göndərildikdən
+          sonra sıra dəyişmir, ona görə təlimat da göstərilmir. */}
+      {!submitted && (
+        <div style={{
+          display: 'flex', gap: 12, alignItems: 'flex-start',
+          background: '#fffdf5', border: '1.5px solid #f1ead4',
+          borderLeft: '5px solid #e0a92e', borderRadius: 12,
+          padding: '14px 18px', marginBottom: 2,
+        }}>
+          <div style={{ fontSize: 20, lineHeight: 1.2 }}>💡</div>
+          <div style={{ fontSize: 13, color: '#4a5060', lineHeight: 1.7, flex: 1, minWidth: 0 }}>
+            <div
+              onClick={() => setHowToOpen(v => !v)}
+              style={{
+                fontWeight: 800, color: '#2b2f3a', fontSize: 13.5, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                gap: 10, marginBottom: howToOpen ? 4 : 0, userSelect: 'none',
+              }}>
+              <span>İxtisas seçimi necə aparılır?</span>
+              <span style={{ fontSize: 11.5, fontWeight: 700, color: '#a9741a', whiteSpace: 'nowrap' }}>
+                {howToOpen ? 'Gizlət ▲' : 'Göstər ▼'}
+              </span>
+            </div>
+            {howToOpen && (<>
+            Siyahıda göstərilən <b>bütün ixtisaslar seçimə daxildir</b>. İxtisasları istəyinizə
+            uyğun olaraq üstünlük sırası ilə yerləşdirin.
+            <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap', marginTop: 6 }}>
+            <div style={{ flex: '1 1 300px', minWidth: 0 }}>
+            <div>
+              1. İxtisasın sağ tərəfindəki <span style={{
+                color: '#8a909c', fontWeight: 800, background: '#f0f2fa',
+                border: '1px solid #e0e4f0', borderRadius: 6, padding: '0 6px',
+              }}>⠿</span> işarəsindən tutaraq onu yuxarı və ya aşağı
+              sürüşdürün{viewMode === 'nested' ? ' (qrupların özünü də sürüşdürə bilərsiniz)' : ''}.
+            </div>
+            <div>2. <b>Ən çox istədiyiniz ixtisası birinci</b>, digər ixtisasları isə istəyinizə uyğun ardıcıllıqla sıralayın.</div>
+            <div>3. Sıralamanı tamamladıqdan sonra <b>«Təsdiqlə və bitir»</b> düyməsini basın.</div>
+            </div>
+            <DragDemo />
+            </div>
+            <div style={{ marginTop: 6 }}>
+              <b>Vacib:</b> Yerləşdirmə müəyyən etdiyiniz ixtisas sırasına və imtahan nəticənizə
+              uyğun aparılır. Balınız birinci ixtisasa uyğun gəlmədikdə növbəti ixtisas, ona da
+              uyğun gəlmədikdə isə siyahı üzrə sonrakı ixtisaslar nəzərə alınır. Buna görə
+              <b> bütün ixtisasları həqiqi istəyinizə uyğun ardıcıllıqla</b> sıralayın.
+            </div>
+            <div style={{ marginTop: 6, color: '#a9741a', fontWeight: 700 }}>
+              Diqqət: Seçim təsdiqləndikdən sonra ixtisasların sırasını dəyişmək mümkün olmayacaq.
+            </div>
+            </>)}
+          </div>
+        </div>
+      )}
 
       {/* ── Görünüş ── */}
       {viewMode === 'list'

@@ -1,0 +1,5 @@
+# Lokal qovluq düzümü: backend "../backend"-dədir ("../ixtisasbackend" deyil)
+services:
+  backend:
+    build:
+      context: ../backend

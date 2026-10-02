@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { useActiveInst } from '../../activeInst'
 import { useSearchParams } from 'react-router-dom'
 import * as XLSX from 'xlsx'
-import { userDb, submissionDb, institutionDb, userArchiveDb, selectionDb, treeDb, adminDb, buildNameMap, useLocalState, usePoll, addLog, systemSettingsDb } from '../../db'
+import { userDb, submissionDb, institutionDb, userArchiveDb, selectionDb, treeDb, adminDb, cohortDb, buildNameMap, useLocalState, usePoll, addLog, systemSettingsDb } from '../../db'
 import InstIcon, { isImageIcon } from '../../components/InstIcon'
 import InstTabs from '../../components/InstTabs'
 import { AppDialog, useDialog } from '../../components/AppDialog'
@@ -191,9 +192,22 @@ async function exportToExcel(rows: any[], instLabel: string, instId: string, sub
     rows.forEach((u: any) => { if (u.subjects) Object.keys(u.subjects).forEach(k => { if (u.subjects[k] != null) ks.add(k) }) })
     return Array.from(ks)
   })()
+  // Sərbəst MƏTN sütunları (məs. "dil") — ixrac → idxal dövrəsi dəyəri itirməsin
+  const extraKeys = (() => {
+    const ks = new Set<string>()
+    rows.forEach((u: any) => { if (u.extraFields) Object.keys(u.extraFields).forEach(k => { if (u.extraFields[k]) ks.add(k) }) })
+    return Array.from(ks)
+  })()
   const hasGroups  = rows.some((u: any) => u.group)
   const hasSources = rows.some((u: any) => u.source)
   const hasGender  = rows.some((u: any) => u.gender)
+  // Əvvəlcədən bölgü sütunları (məs. "Qoşun növü") — cədvəldə göründüyü kimi
+  // ixracda da olmalıdır ki, ixrac → idxal dövrəsi dəyəri itirməsin.
+  const exLevelNames = effectiveLevelNames(tree)
+  const branchLvls = [...new Set(rows.flatMap((u: any) => Object.keys(u.branchByLevel || {}).map(Number)))]
+    .filter(i => rows.some((u: any) => u.branchByLevel?.[i]))
+    .sort((a, b) => a - b)
+  const branchColName = (i: number) => exLevelNames[i] || `Səviyyə ${i + 1}`
 
   const data = rows.map((u: any, i: number) => {
     const hasSub = subCountMap[u.id] > 0
@@ -208,11 +222,16 @@ async function exportToExcel(rows: any[], instLabel: string, instId: string, sub
     if (inc('FİN'))              base['FİN'] = u.fin || '—'
     if (inc('Təhsil müəssisəsi')) base['Təhsil müəssisəsi'] = instLabel
     if (inc('Tədris ili'))       base['Tədris ili'] = u.year || '—'
+    branchLvls.forEach(i => {
+      const c = branchColName(i)
+      if (inc(c)) base[c] = u.branchByLevel?.[i] || '—'
+    })
     if (hasGroups  && inc('Qrup'))  base['Qrup']  = u.group  || '—'
     if (hasSources && inc('Mənbə')) base['Mənbə'] = u.source || '—'
     if (hasGender  && inc('Cins'))  base['Cins']  = u.gender ? (u.gender === 'qadın' ? 'Qadın' : 'Kişi') : '—'
     if (inc('Ümumi imtahan nəticəsi')) base['Ümumi imtahan nəticəsi'] = Number(u.score || 0).toFixed(2)
     subjectKeys.forEach(k => { if (inc(k)) base[k] = (u.subjects?.[k] != null) ? Number(u.subjects[k]).toFixed(2) : '—' })
+    extraKeys.forEach(k => { if (inc(k)) base[k] = u.extraFields?.[k] || '—' })
     if (inc('Seçim statusu'))    base['Seçim statusu'] = hasSub ? 'Seçim edildi' : 'Seçim gözləyir'
     if (inc('Çap statusu'))      base['Çap statusu'] = u.printStatus === 'printed' ? 'Çap edilib' : 'Çap edilməyib'
     if (inc('Yerləşdiyi ixtisas')) base['Yerləşdiyi ixtisas'] = u.placedSpecialty || 'Yerləşdirilməyib'
@@ -489,7 +508,7 @@ export function normSource(v: any): 'mülki' | 'lisey' | null {
   return null
 }
 
-function parseExcel(file: File, instId: string, subjectCols: string[] = [], levelNames: string[] = []): Promise<{ ok: any[]; errors: string[] }> {
+function parseExcel(file: File, instId: string, subjectCols: string[] = [], levelNames: string[] = []): Promise<{ ok: any[]; errors: string[]; warnings: string[] }> {
   return new Promise(resolve => {
     const reader = new FileReader()
     reader.onload = e => {
@@ -498,9 +517,20 @@ function parseExcel(file: File, instId: string, subjectCols: string[] = [], leve
         const ws   = wb.Sheets[wb.SheetNames[0]]
         const rows = XLSX.utils.sheet_to_json(ws, { defval: '' }) as any[]
         const ok: any[] = []; const errors: string[] = []
+        // Baza yalnız RƏQƏM saxlaya bilən sərbəst sütunları qəbul edir. Mətn dəyərli
+        // sütunlar buraxilir və istifadəçiyə səbəb göstərilir (əvvəl null göndərilirdi → 400).
+        // sütun → { nəçə sətirdə mətn var, ilk nümunə, neçə sətir boşdur }
+        const freeCols = new Map<string, { bad: number; sample: string; empty: number }>()
+        const noteCol = (col: string, val: string) => {
+          const e = freeCols.get(col) || { bad: 0, sample: '', empty: 0 }
+          if (val === '') e.empty++
+          else { e.bad++; if (!e.sample) e.sample = val }
+          freeCols.set(col, e)
+        }
         rows.forEach((row, i) => {
           const norm: any = {}
           const subjects: Record<string, number | null> = {}
+          const extraFields: Record<string, string> = {}
           const branchByLevel: Record<number, string> = {}
           for (const [k, v] of Object.entries(row)) {
             const nk    = normalizeColKey(k)
@@ -518,9 +548,13 @@ function parseExcel(file: File, instId: string, subjectCols: string[] = [], leve
                 // subjectCols içindən tap, tapılmasa sütun adının özünü işlət
                 const matchedSubj = subjectCols.find(s => normalizeColKey(s) === nk) || k.trim()
                 const strVal = String(v).trim()
-                if (strVal !== '') {
-                  const val = parseFloat(strVal)
-                  subjects[matchedSubj] = isNaN(val) ? null : val
+                if (strVal === '') {
+                  noteCol(matchedSubj, '')   // boş xana — heç bir sahəyə yazılmır
+                } else {
+                  const val = parseFloat(strVal.replace(',', '.'))
+                  // Rəqəm → Subjects (bal kimi işlənir), mətn → ExtraFields
+                  if (isNaN(val)) { extraFields[matchedSubj] = strVal; noteCol(matchedSubj, strVal) }
+                  else subjects[matchedSubj] = val
                 }
               }
             }
@@ -543,11 +577,20 @@ function parseExcel(file: File, instId: string, subjectCols: string[] = [], leve
             placedSpecialty: norm.placedSpecialty && norm.placedSpecialty !== 'Yerləşdirilməyib'
               ? norm.placedSpecialty : null,
             ...(Object.keys(subjects).length > 0 ? { subjects } : {}),
+            ...(Object.keys(extraFields).length > 0 ? { extraFields } : {}),
             ...(Object.keys(branchByLevel).length > 0 ? { branchByLevel } : {}),
           })
         })
-        resolve({ ok, errors })
-      } catch { resolve({ ok: [], errors: ['Fayl oxuna bilmədi.'] }) }
+        const warnings: string[] = []
+        for (const [col, e] of freeCols) {
+          if (!e.bad) continue
+          warnings.push(
+            `«${col}» sütunu MƏTN kimi saxlanılacaq — ${e.bad} sətir doludur (məs. "${e.sample}")` +
+            (e.empty ? `, ${e.empty} sətir boşdur` : '') +
+            '. Rəqəm dəyərli sərbəst sütunlar isə bal kimi işlənir.')
+        }
+        resolve({ ok, errors, warnings })
+      } catch { resolve({ ok: [], errors: ['Fayl oxuna bilmədi.'], warnings: [] }) }
     }
     reader.readAsArrayBuffer(file)
   })
@@ -559,6 +602,8 @@ function ImportModal({ instId, instLabel, onClose, onImported }: {
   const fileRef = useRef<HTMLInputElement>(null)
   const [preview,    setPreview]    = useState<any[]>([])
   const [errors,     setErrors]     = useState<string[]>([])
+  const [warnings,   setWarnings]   = useState<string[]>([])
+  const [impError,   setImpError]   = useState('')
   const [loading,    setLoading]    = useState(false)
   const [done,       setDone]       = useState(false)
   const [mode]                      = useState<'add' | 'replace'>('add')
@@ -595,6 +640,21 @@ function ImportModal({ instId, instLabel, onClose, onImported }: {
   const effLevelNames = effectiveLevelNames(instTreeForCols)
   const levelCols: { label: string; col: string }[] = effLevelNames.map((ln: string) => ({ label: ln, col: ln }))
   const predefCols = [...EXTRA_COLS, ...levelCols]
+
+  // Öz sütunu — şablona əlavə olunur. İdxalda dəyər RƏQƏM olsa «Prioritet» fənləri
+  // kimi saxlanılır, mətn olsa nəzərə alınmır (baza sütunu yaradılmır).
+  const colTaken = (name: string) => {
+    const n = name.trim().toLowerCase()
+    return [...BASE_COLS, ...extraCols, ...subjectCols, ...predefCols.map(x => x.col)]
+      .some(c => c.trim().toLowerCase() === n)
+  }
+  const customColDup = customCol.trim() !== '' && colTaken(customCol)
+  function addCustomCol() {
+    const v = customCol.trim()
+    if (!v || colTaken(v)) return
+    setExtraCols(pr => [...pr, v])
+    setCustomCol('')
+  }
   // Səviyyə sütunları üçün nümunə dəyərlər (həmin səviyyədəki ilk node adları)
   const levelExamples: Record<string, string[]> = {}
   levelCols.forEach((lc, idx) => {
@@ -609,11 +669,34 @@ function ImportModal({ instId, instLabel, onClose, onImported }: {
     setLoading(true)
     const trees = await treeDb.getAll()
     const instTree = trees.find((t: any) => t.institution === instId)
-    const { ok, errors: errs } = await parseExcel(f, instId, subjectCols, effectiveLevelNames(instTree))
-    setPreview(ok); setErrors(errs); setLoading(false)
+    const { ok, errors: errs, warnings: warns } = await parseExcel(f, instId, subjectCols, effectiveLevelNames(instTree))
+    setPreview(ok); setErrors(errs); setWarnings(warns); setImpError(''); setLoading(false)
+  }
+
+  // Backend-in xam validasiya JSON-unu istifadəçinin başa düşəcəyi cümləyə çevirir
+  function importErrorText(e: any): string {
+    const raw = String(e?.message || '')
+    if (/System\.Decimal|could not be converted/i.test(raw)) {
+      const m = raw.match(/subjects\.([^"|\s]+)/i)
+      const col = m ? `«${m[1]}» sütununda ` : 'Sərbəst sütunların birində '
+      return `${col}rəqəm olmayan dəyər var. Sərbəst sütunlar yalnız rəqəm saxlaya bilər — ` +
+        'həmin sütunu Excel-dən çıxarın və ya dəyərləri rəqəmə çevirin.'
+    }
+    if (e?.status === 403) return 'Bu əməliyyat üçün icazəniz yoxdur (idxal «users.import» səlahiyyəti tələb edir).'
+    if (e?.status === 400) return 'Məlumatlar qəbul edilmədi. Sütun dəyərlərini yoxlayın.'
+    return raw || 'İdxal alınmadı.'
   }
 
   async function handleImport() {
+    setImpError('')
+    try {
+      await runImport()
+    } catch (e: any) {
+      setImpError(importErrorText(e))
+    }
+  }
+
+  async function runImport() {
     const yr = useCustom ? customYear : year
     const existing = await userDb.getAll()
     const withYear = preview.map(u => ({ ...u, year: yr || null }))
@@ -864,7 +947,48 @@ function ImportModal({ instId, instLabel, onClose, onImported }: {
                         }}>
                         🎯 Prioritet{subjectCols.length > 0 ? ` (${subjectCols.length})` : ''}
                       </button>
+
+                      {/* Öz sütunu əlavə et */}
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                        <input
+                          value={customCol}
+                          onChange={e => setCustomCol(e.target.value)}
+                          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addCustomCol() } }}
+                          placeholder="✦ Öz sütununuzun adı"
+                          style={{
+                            padding: '5px 12px', borderRadius: 20, fontSize: 11, fontWeight: 600,
+                            width: 150, outline: 'none',
+                            border: `1.5px solid ${customColDup ? '#ffadd2' : '#c5d0ff'}`,
+                            background: customColDup ? '#fff0f6' : '#fff',
+                            color: '#3a4560',
+                          }} />
+                        <button
+                          onClick={addCustomCol}
+                          disabled={!customCol.trim() || customColDup}
+                          title={customColDup ? 'Bu adda sütun artıq var' : 'Şablona öz sütununuzu əlavə edin'}
+                          style={{
+                            padding: '5px 12px', borderRadius: 20, fontSize: 11, fontWeight: 700,
+                            border: '1.5px solid #ffadd2',
+                            background: !customCol.trim() || customColDup ? '#fff' : '#fff0f6',
+                            color: '#c41d7f',
+                            cursor: !customCol.trim() || customColDup ? 'not-allowed' : 'pointer',
+                            opacity: !customCol.trim() || customColDup ? .5 : 1,
+                            transition: 'all .15s',
+                          }}>+ Əlavə et</button>
+                      </span>
                     </div>
+
+                    {customColDup && (
+                      <div style={{ fontSize: 10.5, color: '#c41d7f', fontWeight: 600, marginTop: 6 }}>
+                        «{customCol.trim()}» adlı sütun artıq siyahıdadır.
+                      </div>
+                    )}
+                    {customOnly.length > 0 && (
+                      <div style={{ fontSize: 10.5, color: 'var(--muted)', marginTop: 6, lineHeight: 1.45 }}>
+                        ✦ Öz sütunlarınız şablona və ön izləməyə düşür. İdxal zamanı dəyəri
+                        <b> rəqəm</b> olsa saxlanılır, mətn olsa nəzərə alınmır.
+                      </div>
+                    )}
                   </div>
 
                   {/* ── Prioritet fənləri modalı ── */}
@@ -987,6 +1111,18 @@ function ImportModal({ instId, instLabel, onClose, onImported }: {
               <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--blue)' }}>Excel faylını seçin</span>
             </label>
             {loading && <div style={{ textAlign: 'center', color: 'var(--muted)', fontSize: 13, padding: 12 }}>⏳ Fayl oxunur...</div>}
+            {impError && (
+              <div style={{ background: '#fff1f0', border: '1.5px solid #ffccc7', borderRadius: 8, padding: '10px 14px', marginBottom: 12 }}>
+                <div style={{ fontWeight: 700, fontSize: 12, color: '#cf1322', marginBottom: 3 }}>⚠ İdxal edilmədi</div>
+                <div style={{ fontSize: 11.5, color: '#cf1322', lineHeight: 1.5 }}>{impError}</div>
+              </div>
+            )}
+            {warnings.length > 0 && (
+              <div style={{ background: '#f0f7ff', border: '1.5px solid #adc6ff', borderRadius: 8, padding: '10px 14px', marginBottom: 12 }}>
+                <div style={{ fontWeight: 700, fontSize: 12, color: '#0958d9', marginBottom: 3 }}>ℹ Sərbəst sütunlar</div>
+                {warnings.map((w, i) => <div key={i} style={{ fontSize: 11.5, color: '#0958d9', lineHeight: 1.5 }}>{w}</div>)}
+              </div>
+            )}
             {errors.length > 0 && (
               <div style={{ background: '#fff1f0', border: '1.5px solid #ffccc7', borderRadius: 8, padding: '10px 14px', marginBottom: 12 }}>
                 <div style={{ fontWeight: 700, fontSize: 12, color: '#cf1322', marginBottom: 4 }}>⚠ {errors.length} xəta:</div>
@@ -1048,8 +1184,8 @@ function ImportModal({ instId, instLabel, onClose, onImported }: {
 }
 
 // ── Təhsilalan redaktə modalı ───────────────────────────────────────────────────
-function EditUserModal({ user, instLabel, activeSel, hasSub, onClose, onSaved }: {
-  user: any; instLabel: string; activeSel: any; hasSub: boolean; onClose: () => void; onSaved: () => void
+function EditUserModal({ user, instLabel, activeSel, hasSub, cohorts, onClose, onSaved }: {
+  user: any; instLabel: string; activeSel: any; hasSub: boolean; cohorts: any[]; onClose: () => void; onSaved: () => void
 }) {
   const [selStatus, setSelStatus] = useState<'submitted' | 'pending'>(hasSub ? 'submitted' : 'pending')
   const _nameParts = (user.name || '').trim().split(/\s+/)
@@ -1062,6 +1198,7 @@ function EditUserModal({ user, instLabel, activeSel, hasSub, onClose, onSaved }:
     fin:         user.fin         || '',
     score:       String(user.score ?? ''),
     group:       user.group       || '',
+    cohort:      user.cohort      || '',
     source:      user.source      || '',
     gender:      user.gender      || '',
     year:        user.year        || '',
@@ -1072,6 +1209,12 @@ function EditUserModal({ user, instLabel, activeSel, hasSub, onClose, onSaved }:
   const subjectKeys = Object.keys(user.subjects || {})
   const [subjects, setSubjects] = useState<Record<string, string>>(
     Object.fromEntries(subjectKeys.map(k => [k, String(user.subjects[k] ?? '')]))
+  )
+
+  // Sərbəst mətn sütunları (məs. "dil")
+  const extraKeys = Object.keys(user.extraFields || {})
+  const [extraVals, setExtraVals] = useState<Record<string, string>>(
+    Object.fromEntries(extraKeys.map(k => [k, String(user.extraFields[k] ?? '')]))
   )
 
   // ── Ağac səviyyələri — yalnız ŞABLONDA gələn (kursantda mövcud olan) səviyyələr redaktə/əlavə oluna bilər ──
@@ -1116,6 +1259,7 @@ function EditUserModal({ user, instLabel, activeSel, hasSub, onClose, onSaved }:
 
   const set = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }))
   const setSubj = (k: string, v: string) => setSubjects(p => ({ ...p, [k]: v }))
+  const setExtra = (k: string, v: string) => setExtraVals(p => ({ ...p, [k]: v }))
 
   async function handleSave() {
     const fullName = [form.firstName.trim(), form.lastName.trim()].filter(Boolean).join(' ')
@@ -1148,12 +1292,22 @@ function EditUserModal({ user, instLabel, activeSel, hasSub, onClose, onSaved }:
       fin:             form.fin,
       score:           parseFloat(form.score) || 0,
       group:           form.group || null,
+      cohort:          form.cohort || null,
       source:          form.source || undefined,
       gender:          form.gender || null,
       year:            form.year || null,
       printStatus:     form.printStatus,
       placedSpecialty: form.placedSpecialty || null,
       ...(subjectKeys.length > 0 ? { subjects: newSubjects } : {}),
+      ...(extraKeys.length > 0 ? { extraFields: (() => {
+        const m: Record<string, string> = {}
+        for (const k of extraKeys) {
+          const v = (extraVals[k] ?? '').trim()
+          if (v) m[k] = v
+          if (String(user.extraFields?.[k] ?? '') !== v) changed.push(`${k}: ${user.extraFields?.[k] ?? '—'} → ${v || '—'}`)
+        }
+        return m
+      })() } : {}),
       ...(branchLevelIdxs.length > 0 ? { branchByLevel: (() => {
         const m: Record<number, any> = { ...(user.branchByLevel || {}) }
         for (const i of branchLevelIdxs) { const v = branchMap[i]; if (v) m[i] = v; else delete m[i] }
@@ -1259,6 +1413,17 @@ function EditUserModal({ user, instLabel, activeSel, hasSub, onClose, onSaved }:
               </div>
             )}
 
+            {/* Təhsilalan qrupu (axın) */}
+            <div className="form-group">
+              <label className="form-label">Təhsilalan qrupu</label>
+              <select className="form-input" value={form.cohort} onChange={e => set('cohort', e.target.value)} style={{ cursor: 'pointer' }}>
+                <option value="">— Qrupsuz —</option>
+                {cohorts.map((c: any) => (
+                  <option key={c.id} value={c.id}>{c.label}</option>
+                ))}
+              </select>
+            </div>
+
             {/* Mənbə — yalnız təyin olunubsa */}
             {user.source && (
               <div className="form-group">
@@ -1310,6 +1475,20 @@ function EditUserModal({ user, instLabel, activeSel, hasSub, onClose, onSaved }:
             </div>
 
             {/* Fənn balları */}
+            {extraKeys.length > 0 && (
+              <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                <label className="form-label" style={{ marginBottom: 8 }}>✦ Əlavə sütunlar</label>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px 12px' }}>
+                  {extraKeys.map(k => (
+                    <div key={k}>
+                      <label style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600, display: 'block', marginBottom: 4, textTransform: 'capitalize' }}>{k}</label>
+                      <input className="form-input" value={extraVals[k]} onChange={e => setExtra(k, e.target.value)} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {subjectKeys.length > 0 && (
               <div className="form-group" style={{ gridColumn: '1 / -1' }}>
                 <label className="form-label" style={{ marginBottom: 8 }}>📚 Fənn balları</label>
@@ -1689,23 +1868,61 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
   const [archiveDone, setArchiveDone] = useState(false)
   const { dialog, showConfirm, closeDialog } = useDialog()
 
-  function handleArchiveUsers(instUsers: any[]) {
+  // Yalnız CARİ qrupun siyahısını arxivləyir (səhifədə bir anda tək qrup görünür).
+  function handleArchiveUsers(instUsers: any[], cohortLabel?: string) {
     if (!instUsers.length) return
+    const scope = cohortLabel ? `${instLabel} → ${cohortLabel}` : instLabel
     showConfirm({
       icon: '🗄️', iconBg: '#f0f2fa', iconColor: '#9a7b1e',
       title: 'Təhsilalanları arxivlə',
-      message: `${instLabel} üçün ${instUsers.length} təhsilalanın siyahısı arxivlənəcək. Arxiv bölməsindən baxıla bilər.`,
+      message: `${scope} üçün ${instUsers.length} təhsilalanın siyahısı arxivlənəcək. Arxiv bölməsindən baxıla bilər.`,
       confirmLabel: 'Arxivlə', confirmColor: '#9a7b1e',
       onConfirm: async () => {
-        await userArchiveDb.save({ label: instLabel, institution: instId, snapshot: instUsers })
+        // Təhsilalan silinəndə onun göndərdiyi seçim (Submission) Cascade ilə bazadan silinir.
+        // Ona görə seçimlər də arxivə yazılır — yoxsa bərpada nəticələr itir.
+        const ids = new Set(instUsers.map((u: any) => u.id))
+        const allSubs = await submissionDb.getAll()
+        const subs = allSubs.filter((s: any) => ids.has(s.userId))
+        await userArchiveDb.save({ label: scope, institution: instId, snapshot: instUsers, submissions: subs })
         await userDb.deleteMany(instUsers.map((u: any) => u.id))
         await refreshUsers()
         setArchiveDone(true)
         setTimeout(() => setArchiveDone(false), 3000)
-        addLog('user', 'warning', `Təhsilalanlar arxivləndi: ${instUsers.length} nəfər`, `Müəssisə: ${instLabel}`)
+        addLog('user', 'warning', `Təhsilalanlar arxivləndi: ${instUsers.length} nəfər`, `Müəssisə: ${scope}`)
       },
     })
   }
+  function handleDeleteUser(u: any, hasSub: boolean, hasPlacement: boolean) {
+    const notes: string[] = []
+    if (hasSub) notes.push('göndərilmiş seçimi')
+    if (hasPlacement) notes.push('yerləşdirmə nəticəsi')
+    showConfirm({
+      icon: '🗑', iconBg: '#fff5f5', iconColor: '#cf1322',
+      title: 'Təhsilalanı sil',
+      message: `"${u.name}" siyahıdan tamamilə silinəcək.`
+        + (notes.length ? ` Onun ${notes.join(' və ')} də birlikdə silinir.` : '')
+        + ' Bu əməliyyat geri alına bilməz.',
+      confirmLabel: 'Sil', confirmColor: '#cf1322',
+      onConfirm: async () => {
+        try {
+          await userDb.delete(u.id)
+        } catch (e: any) {
+          let msg = String(e?.message ?? e ?? '')
+          try { const j = JSON.parse(msg); if (j?.message) msg = j.message } catch { /* JSON deyil */ }
+          showConfirm({
+            icon: '⚠️', iconBg: '#fdecea', iconColor: '#c0392b', infoOnly: true,
+            title: 'Təhsilalan silinmədi', message: msg || 'Naməlum xəta baş verdi.',
+            confirmLabel: 'Bağla',
+          })
+          return
+        }
+        await refreshUsers()
+        addLog('user', 'warning', `Təhsilalan silindi: ${u.name}`,
+          `Müəssisə: ${instLabel} · FİN: ${u.fin || '—'}`)
+      },
+    })
+  }
+
   const [users, refreshUsers] = useLocalState(userDb.getAll)
   const tableWrapRef  = useRef<HTMLDivElement>(null)
 
@@ -1713,6 +1930,10 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
   const [filter,      setFilter]      = useState('all')
   const [printFilter, setPrintFilter] = useState('all')
   const [grpFilter,   setGrpFilter]   = useState('all')
+  // ── Təhsilalan qrupları (axınlar) ──
+  const [cohorts,     setCohorts]     = useState<any[]>([])
+  const [cohFilter,   setCohFilter]   = useState('all')   // 'all' | '<id>' | 'none'
+  const [showCohMgr,  setShowCohMgr]  = useState(false)
   const [yearFilter,  setYearFilter]  = useState('all')
   const [sortKey,     setSortKey]     = useState<string | null>(null)   // 'score' və ya fənn adı
   const [sortDir,     setSortDir]     = useState<'asc' | 'desc'>('desc')
@@ -1742,12 +1963,27 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
     })
   }, [instId])
   useEffect(() => { loadSubs() }, [loadSubs])
+  const loadCohorts = useCallback(() => { cohortDb.getAll(instId).then(setCohorts) }, [instId])
+  useEffect(() => { loadCohorts() }, [loadCohorts])
+  // Səhifə açılanda (və ya seçilmiş qrup yox olanda) ilk qrupa keçir — "hamısı"
+  // vəziyyəti yoxdur, çünki qarışıq siyahı göstərilmir.
+  useEffect(() => {
+    if (!cohorts.length) return
+    const varMi = cohorts.some((c: any) => c.id === cohFilter)
+    if (!varMi && cohFilter !== 'none') setCohFilter(cohorts[0].id)
+  }, [cohorts, cohFilter])
   usePoll(loadSubs)   // real-time: kursant seçim göndərən kimi "Seçim etdi" avtomatik yenilənir
 
   const subCountMap: Record<string, number> = {}
   for (const s of allSubs) subCountMap[s.userId] = (subCountMap[s.userId] || 0) + 1
 
-  const instUsers = (users ?? []).filter((u: any) => u.institution === instId)
+  // Müəssisənin BÜTÜN təhsilalanları — yalnız qrup saylarını hesablamaq üçün.
+  const instAllUsers = (users ?? []).filter((u: any) => u.institution === instId)
+  // Səhifədə görünən siyahı HƏMİŞƏ tək bir qrupdur: fərqli qrupların
+  // təhsilalanları qarışıq göstərilmir. Qrup yoxdursa köhnə davranış qalır.
+  const instUsers = cohorts.length === 0
+    ? instAllUsers
+    : instAllUsers.filter((u: any) => cohFilter === 'none' ? !u.cohort : u.cohort === cohFilter)
   const hasGroups = instUsers.some((u: any) => u.group)
   const hasYears  = instUsers.some((u: any) => u.year)
   const allYears  = [...new Set(instUsers.map((u: any) => u.year).filter(Boolean))].sort() as string[]
@@ -1773,11 +2009,20 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
     return Array.from(keys)
   })()
 
+  // Sərbəst MƏTN sütunları (məs. "dil") — ExtraFields-dən
+  const allExtraKeys: string[] = (() => {
+    const keys = new Set<string>()
+    instUsers.forEach((u: any) => { if (u.extraFields) Object.keys(u.extraFields).forEach(k => { if (u.extraFields[k]) keys.add(k) }) })
+    return Array.from(keys)
+  })()
+
   // ── Export üçün seçilə bilən sütunlar ──
   const exportCols: string[] = [
     'Ad', 'Soyad', 'Ata adı', 'İş nömrəsi', 'FİN', 'Təhsil müəssisəsi', 'Tədris ili',
+    // Əvvəlcədən bölgü sütunları (məs. "Qoşun növü") — cədvəldə görünənlərin eynisi
+    ...branchLevels.map(i => branchLevelName(i)),
     ...(hasGroups ? ['Qrup'] : []), ...(hasSources ? ['Mənbə'] : []), ...(hasGender ? ['Cins'] : []),
-    'Ümumi imtahan nəticəsi', ...allSubjectKeys, 'Seçim statusu', 'Çap statusu',
+    'Ümumi imtahan nəticəsi', ...allSubjectKeys, ...allExtraKeys, 'Seçim statusu', 'Çap statusu',
     'Yerləşdiyi ixtisas', 'Təhsilalanın seçimləri (prioritetlə)',
   ]
   const includedCols = new Set(exportCols.filter(c => !excludedCols.has(c)))
@@ -1890,9 +2135,19 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
           onClose={() => setShowImport(false)}
           onImported={() => { refreshUsers(); setShowImport(false) }} />
       )}
+      {showCohMgr && (
+        <CohortManagerModal
+          instId={instId}
+          cohorts={cohorts}
+          instUsers={instAllUsers}
+          filtered={sorted}
+          onClose={() => setShowCohMgr(false)}
+          onChanged={() => { loadCohorts(); refreshUsers() }}
+        />
+      )}
       {editUser && (
         <EditUserModal user={editUser} instLabel={instLabel}
-          activeSel={activeSel}
+          activeSel={activeSel} cohorts={cohorts}
           hasSub={subCountMap[editUser.id] > 0}
           onClose={() => setEditUser(null)}
           onSaved={() => { refreshUsers(); setEditUser(null) }} />
@@ -1990,7 +2245,7 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
         <div className="card-head" style={{ flexShrink: 0, padding: '10px 16px', gap: 10 }}>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end', flex: 1 }}>
             {can('users.delete') && (
-            <button onClick={() => handleArchiveUsers(instUsers)} disabled={instUsers.length === 0}
+            <button onClick={() => handleArchiveUsers(instUsers, cohorts.find((c: any) => c.id === cohFilter)?.label)} disabled={instUsers.length === 0}
               title="Arxivlə"
               style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 16px', borderRadius: 10, cursor: instUsers.length ? 'pointer' : 'not-allowed',
                 border: archiveDone ? '1.5px solid #52c41a' : '1.5px solid #ecd9a0', background: archiveDone ? '#f0fff4' : '#fffdf5',
@@ -2019,6 +2274,67 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
               style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 16px', borderRadius: 10, border: '1.5px solid #ffccc7', background: '#fff5f5', color: '#cf1322', fontWeight: 800, fontSize: 13, boxShadow: '0 2px 8px #cf132222', cursor: 'pointer' }}>🗑 Müəssisəni sil</button>
             )}
           </div>
+        </div>
+
+        {/* ── Təhsilalan qrupu sekmələri ──────────────────────────────────────
+            Hər qrup ayrı siyahıdır; fərqli qrupların təhsilalanları eyni
+            səhifədə qarışıq göstərilmir. */}
+        <div style={{
+          flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6,
+          padding: '10px 16px 0', flexWrap: 'wrap',
+        }}>
+          {cohorts.filter((c: any) => !c.isArchived).map((c: any) => {
+            const on  = cohFilter === c.id
+            const cnt = instAllUsers.filter((u: any) => u.cohort === c.id).length
+            return (
+              <button key={c.id} type="button" onClick={() => setCohFilter(c.id)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer',
+                  padding: '9px 16px', borderRadius: '10px 10px 0 0',
+                  fontSize: 13, fontWeight: 800, lineHeight: 1,
+                  border: '1.5px solid ' + (on ? '#adc6ff' : 'var(--border)'),
+                  borderBottom: on ? '1.5px solid #f0f5ff' : '1.5px solid var(--border)',
+                  background: on ? '#f0f5ff' : '#fafafa',
+                  color: on ? '#0958d9' : 'var(--muted)',
+                  marginBottom: -1.5,
+                }}>
+                <span>{c.label}</span>
+                <span style={{
+                  padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 800,
+                  background: on ? '#d6e4ff' : '#eee', color: on ? '#0958d9' : 'var(--muted)',
+                }}>{cnt}</span>
+              </button>
+            )
+          })}
+          {/* Qrupsuz — yalnız belə təhsilalan varsa */}
+          {(() => {
+            const cnt = instAllUsers.filter((u: any) => !u.cohort).length
+            if (!cnt || !cohorts.length) return null
+            const on = cohFilter === 'none'
+            return (
+              <button type="button" onClick={() => setCohFilter('none')}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer',
+                  padding: '9px 16px', borderRadius: '10px 10px 0 0',
+                  fontSize: 13, fontWeight: 800, lineHeight: 1,
+                  border: '1.5px solid ' + (on ? '#ffd591' : 'var(--border)'),
+                  borderBottom: on ? '1.5px solid #fff7e6' : '1.5px solid var(--border)',
+                  background: on ? '#fff7e6' : '#fafafa',
+                  color: on ? '#d46b08' : 'var(--muted)',
+                  marginBottom: -1.5,
+                }}>
+                <span>Qrupsuz</span>
+                <span style={{
+                  padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 800,
+                  background: on ? '#ffe7ba' : '#eee', color: on ? '#d46b08' : 'var(--muted)',
+                }}>{cnt}</span>
+              </button>
+            )
+          })()}
+          <div style={{ flex: 1, minWidth: 8, borderBottom: '1.5px solid var(--border)', alignSelf: 'stretch' }} />
+          <button className="btn btn-sm btn-ghost" onClick={() => setShowCohMgr(true)}
+            title="Təhsilalan qruplarını yarat, adlandır, arxivlə"
+            style={{ marginBottom: 6 }}>⚙ Qruplar</button>
         </div>
 
         <div className="search-row" style={{ flexShrink: 0, padding: '10px 16px' }}>
@@ -2069,6 +2385,9 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
                     {k} <span style={{ color: sortColor(k), fontSize: 16, fontWeight: 900, verticalAlign: 'middle' }}>{sortIcon(k)}</span>
                   </th>
                 ))}
+                {allExtraKeys.map(k => (
+                  <th key={'ex' + k} style={{ textAlign: 'center', textTransform: 'capitalize' }}>{k}</th>
+                ))}
                 <th>Seçim Statusu</th>
                 <th>Çap Statusu</th>
                 <th>Yerləşdiyi İxtisas</th>
@@ -2096,6 +2415,13 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
                         onMouseLeave={e => { (e.currentTarget.style.background = '#f4f7ff'); (e.currentTarget.style.borderColor = '#c5d0ff') }}
                       >✏️</button>
                       ))}
+                      {can('users.delete') && (
+                      <button onClick={() => handleDeleteUser(u, hasSub, hasPlacement)} title="Təhsilalanı sil"
+                        style={{ width: 26, height: 26, marginLeft: 5, borderRadius: 7, border: '1.5px solid #ffccc7', background: '#fff5f5', color: '#cf1322', cursor: 'pointer', fontSize: 12, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', transition: 'all .15s' }}
+                        onMouseEnter={e => { (e.currentTarget.style.background = '#ffe3e0'); (e.currentTarget.style.borderColor = '#cf1322') }}
+                        onMouseLeave={e => { (e.currentTarget.style.background = '#fff5f5'); (e.currentTarget.style.borderColor = '#ffccc7') }}
+                      >🗑</button>
+                      )}
                     </td>
                     <td className="sticky-col sticky-col-3">
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -2194,6 +2520,13 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
                         </td>
                       )
                     })}
+                    {allExtraKeys.map(k => (
+                      <td key={'ex' + k} style={{ textAlign: 'center' }}>
+                        {u.extraFields?.[k]
+                          ? <span className="cell-badge" style={{ background: '#f9f0ff', color: '#531dab', border: '1px solid #d3adf7' }}>{u.extraFields[k]}</span>
+                          : <span style={{ color: 'var(--muted)' }}>—</span>}
+                      </td>
+                    ))}
                     <td>
                       {hasSub
                         ? <span className="cell-badge" style={{ background: '#f6ffed', color: '#237804', border: '1px solid #b7eb8f' }}>✓ Edildi</span>
@@ -2213,7 +2546,7 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
                 )
               })}
               {filtered.length === 0 && (
-                <tr><td colSpan={11 + (hasGroups ? 1 : 0) + (hasSources ? 1 : 0) + (hasGender ? 1 : 0) + (showBranch ? branchLevels.length : 0) + allSubjectKeys.length} style={{ textAlign: 'center', color: 'var(--muted)', padding: '40px', fontSize: 13 }}>Nəticə tapılmadı</td></tr>
+                <tr><td colSpan={11 + (hasGroups ? 1 : 0) + (hasSources ? 1 : 0) + (hasGender ? 1 : 0) + (showBranch ? branchLevels.length : 0) + allSubjectKeys.length + allExtraKeys.length} style={{ textAlign: 'center', color: 'var(--muted)', padding: '40px', fontSize: 13 }}>Nəticə tapılmadı</td></tr>
               )}
             </tbody>
           </table>
@@ -2231,7 +2564,9 @@ export default function Users() {
   const insts = institutions ?? []
 
   const instParam  = params.get('inst')
-  const [tab, setTab] = useState<string>(instParam || (insts[0]?.id ?? ''))
+  const [tab, setTab] = useActiveInst(insts)
+  // URL-dəki ?inst= parametri üstündür (başqa səhifədən birbaşa keçid)
+  useEffect(() => { if (instParam && instParam !== tab) setTab(instParam) }, [instParam])
   const [showNewInst,  setShowNewInst]  = useState(false)
   const [editInst,     setEditInst]     = useState<any>(null)
   const [deleteTarget, setDeleteTarget] = useState<any>(null)
@@ -2241,6 +2576,17 @@ export default function Users() {
 
   // Aktif tab mövcud deyilsə birinciyə keç
   const activeInst = insts.find((i: any) => i.id === tab) || insts[0]
+
+  // Müəssisə siyahısı asinxron gəlir: ilk render-də insts boşdur, ona görə tab
+  // "" kimi qalır. Cədvəl yuxarıdakı fallback sayəsində açılsa da, InstTabs-a
+  // activeId="" gedirdi və heç bir müəssisə düyməsi işıqlanmırdı. Siyahı
+  // yüklənən kimi tab-ı həqiqətən göstərilən müəssisə ilə uyğunlaşdırırıq.
+  const resettingRef = useRef(false)
+  useEffect(() => {
+    if (resettingRef.current) return          // sıfırlama zamanı tab qəsdən boşalır
+    if (!activeInst) return
+    if (tab !== activeInst.id) setTab(activeInst.id)
+  }, [activeInst?.id, tab])
 
   function switchTab(id: string) { setTab(id); setParams({ inst: id }) }
 
@@ -2252,8 +2598,9 @@ export default function Users() {
     setResetTarget(null)
     // UserTable-i yeniləmək üçün tab-ı yenidən yükləyirik
     const cur = tab
+    resettingRef.current = true
     setTab('')
-    setTimeout(() => setTab(cur), 0)
+    setTimeout(() => { setTab(cur); resettingRef.current = false }, 0)
   }
 
   async function handleDeleteInst(inst: any) {
@@ -2408,5 +2755,216 @@ export default function Users() {
       }
       </div>
     </>
+  )
+}
+
+
+// ── Təhsilalan qrupları (axınlar) idarəetmə modalı ───────────────────────────
+// Qrup yalnız təhsilalanı əhatələyir: struktur və seçim qrupa bağlanmır, seçim
+// sadəcə hansı qrupların iştirak etdiyini göstərir. Beləliklə eyni struktur
+// üzərində fərqli qruplarla ayrı-ayrı seçimlər aparmaq mümkündür.
+function CohortManagerModal({ instId, cohorts, instUsers, filtered, onClose, onChanged }: {
+  instId: string; cohorts: any[]; instUsers: any[]; filtered: any[];
+  onClose: () => void; onChanged: () => void;
+}) {
+  const [newLabel, setNewLabel] = useState('')
+  const [editId,   setEditId]   = useState<string | null>(null)
+  const [editLbl,  setEditLbl]  = useState('')
+  const [busy,     setBusy]     = useState(false)
+  const [target,   setTarget]   = useState('')
+  const [delId,    setDelId]    = useState<string | null>(null)
+  const [err,      setErr]      = useState('')
+
+  const countOf = (id: string) => instUsers.filter((u: any) => u.cohort === id).length
+  const noneCount = instUsers.filter((u: any) => !u.cohort).length
+
+  const run = async (fn: () => Promise<any>) => {
+    setBusy(true); setErr('')
+    // Xəta udulmamalıdır: 403/500 halda düyməni basan səbəbi görməlidir
+    try { await fn(); onChanged() }
+    catch (e: any) {
+      setErr(e?.status === 403
+        ? 'Bu əməliyyat üçün icazəniz yoxdur (qrup silmək «inst.delete» səlahiyyəti tələb edir).'
+        : e?.message || 'Əməliyyat alınmadı.')
+    }
+    finally { setBusy(false) }
+  }
+
+  const create = () => {
+    const l = newLabel.trim()
+    if (!l) return
+    run(async () => {
+      await cohortDb.create({ institution: instId, label: l })
+      addLog('user', 'success', `Təhsilalan qrupu yaradıldı: "${l}"`)
+      setNewLabel('')
+    })
+  }
+
+  const rename = (c: any) => {
+    const l = editLbl.trim()
+    if (!l || l === c.label) { setEditId(null); return }
+    run(async () => {
+      await cohortDb.update(c.id, { institution: instId, label: l, icon: c.icon, year: c.year })
+      addLog('user', 'success', `Təhsilalan qrupu adlandırıldı: "${c.label}" → "${l}"`)
+      setEditId(null)
+    })
+  }
+
+  // Cari filtrdəki təhsilalanları seçilmiş qrupa köçürür. Sətir-sətir seçim
+  // əvəzinə filtrdən istifadə olunur — mövcud axtarış/qrup/il filtrləri onsuz da
+  // lazımi bölgünü verir (məs. "lisey-QQ" → "2025 qəbulu").
+  // Qrupun silinməsi. withStudents=false → təhsilalanlar qalır, sadəcə qrupsuz olur;
+  // true → qrupdakı təhsilalanlar da silinir (göndərdikləri seçimlərlə birlikdə).
+  // Əvvəlcə qrup, sonra təhsilalanlar silinir — ikinci addim ugursuz olsa təhsilalanlar
+  // qrupsuz qalır (bərpa oluna bilən hal), əksi halda onlar geri dönməzcə itirdi.
+  const removeCohort = (c: any, withStudents: boolean) => {
+    const ids = withStudents ? instUsers.filter((u: any) => u.cohort === c.id).map((u: any) => u.id) : []
+    run(async () => {
+      await cohortDb.delete(c.id)
+      if (ids.length) await userDb.deleteMany(ids)
+      addLog('user', 'warning', withStudents
+        ? `Təhsilalan qrupu və ${ids.length} təhsilalan silindi: "${c.label}"`
+        : `Təhsilalan qrupu silindi: "${c.label}"`)
+      setDelId(null)
+    })
+  }
+
+  const assignFiltered = () => {
+    if (!target) return
+    const ids = filtered.map((u: any) => u.id)
+    if (!ids.length) return
+    run(async () => {
+      const r = await cohortDb.assign(target, ids)
+      const lbl = target === 'none' ? 'qrupsuz' : (cohorts.find((c: any) => c.id === target)?.label || target)
+      addLog('user', 'success', `${r?.count ?? ids.length} təhsilalan "${lbl}" qrupuna köçürüldü`)
+    })
+  }
+
+  return (
+    <div className="modal-overlay open" onClick={onClose}>
+      <div className="modal" style={{ maxWidth: 620, width: '94vw' }} onClick={e => e.stopPropagation()}>
+        <div className="modal-head">
+          <span className="modal-title">⚙ Təhsilalan qrupları</span>
+          <button className="modal-close" onClick={onClose}>✕</button>
+        </div>
+        <div className="modal-body">
+          <div style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.5, marginBottom: 14 }}>
+            Qrup bir müəssisə daxilində ayrı təhsilalan dəstəsidir (məs. “2025-ci ildə qəbul
+            olunanlar”, “hazırlıqdan 1-ə keçənlər”). Struktur və seçim qrupa bağlanmır —
+            seçim yaradarkən hansı qrupların iştirak edəcəyini göstərirsiniz, ona görə
+            <b> eyni struktur üzərində fərqli qruplarla ayrı-ayrı seçimlər</b> apara bilərsiniz.
+          </div>
+
+          {/* ── Mövcud qruplar ── */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
+            {cohorts.length === 0 && (
+              <div style={{ fontSize: 12.5, color: 'var(--muted)', padding: '10px 2px' }}>
+                Hələ qrup yoxdur. Aşağıdan birinci qrupu yaradın.
+              </div>
+            )}
+            {cohorts.map((c: any) => (
+              <div key={c.id} style={{
+                display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px',
+                borderRadius: 10, border: '1.5px solid var(--border)',
+                background: c.isArchived ? '#fafafa' : '#fff', opacity: c.isArchived ? .65 : 1,
+              }}>
+                {delId === c.id ? (() => {
+                  const n = countOf(c.id)
+                  return (
+                  <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <span style={{ fontSize: 12.5, color: '#cf1322', fontWeight: 700 }}>
+                      «{c.label}» qrupu silinsin?
+                    </span>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      <button className="btn btn-sm" disabled={busy}
+                        style={{ background: '#cf1322', color: '#fff' }}
+                        onClick={() => removeCohort(c, false)}>Yalnız qrupu sil</button>
+                      {n > 0 && (
+                        <button className="btn btn-sm" disabled={busy}
+                          style={{ background: '#a8071a', color: '#fff' }}
+                          onClick={() => removeCohort(c, true)}>Qrupu və {n} təhsilalanı sil</button>
+                      )}
+                      <button className="btn btn-sm btn-ghost" disabled={busy} onClick={() => setDelId(null)}>Ləğv</button>
+                    </div>
+                    <span style={{ fontSize: 11, color: 'var(--muted)', lineHeight: 1.45 }}>
+                      {n > 0
+                        ? `Qrupda ${n} təhsilalan var. «Yalnız qrupu sil» — onlar qalır, sadəcə qrupsuz olur. «Qrupu və ${n} təhsilalanı sil» — təhsilalanlar və onların göndərdiyi seçimlər də silinir, bu geri alına bilməz.`
+                        : 'Qrup boşdur — heç bir təhsilalan itmir.'}
+                    </span>
+                  </div>
+                  )
+                })() : editId === c.id ? (
+                  <>
+                    <input className="form-input" style={{ flex: 1 }} value={editLbl} autoFocus
+                      onChange={e => setEditLbl(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') rename(c); if (e.key === 'Escape') setEditId(null) }} />
+                    <button className="btn btn-sm btn-primary" disabled={busy} onClick={() => rename(c)}>Yadda saxla</button>
+                    <button className="btn btn-sm btn-ghost" onClick={() => setEditId(null)}>Ləğv</button>
+                  </>
+                ) : (
+                  <>
+                    <span style={{ flex: 1, fontWeight: 700, fontSize: 13 }}>
+                      {c.label}{c.isArchived && <span style={{ fontWeight: 600, color: 'var(--muted)' }}> · arxiv</span>}
+                    </span>
+                    <span style={{
+                      padding: '2px 10px', borderRadius: 20, background: '#e6f0ff',
+                      color: '#0958d9', fontWeight: 800, fontSize: 12,
+                    }}>{countOf(c.id)}</span>
+                    <button className="btn btn-sm btn-ghost" disabled={busy}
+                      onClick={() => { setEditId(c.id); setEditLbl(c.label) }}>Adını dəyiş</button>
+                    <button className="btn btn-sm btn-ghost" disabled={busy}
+                      onClick={() => run(() => cohortDb.archive(c.id, !c.isArchived))}>
+                      {c.isArchived ? 'Bərpa et' : 'Arxivlə'}
+                    </button>
+                    <button className="btn btn-sm btn-ghost" disabled={busy} style={{ color: '#cf1322' }}
+                      onClick={() => { setErr(''); setDelId(c.id) }}>Sil</button>
+                  </>
+                )}
+              </div>
+            ))}
+            {noneCount > 0 && (
+              <div style={{ fontSize: 12, color: 'var(--muted)', padding: '4px 2px' }}>
+                Heç bir qrupa aid edilməyən: <b>{noneCount}</b> təhsilalan
+              </div>
+            )}
+          </div>
+
+          {err && (
+            <div style={{
+              marginBottom: 12, padding: '9px 12px', borderRadius: 9, fontSize: 12.5,
+              background: '#fff2f0', border: '1.5px solid #ffccc7', color: '#cf1322', fontWeight: 600,
+            }}>⚠️ {err}</div>
+          )}
+
+          {/* ── Yeni qrup ── */}
+          <div style={{ display: 'flex', gap: 8, marginBottom: 18 }}>
+            <input className="form-input" style={{ flex: 1 }} placeholder="Yeni qrupun adı (məs. 2025-ci ildə qəbul olunanlar)"
+              value={newLabel} onChange={e => setNewLabel(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') create() }} />
+            <button className="btn btn-primary" disabled={busy || !newLabel.trim()} onClick={create}>Əlavə et</button>
+          </div>
+
+          {/* ── Filtrdəkiləri qrupa köçür ── */}
+          <div style={{ padding: '12px 14px', borderRadius: 10, background: '#f7f9ff', border: '1.5px solid #d6e4ff' }}>
+            <div style={{ fontWeight: 800, fontSize: 13, marginBottom: 6 }}>Filtrdəki təhsilalanları qrupa köçür</div>
+            <div style={{ fontSize: 11.5, color: 'var(--muted)', marginBottom: 10, lineHeight: 1.45 }}>
+              Cədvəldəki cari filtrə uyğun <b>{filtered.length}</b> təhsilalan köçürüləcək.
+              Əvvəlcə siyahını axtarış/qrup/il filtrləri ilə daraldın, sonra hədəf qrupu seçin.
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <select className="form-select" style={{ flex: 1 }} value={target} onChange={e => setTarget(e.target.value)}>
+                <option value="">— Hədəf qrup seçin —</option>
+                {cohorts.filter((c: any) => !c.isArchived).map((c: any) => (
+                  <option key={c.id} value={c.id}>{c.label}</option>
+                ))}
+                <option value="none">Qrupdan çıxar</option>
+              </select>
+              <button className="btn btn-primary" disabled={busy || !target || !filtered.length}
+                onClick={assignFiltered}>Köçür</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   )
 }

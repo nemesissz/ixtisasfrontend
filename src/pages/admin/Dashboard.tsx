@@ -1,8 +1,11 @@
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, Fragment } from 'react'
+import { useActiveInst } from '../../activeInst'
 import * as XLSX from 'xlsx'
-import { institutionDb, userDb, treeDb, selectionDb, submissionDb, POLL_MS, usePoll } from '../../db'
+import { institutionDb, userDb, treeDb, selectionDb, submissionDb, cohortDb, POLL_MS, usePoll } from '../../db'
 import InstIcon from '../../components/InstIcon'
 import InstTabs from '../../components/InstTabs'
+import { formatDate } from '../../utils-date'
+import { canChoose } from '../../quota-pool'
 
 // ── Köməkçilər ────────────────────────────────────────────────────────────────
 function getLeaves(nodes: any[], anc: any[] = []): Array<{ leaf: any; path: any[] }> {
@@ -14,6 +17,17 @@ function getLeaves(nodes: any[], anc: any[] = []): Array<{ leaf: any; path: any[
   return res
 }
 const pct = (a: number, b: number) => (b > 0 ? Math.round((a / b) * 100) : 0)
+
+// Ekranda göstərmək üçün faiz mətni. `pct` böyük məxrəclərdə yanıldır: 687 nəfərdən
+// 1-i seçim etdikdə 0.15% → Math.round → "0%", yəni real fəaliyyət yoxa çıxır.
+// Sıfır YALNIZ pay həqiqətən sıfır olduqda görünməlidir; kiçik paylar onda kəsr
+// dəqiqliyi ilə, çox kiçikləri isə "<0.1" kimi verilir.
+const pctText = (a: number, b: number): string => {
+  if (b <= 0 || a <= 0) return '0'
+  const v = (a / b) * 100
+  if (v >= 1) return String(Math.round(v))
+  return v >= 0.1 ? v.toFixed(1) : '<0.1'
+}
 
 // ── SVG halqa (donut) ─────────────────────────────────────────────────────────
 function Donut({ segments, size = 150, stroke = 20, center }: {
@@ -67,7 +81,7 @@ function Bars({ data, max }: { data: { label: string; value: number; color: stri
 const esc = (v: any) => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 
 function buildStatsReportHtml(A: any, instLabel: string, selName: string): string {
-  const today = new Date().toLocaleDateString('az-AZ', { day: '2-digit', month: 'long', year: 'numeric' })
+  const today = formatDate(new Date())
   const p = (a: number, b: number) => (b > 0 ? Math.round((a / b) * 100) : 0)
   const N = A.instUsers.length
 
@@ -145,23 +159,33 @@ function buildStatsReportHtml(A: any, instLabel: string, selName: string): strin
   // İxtisas performansı
   const perf = A.byLeaf.length ? `
     <table class="t">
-      <thead><tr><th>İxtisas</th><th>Kvota</th><th>Yerləşən</th><th>Doluluq</th><th>Ən aşağı</th><th>Orta</th><th>Ən yüksək</th></tr></thead>
+      <thead><tr><th rowspan="2">İxtisas</th><th rowspan="2">Kvota</th><th rowspan="2">Yerləşən</th><th colspan="2">Lisey</th><th colspan="2">Mülki</th></tr>
+      <tr><th>ən aşağı</th><th>ən yuxarı</th><th>ən aşağı</th><th>ən yuxarı</th></tr></thead>
       <tbody>${[...A.byLeaf].sort((a: any, b: any) => b.quota - a.quota).map((l: any) =>
-        `<tr><td>${esc(l.name)}${l.path ? `<div class="sub">${esc(l.path)}</div>` : ''}</td><td class="c">${l.quota}</td><td class="c">${l.placed}</td><td class="c">${p(l.placed, l.quota)}%</td><td class="c">${l.min ? l.min.toFixed(1) : '—'}</td><td class="c">${l.avg ? l.avg.toFixed(1) : '—'}</td><td class="c">${l.max ? l.max.toFixed(1) : '—'}</td></tr>`).join('')}</tbody>
+        `<tr><td>${esc(l.name)}${l.path ? `<div class="sub">${esc(l.path)}</div>` : ''}</td><td class="c">${l.quota}</td><td class="c">${l.placed}</td><td class="c">${l.liseyMin ? l.liseyMin.toFixed(1) : '—'}</td><td class="c">${l.liseyMax ? l.liseyMax.toFixed(1) : '—'}</td><td class="c">${l.mülkiMin ? l.mülkiMin.toFixed(1) : '—'}</td><td class="c">${l.mülkiMax ? l.mülkiMax.toFixed(1) : '—'}</td></tr>`).join('')}</tbody>
     </table>` : ''
 
   // Rəqabət
   const comp = A.byLeaf.length ? `
     <div class="two">
-      <div><h3>Ən rəqabətli ixtisaslar</h3>
+      <div><h3>Ən çox rəqabətli ixtisaslar</h3>
         <table class="t"><thead><tr><th>#</th><th>İxtisas</th><th>Tələb/Yer</th><th>Rəqabət</th></tr></thead>
         <tbody>${A.mostCompetitive.map((l: any, i: number) => `<tr><td class="c">${i + 1}</td><td>${esc(l.name)}</td><td class="c">${l.demand}/${l.quota}</td><td class="c">${l.comp.toFixed(1)}×</td></tr>`).join('')}</tbody></table>
       </div>
-      <div><h3>Ən az tələb olunan ixtisaslar</h3>
+      <div><h3>Ən az rəqabətli olan ixtisaslar</h3>
         <table class="t"><thead><tr><th>#</th><th>İxtisas</th><th>Tələb/Yer</th><th>Rəqabət</th></tr></thead>
         <tbody>${A.leastDemanded.map((l: any, i: number) => `<tr><td class="c">${i + 1}</td><td>${esc(l.name)}</td><td class="c">${l.demand}/${l.quota}</td><td class="c">${l.comp.toFixed(1)}×</td></tr>`).join('')}</tbody></table>
       </div>
     </div>` : ''
+
+  // İxtisaslara maraq sıralaması — kvota nəzərə alınmadan xam tələb.
+  // Ekrandakı cədvəllə eyni sütunlar; sıralama 1-ci seçim sayına görədir.
+  const interest = A.byInterest.length ? `
+    <table class="t">
+      <thead><tr><th>#</th><th>İxtisas</th><th>Kvota</th><th>Uyğun namizəd</th><th>1-ci seçim %</th><th>1-ci seçim</th><th>İlk 3 seçim</th></tr></thead>
+      <tbody>${A.byInterest.map((l: any, i: number) =>
+        `<tr><td class="c">${i + 1}</td><td>${esc(l.name)}${l.path ? `<div class="sub">${esc(l.path)}</div>` : ''}</td><td class="c">${l.quota}</td><td class="c">${l.eligible}</td><td class="c">${l.eligible > 0 ? ((l.demand / l.eligible) * 100).toFixed(1) : '—'}%</td><td class="c">${l.demand}</td><td class="c">${l.top3}</td></tr>`).join('')}</tbody>
+    </table>` : ''
 
   const sec = (title: string, body: string) => body ? `<h2>${esc(title)}</h2>${body}` : ''
 
@@ -201,6 +225,7 @@ function buildStatsReportHtml(A: any, instLabel: string, selName: string): strin
   ${sec('7. Qrup üzrə bölgü', group)}
   ${sec('8. İxtisas üzrə performans', perf)}
   ${sec('9. Rəqabət təhlili', comp)}
+  ${sec('10. İxtisaslara maraq sıralaması', interest)}
   <div class="foot">Hesabat ${today} tarixində İxtisas Seçim Proqramı tərəfindən avtomatik hazırlanmışdır.</div>
 </body></html>`
 }
@@ -223,9 +248,14 @@ export default function Dashboard() {
   const [allTrees, setAllTrees] = useState<any[]>([])
   const [allSels, setAllSels] = useState<any[]>([])
   const [loaded, setLoaded] = useState(false)
-  const [instId, setInstId] = useState<string>('')
-  const [sortBy, setSortBy] = useState<'comp' | 'fill' | 'avg' | 'quota'>('quota')
+  const [instId, setInstId] = useActiveInst(insts)
+  // Statistika HƏMİŞƏ tək bir struktur üzrədir: fərqli təhsilalan qruplarının
+  // rəqəmləri bir-birinə qarışmamalıdır (struktur qrupu özündə saxlayır).
+  const [treeId, setTreeId] = useState<string>('')
+  const [cohorts, setCohorts] = useState<any[]>([])
   const [showAllChoices, setShowAllChoices] = useState(false)
+  // maraq cədvəlinin sıralaması: sütun + istiqamət
+  const [intSort, setIntSort] = useState<{ k: 'name' | 'ratio' | 'eligible' | 'demand' | 'top3'; asc: boolean }>({ k: 'demand', asc: false })
   const [subs, setSubs] = useState<any[]>([])
   const [reportMenu, setReportMenu] = useState(false)
 
@@ -244,14 +274,46 @@ export default function Dashboard() {
     return () => { cancelled = true; clearInterval(timer); document.removeEventListener('visibilitychange', onVisible) }
   }, [])
 
+  useEffect(() => { cohortDb.getAll().then(setCohorts) }, [])
+
   useEffect(() => {
     if (loaded && !instId && insts[0]?.id) setInstId(insts[0].id)
   }, [loaded, insts, instId])
 
-  const sel = useMemo(() =>
-    allSels.find((s: any) => s.institution === instId && s.status === 'published')
-      || allSels.find((s: any) => s.institution === instId),
-    [allSels, instId])
+  // Müəssisənin arxivlənməmiş strukturları
+  const instTrees = useMemo(
+    () => allTrees.filter((t: any) => t.institution === instId && !t.isArchived),
+    [allTrees, instId])
+
+  // Struktur seçilməyibsə (və ya müəssisə dəyişibsə) birincisinə keçirik
+  useEffect(() => {
+    if (!instTrees.length) { if (treeId) setTreeId(''); return }
+    if (!instTrees.some((t: any) => t.id === treeId)) setTreeId(instTrees[0].id)
+  }, [instTrees, treeId])
+
+  const activeTree = useMemo(
+    () => instTrees.find((t: any) => t.id === treeId) || null,
+    [instTrees, treeId])
+
+  // Strukturun təhsilalanları — qrupu strukturdan gəlir (bax: Specialties.usersForTree)
+  const treeUsers = useMemo(() => {
+    const inInst = allUsers.filter((u: any) => u.institution === instId)
+    const cid = activeTree?.cohort || ''
+    return cid ? inInst.filter((u: any) => u.cohort === cid) : inInst
+  }, [allUsers, instId, activeTree?.cohort])
+
+  // Seçim də strukturla bağlıdır: statistika hansı struktur seçilibsə, ona aid
+  // seçimin göndərişlərini göstərməlidir.
+  const sel = useMemo(() => {
+    if (treeId) {
+      return allSels.find((s: any) => s.treeId === treeId && s.status === 'published')
+          || allSels.find((s: any) => s.treeId === treeId)
+          || null
+    }
+    return allSels.find((s: any) => s.institution === instId && s.status === 'published')
+        || allSels.find((s: any) => s.institution === instId)
+        || null
+  }, [allSels, instId, treeId])
 
   const loadSubs = useCallback(() => {
     if (sel) submissionDb.getBySelection(sel.id).then(setSubs)
@@ -263,14 +325,16 @@ export default function Dashboard() {
   // ── Qlobal göstəricilər (bütün müəssisələr) ──
   // ── Seçilmiş müəssisə analitikası ──
   const A = useMemo(() => {
-    const instUsers = allUsers.filter(u => u.institution === instId)
-    const tree = (sel && allTrees.find(t => t.id === sel.treeId)) || allTrees.find(t => t.institution === instId)
+    const instUsers = treeUsers
+    const tree = activeTree || (sel && allTrees.find(t => t.id === sel.treeId)) || null
     const leaves = tree ? getLeaves(tree.nodes || []) : []
     // Rəqabət "tələbi" yalnız BİRİNCİ seçimə görə hesablanır (daha sərt ölçü):
     // ixtisası 1-ci seçim kimi yazanların sayı. (Əvvəl hər hansı sırada seçmək sayılırdı.)
     const firstChoice: Record<string, number> = {}
+    const top3: Record<string, number> = {}
     for (const s of subs) {
       const f = s.ranking?.[0]; if (f) firstChoice[f] = (firstChoice[f] || 0) + 1
+      for (const id of (s.ranking || []).slice(0, 3)) top3[id] = (top3[id] || 0) + 1
     }
 
     const placedUsers = instUsers.filter(u => u.placedSpecialtyId)
@@ -287,12 +351,22 @@ export default function Dashboard() {
     const byLeaf = leaves.map(({ leaf, path }) => {
       const us = placedUsers.filter(u => u.placedSpecialtyId === leaf.id)
       const scores = us.map(u => u.score || 0)
+      // mənbə üzrə bal aralığı (lisey / mülki ayrıca)
+      const bySrc = (src: string) => us.filter(u => u.source === src).map(u => u.score || 0)
+      const liseyS = bySrc('lisey'), mülkiS = bySrc('mülki')
       return {
         id: leaf.id, name: leaf.name, path: path.slice(0, -1).map((n: any) => n.name).join(' › '),
         quota: leaf.quota || 0, placed: us.length,
         avg: scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : 0,
         min: scores.length ? Math.min(...scores) : 0,
         max: scores.length ? Math.max(...scores) : 0,
+        // bu ixtisası seçə bilən namizəd sayı (bütün səviyyələrdəki məhdudiyyətlərlə)
+        eligible: instUsers.filter(u => canChoose(u, path, { preAssignLevel: sel?.preAssignLevel ?? null })).length,
+        top3: top3[leaf.id] || 0,
+        liseyMin: liseyS.length ? Math.min(...liseyS) : 0,
+        liseyMax: liseyS.length ? Math.max(...liseyS) : 0,
+        mülkiMin: mülkiS.length ? Math.min(...mülkiS) : 0,
+        mülkiMax: mülkiS.length ? Math.max(...mülkiS) : 0,
         demand: firstChoice[leaf.id] || 0,
         firstChoice: firstChoice[leaf.id] || 0,
       }
@@ -325,13 +399,24 @@ export default function Dashboard() {
     const hasSource = mulki + lisey > 0
 
     const totalQuota = byLeaf.reduce((s, l) => s + l.quota, 0)
-    const avgScore = instUsers.length ? instUsers.reduce((s, u) => s + (u.score || 0), 0) / instUsers.length : 0
 
-    // bal statistikası (min / max)
+    // Bal statistikası — bütün təhsilalanlar üzrə (qəbul balı profili).
+    // ⚠ Üçü də EYNİ çoxluq üzərində hesablanmalıdır: əvvəl orta bala balı olmayanlar da
+    // sıfır kimi daxil edilirdi, min/max isə onları kənarlaşdırırdı — nəticədə balsız
+    // sətir əlavə olunan kimi orta bal süni şəkildə aşağı düşürdü.
     const scores = instUsers.map(u => u.score || 0).filter(s => s > 0).sort((a, b) => a - b)
     const n = scores.length
     const minScore = n ? scores[0] : 0
     const maxScore = n ? scores[n - 1] : 0
+    const avgScore = n ? scores.reduce((s, v) => s + v, 0) / n : 0
+
+    // Yerləşənlərin balı — "Yerləşmə statusu" kartı üçün. Yuxarıdakı ümumi profillə
+    // qarışdırılmamalıdır: yerləşdirmə aparılmayıbsa bunlar boş qalır.
+    const placedScores = placedUsers.map(u => u.score || 0).filter(s => s > 0).sort((a, b) => a - b)
+    const pn = placedScores.length
+    const placedMinScore = pn ? placedScores[0] : 0
+    const placedMaxScore = pn ? placedScores[pn - 1] : 0
+    const placedAvgScore = pn ? placedScores.reduce((s, v) => s + v, 0) / pn : 0
 
     // səviyyə adlarına görə struktur sayları (qoşun növü, mülki ixtisası, …)
     const levelNames: string[] = tree?.levelNames || []
@@ -397,31 +482,54 @@ export default function Dashboard() {
     const mostCompetitive = byComp.slice(0, half)
     const leastDemanded = byComp.slice(half).reverse()
 
+    // maraq sıralaması — 1-ci seçim sayına görə (rəqabətdən fərqli ölçü)
+    const byInterest = [...byLeaf].sort((a, b) => b.demand - a.demand || b.top3 - a.top3)
+
     return {
-      sel, tree, instUsers, leaves, byLeaf, choiceDist, hist, scoreBuckets, totalQuota, avgScore,
+      sel, tree, instUsers, leaves, byLeaf, byInterest, choiceDist, hist, scoreBuckets, totalQuota, avgScore,
       placed: placedUsers.length, submittedCount, pendingCount, unplacedSubmitted,
       fem, mal, hasGender, mulki, lisey, hasSource,
-      minScore, maxScore, branchStats, subjectAvg, mostCompetitive, leastDemanded, levelStats,
+      minScore, maxScore, placedMinScore, placedAvgScore, placedMaxScore,
+      branchStats, subjectAvg, mostCompetitive, leastDemanded, levelStats,
       groupStats, hasGroups,
       satisfaction: pct(choiceDist[1] || 0, placedUsers.length),
     }
-  }, [instId, allUsers, allTrees, sel, subs])
+  }, [instId, treeUsers, activeTree, allTrees, sel, subs])
 
-  const sortedLeaves = useMemo(() => {
-    const arr = [...A.byLeaf]
-    if (sortBy === 'comp') arr.sort((a, b) => (b.demand / (b.quota || 1)) - (a.demand / (a.quota || 1)))
-    else if (sortBy === 'fill') arr.sort((a, b) => pct(b.placed, b.quota) - pct(a.placed, a.quota))
-    else if (sortBy === 'avg') arr.sort((a, b) => b.avg - a.avg)
-    else arr.sort((a, b) => b.quota - a.quota)
+  // performans cedveli sabit siralidir: kvotaya gore azalan
+  const sortedLeaves = useMemo(() => [...A.byLeaf].sort((a, b) => b.quota - a.quota), [A.byLeaf])
+
+  // maraq cədvəli — seçilmiş sütuna görə sıralanır
+  const sortedInterest = useMemo(() => {
+    const val = (l: any) => {
+      switch (intSort.k) {
+        case 'name':     return l.name || ''
+        case 'ratio':    return l.eligible > 0 ? l.demand / l.eligible : -1
+        case 'eligible': return l.eligible
+        case 'top3':     return l.top3
+        default:         return l.demand
+      }
+    }
+    const arr = [...A.byInterest]
+    arr.sort((a, b) => {
+      const x = val(a), y = val(b)
+      const c = typeof x === 'string' ? String(x).localeCompare(String(y), 'az') : (x as number) - (y as number)
+      return intSort.asc ? c : -c
+    })
     return arr
-  }, [A.byLeaf, sortBy])
+  }, [A.byInterest, intSort])
 
   const activeInst = insts.find(i => i.id === instId)
 
   // ── Statistik hesabatı sənəd kimi çıxar (çap/PDF + Word) ──
-  const reportName = () => `Statistika_${(activeInst?.label || 'muessise').replace(/[^\wəğıöüçşĞİÖÜÇŞƏ]+/gi, '_')}_${new Date().toISOString().slice(0, 10)}`
+  // Hesabat başlığı: müəssisə + struktur (statistika tək struktur üzrədir)
+  const reportScope = () => {
+    const c = activeTree ? cohortLabelOf(activeTree) : ''
+    return [activeInst?.label || '', c || activeTree?.name || ''].filter(Boolean).join(' — ')
+  }
+  const reportName = () => `Statistika_${(reportScope() || 'muessise').replace(/[^\wəğıöüçşĞİÖÜÇŞƏ]+/gi, '_')}_${new Date().toISOString().slice(0, 10)}`
   function printReport() {
-    const html = buildStatsReportHtml(A, activeInst?.label || '', A.sel?.name || '')
+    const html = buildStatsReportHtml(A, reportScope() || activeInst?.label || '', A.sel?.name || '')
     const w = window.open('', '_blank')
     if (!w) return
     w.document.write(html); w.document.close()
@@ -429,7 +537,7 @@ export default function Dashboard() {
     setTimeout(() => { try { w.focus(); w.print() } catch {} }, 400)
   }
   function exportReportWord() {
-    const html = buildStatsReportHtml(A, activeInst?.label || '', A.sel?.name || '')
+    const html = buildStatsReportHtml(A, reportScope() || activeInst?.label || '', A.sel?.name || '')
     const blob = new Blob(['﻿', html], { type: 'application/msword' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -477,9 +585,13 @@ export default function Dashboard() {
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(icmal), 'İcmal')
 
     // İxtisaslar vərəqi
-    const perf: any[][] = [['İxtisas', 'Yol', 'Kvota', 'Yerləşən', 'Doluluq %', 'Ən aşağı bal', 'Orta bal', 'Ən yüksək bal'],
+    const perf: any[][] = [
+      ['İxtisas', 'Yol', 'Kvota', 'Yerləşən', 'Doluluq %', 'Lisey', '', 'Mülki', ''],
+      ['', '', '', '', '', 'ən aşağı bal', 'ən yuxarı bal', 'ən aşağı bal', 'ən yuxarı bal'],
       ...[...A.byLeaf].sort((a: any, b: any) => b.quota - a.quota).map((l: any) =>
-        [l.name, l.path, l.quota, l.placed, pc(l.placed, l.quota), l.min ? +l.min.toFixed(1) : '', l.avg ? +l.avg.toFixed(1) : '', l.max ? +l.max.toFixed(1) : ''])]
+        [l.name, l.path, l.quota, l.placed, pc(l.placed, l.quota),
+          l.liseyMin ? +l.liseyMin.toFixed(1) : '', l.liseyMax ? +l.liseyMax.toFixed(1) : '',
+          l.mülkiMin ? +l.mülkiMin.toFixed(1) : '', l.mülkiMax ? +l.mülkiMax.toFixed(1) : ''])]
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(perf), 'İxtisaslar')
 
     // Rəqabət vərəqi (1-ci seçim üzrə)
@@ -488,6 +600,20 @@ export default function Dashboard() {
       [], ['ƏN AZ TƏLƏB OLUNAN'], ['#', 'İxtisas', 'Tələb', 'Yer', 'Rəqabət'],
       ...A.leastDemanded.map((l: any, i: number) => [i + 1, l.name, l.demand, l.quota, +l.comp.toFixed(1)])]
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(comp), 'Rəqabət')
+
+    // Maraq sıralaması vərəqi — kvotadan asılı olmayan xam tələb.
+    // Rəqabət vərəqindən fərqlidir: orada tələb/yer nisbəti, burada isə ixtisası
+    // seçə bilən namizədlərin neçəsinin onu 1-ci yazdığı göstərilir.
+    if (A.byInterest.length) {
+      const maraq: any[][] = [
+        ['#', 'İxtisas', 'Yol', 'Kvota', 'Uyğun namizəd', '1-ci seçim %', '1-ci seçim', 'İlk 3 seçim'],
+        ...A.byInterest.map((l: any, i: number) => [
+          i + 1, l.name, l.path, l.quota, l.eligible,
+          l.eligible > 0 ? +((l.demand / l.eligible) * 100).toFixed(1) : '',
+          l.demand, l.top3,
+        ])]
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(maraq), 'Maraq sıralaması')
+    }
 
     // Qrup vərəqi (varsa)
     if (A.hasGroups) {
@@ -506,9 +632,13 @@ export default function Dashboard() {
     { label: 'Təhsilalan', value: A.instUsers.length, icon: '👥', accent: '#722ed1' },
     ...A.levelStats.map((l: any, i: number) => ({ label: l.name, value: l.count, icon: LEVEL_ICONS[i] || '🎓', accent: '#13c2c2' })),
     { label: 'Ümumi kvota', value: A.totalQuota, icon: '🎯', accent: '#fa8c16' },
-    { label: 'Yerləşmə', value: `${pct(A.placed, A.instUsers.length)}%`, icon: '✅', accent: '#52c41a', sub: `${A.placed}/${A.instUsers.length}` },
-    { label: 'Seçim etdi', value: `${pct(A.submittedCount, A.instUsers.length)}%`, icon: '🗳️', accent: '#eb2f96', sub: `${A.submittedCount}/${A.instUsers.length}` },
+    { label: 'Yerləşmə', value: `${pctText(A.placed, A.instUsers.length)}%`, icon: '✅', accent: '#52c41a', sub: `${A.placed}/${A.instUsers.length}` },
+    { label: 'Seçim etdi', value: `${pctText(A.submittedCount, A.instUsers.length)}%`, icon: '🗳️', accent: '#eb2f96', sub: `${A.submittedCount}/${A.instUsers.length}` },
   ]
+
+  // Strukturun təhsilalan qrupunun adı (nişanda göstərmək üçün)
+  const cohortLabelOf = (t: any) =>
+    t?.cohort ? (cohorts.find((c: any) => c.id === t.cohort)?.label || '') : ''
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
@@ -550,6 +680,45 @@ export default function Dashboard() {
         )}
       </div>
 
+      {/* ── Struktur seçicisi ───────────────────────────────────────────────
+          Statistika tək bir struktur üzrədir; struktur öz təhsilalan qrupunu
+          gətirir, ona görə fərqli qrupların rəqəmləri qarışmır. Struktur adları
+          uzun ola bildiyi üçün sekmə yox, açılan siyahı istifadə olunur. */}
+      {activeInst && instTrees.length > 1 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 12, fontWeight: 800, color: 'var(--muted)', whiteSpace: 'nowrap' }}>
+            Struktur:
+          </span>
+          <select
+            value={treeId}
+            onChange={e => setTreeId(e.target.value)}
+            title={activeTree ? activeTree.name : ''}
+            style={{
+              fontSize: 13, fontWeight: 700, padding: '8px 12px', borderRadius: 10,
+              border: '1.5px solid #adc6ff', background: '#f0f5ff', color: '#0958d9',
+              cursor: 'pointer', maxWidth: 520, minWidth: 260,
+            }}>
+            {instTrees.map((t: any) => {
+              const lbl = cohortLabelOf(t)
+              const cnt = allUsers.filter((u: any) =>
+                u.institution === instId && (t.cohort ? u.cohort === t.cohort : true)).length
+              return (
+                <option key={t.id} value={t.id}>
+                  {(lbl || t.name)} ({cnt})
+                </option>
+              )
+            })}
+          </select>
+          {/* Seçilmiş strukturun tam adı — siyahıda qısa ad göstərilir */}
+          {activeTree && (
+            <span style={{
+              fontSize: 11.5, color: 'var(--muted)', overflow: 'hidden',
+              textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 420,
+            }}>{activeTree.name}</span>
+          )}
+        </div>
+      )}
+
       {!activeInst ? (
         <Card title="Məlumat yoxdur">
           <div style={{ color: 'var(--muted)', fontSize: 13, padding: '20px 0', textAlign: 'center' }}>Müəssisə seçin və ya əlavə edin.</div>
@@ -571,22 +740,33 @@ export default function Dashboard() {
 
           {/* Sıra 1: status donut + bal paylanması */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 14 }}>
-            <Card title={`Yerləşmə statusu — ${activeInst.label}`} icon="🎯">
+            {/* Kart iki rejimlidir: yerləşdirmə bir kliklə aparıldığı üçün ondan ƏVVƏL
+                diaqram boş dayanmasın — seçim gedişatını (seçim etdi / etmədi) göstərir.
+                Yerləşdirmə aparılan kimi (placed > 0) avtomatik yerləşmə mənzərəsinə keçir. */}
+            <Card title={`${A.placed ? 'Yerləşmə' : 'Seçim'} statusu — ${activeInst.label}`} icon="🎯">
               <div style={{ display: 'flex', alignItems: 'center', gap: 22, flexWrap: 'wrap' }}>
-                <Donut size={150} segments={[
+                <Donut size={150} segments={A.placed ? [
                   { value: A.placed, color: '#52c41a', label: 'Yerləşdi' },
                   { value: A.unplacedSubmitted, color: '#faad14', label: 'Yerləşmədi' },
                   { value: A.pendingCount, color: '#d9d9d9', label: 'Seçim etmədi' },
+                ] : [
+                  { value: A.submittedCount, color: '#52c41a', label: 'Seçim etdi' },
+                  { value: A.pendingCount, color: '#d9d9d9', label: 'Seçim etmədi' },
                 ]} center={<>
-                  <div style={{ fontSize: 26, fontWeight: 800, color: 'var(--text)' }}>{pct(A.placed, A.instUsers.length)}%</div>
-                  <div style={{ fontSize: 11, color: 'var(--muted)' }}>yerləşdi</div>
+                  <div style={{ fontSize: 26, fontWeight: 800, color: 'var(--text)' }}>
+                    {A.placed ? pctText(A.placed, A.instUsers.length) : pctText(A.submittedCount, A.instUsers.length)}%
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--muted)' }}>{A.placed ? 'yerləşdi' : 'seçim etdi'}</div>
                 </>} />
                 <div style={{ flex: 1, minWidth: 160, display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {[
+                  {(A.placed ? [
                     { c: '#52c41a', l: 'Yerləşdi', v: A.placed },
                     { c: '#faad14', l: 'Seçim etdi, yerləşdirilmədi', v: A.unplacedSubmitted },
                     { c: '#d9d9d9', l: 'Seçim etmədi', v: A.pendingCount },
-                  ].map(x => (
+                  ] : [
+                    { c: '#52c41a', l: 'Seçim etdi', v: A.submittedCount },
+                    { c: '#d9d9d9', l: 'Seçim etmədi', v: A.pendingCount },
+                  ]).map(x => (
                     <div key={x.l} style={{ display: 'flex', alignItems: 'center', gap: 9, fontSize: 13 }}>
                       <span style={{ width: 12, height: 12, borderRadius: 3, background: x.c, flexShrink: 0 }} />
                       <span style={{ flex: 1, color: 'var(--text)' }}>{x.l}</span>
@@ -594,10 +774,24 @@ export default function Dashboard() {
                     </div>
                   ))}
                   <div style={{ borderTop: '1px solid var(--border)', paddingTop: 10, fontSize: 12, color: 'var(--muted)', display: 'flex', justifyContent: 'space-between' }}>
-                    <span>Kvota doluluğu</span><b style={{ color: '#fa8c16' }}>{pct(A.placed, A.totalQuota)}% ({A.placed}/{A.totalQuota})</b>
+                    {A.placed ? <>
+                      <span>Kvota doluluğu</span>
+                      <b style={{ color: '#fa8c16' }}>{pctText(A.placed, A.totalQuota)}% ({A.placed}/{A.totalQuota})</b>
+                    </> : <>
+                      <span>Ümumi kvota</span>
+                      <b style={{ color: '#fa8c16' }}>{A.totalQuota} yer · {A.instUsers.length} təhsilalan</b>
+                    </>}
                   </div>
-                  <div style={{ display: 'flex', gap: 6, marginTop: 2 }}>
-                    {[['Ən aşağı', A.minScore, '#ff4d4f'], ['Orta', A.avgScore, '#c9962a'], ['Ən yüksək', A.maxScore, '#52c41a']].map(([l, v, c]: any) => (
+                  {/* Yerləşdirmədən əvvəl bütün təhsilalanların qəbul balı göstərilir,
+                      sonra isə yalnız yerləşənlərin balı — kartın rejiminə uyğun olsun. */}
+                  <div style={{ fontSize: 10.5, color: 'var(--muted)', marginTop: 2 }}>
+                    {A.placed ? 'Yerləşənlərin balı' : 'Təhsilalanların balı'}
+                  </div>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    {(A.placed
+                      ? [['Ən aşağı', A.placedMinScore, '#ff4d4f'], ['Orta', A.placedAvgScore, '#c9962a'], ['Ən yüksək', A.placedMaxScore, '#52c41a']]
+                      : [['Ən aşağı', A.minScore, '#ff4d4f'], ['Orta', A.avgScore, '#c9962a'], ['Ən yüksək', A.maxScore, '#52c41a']]
+                    ).map(([l, v, c]: any) => (
                       <div key={l} style={{ flex: 1, textAlign: 'center', background: `${c}10`, borderRadius: 8, padding: '6px 2px' }}>
                         <div style={{ fontSize: 14, fontWeight: 800, color: c }}>{Number(v).toFixed(1)}</div>
                         <div style={{ fontSize: 9.5, color: 'var(--muted)' }}>{l}</div>
@@ -646,8 +840,8 @@ export default function Dashboard() {
                     <div>
                       <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', marginBottom: 8 }}>Cins</div>
                       <Bars data={[
-                        { label: 'Qadın', value: A.fem, color: '#eb2f96', sub: `(${pct(A.fem, A.instUsers.length)}%)` },
-                        { label: 'Kişi', value: A.mal, color: '#1677ff', sub: `(${pct(A.mal, A.instUsers.length)}%)` },
+                        { label: 'Qadın', value: A.fem, color: '#eb2f96', sub: `(${pctText(A.fem, A.instUsers.length)}%)` },
+                        { label: 'Kişi', value: A.mal, color: '#1677ff', sub: `(${pctText(A.mal, A.instUsers.length)}%)` },
                       ]} />
                     </div>
                   )}
@@ -655,8 +849,8 @@ export default function Dashboard() {
                     <div>
                       <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', marginBottom: 8 }}>Mənbə</div>
                       <Bars data={[
-                        { label: 'Mülki', value: A.mulki, color: '#c9962a', sub: `(${pct(A.mulki, A.instUsers.length)}%)` },
-                        { label: 'Lisey', value: A.lisey, color: '#722ed1', sub: `(${pct(A.lisey, A.instUsers.length)}%)` },
+                        { label: 'Mülki', value: A.mulki, color: '#c9962a', sub: `(${pctText(A.mulki, A.instUsers.length)}%)` },
+                        { label: 'Lisey', value: A.lisey, color: '#722ed1', sub: `(${pctText(A.lisey, A.instUsers.length)}%)` },
                       ]} />
                     </div>
                   )}
@@ -798,23 +992,30 @@ export default function Dashboard() {
               <div style={{ color: 'var(--muted)', fontSize: 13, padding: '14px 0' }}>Bu müəssisə üçün ixtisas strukturu tapılmadı.</div>
             ) : (
               <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5, minWidth: 720 }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5, minWidth: A.hasSource ? 900 : 720 }}>
                   <thead>
                     <tr style={{ background: '#f8f9fd', color: 'var(--muted)', textAlign: 'left' }}>
-                      <th style={{ padding: '9px 12px', fontWeight: 700 }}>İxtisas</th>
-                      {([['quota', 'Kvota'], ['fill', 'Yerləşən / Doluluq']] as const).map(([k, lbl]) => (
-                        <th key={k} onClick={() => setSortBy(k as any)} style={{ padding: '9px 12px', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', color: sortBy === k ? '#c9962a' : undefined, textAlign: 'center' }}>
-                          {lbl} {sortBy === k ? '▾' : ''}
-                        </th>
+                      <th rowSpan={2} style={{ padding: '9px 12px', fontWeight: 700, verticalAlign: 'bottom' }}>İxtisas</th>
+                      <th rowSpan={2} style={{ padding: '9px 12px', fontWeight: 700, whiteSpace: 'nowrap', textAlign: 'center', verticalAlign: 'bottom' }}>Kvota</th>
+                      <th rowSpan={2} style={{ padding: '9px 12px', fontWeight: 700, whiteSpace: 'nowrap', textAlign: 'center', verticalAlign: 'bottom' }}>Yerləşən</th>
+                      {A.hasSource
+                        ? <>
+                            <th colSpan={2} style={{ padding: '7px 12px', fontWeight: 800, textAlign: 'center', borderLeft: '1px solid #e6e9f5', color: '#2f54eb' }}>Lisey</th>
+                            <th colSpan={2} style={{ padding: '7px 12px', fontWeight: 800, textAlign: 'center', borderLeft: '1px solid #e6e9f5', color: '#c9962a' }}>Mülki</th>
+                          </>
+                        : <th colSpan={2} style={{ padding: '7px 12px', fontWeight: 800, textAlign: 'center', borderLeft: '1px solid #e6e9f5' }}>Bal</th>}
+                    </tr>
+                    <tr style={{ background: '#f8f9fd', color: 'var(--muted)' }}>
+                      {(A.hasSource ? [0, 1] : [0]).map(g => (
+                        <Fragment key={g}>
+                          <th style={{ padding: '7px 12px', fontWeight: 700, fontSize: 11, textAlign: 'center', whiteSpace: 'nowrap', borderLeft: '1px solid #e6e9f5' }}>ən aşağı bal</th>
+                          <th style={{ padding: '7px 12px', fontWeight: 700, fontSize: 11, textAlign: 'center', whiteSpace: 'nowrap' }}>ən yuxarı bal</th>
+                        </Fragment>
                       ))}
-                      <th style={{ padding: '9px 12px', fontWeight: 700, textAlign: 'center' }}>Ən aşağı bal</th>
-                      <th onClick={() => setSortBy('avg')} style={{ padding: '9px 12px', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', color: sortBy === 'avg' ? '#c9962a' : undefined, textAlign: 'center' }}>Orta bal {sortBy === 'avg' ? '▾' : ''}</th>
-                      <th style={{ padding: '9px 12px', fontWeight: 700, textAlign: 'center' }}>Ən yüksək bal</th>
                     </tr>
                   </thead>
                   <tbody>
                     {sortedLeaves.map((l, i) => {
-                      const fillP = pct(l.placed, l.quota)
                       return (
                         <tr key={l.id} style={{ borderTop: '1px solid #f0f2fa', background: i % 2 ? '#fafbff' : '#fff' }}>
                           <td style={{ padding: '9px 12px' }}>
@@ -822,17 +1023,17 @@ export default function Dashboard() {
                             {l.path && <div style={{ fontSize: 11, color: 'var(--muted)' }}>{l.path}</div>}
                           </td>
                           <td style={{ padding: '9px 12px', textAlign: 'center', fontWeight: 700 }}>{l.quota}</td>
-                          <td style={{ padding: '9px 12px', textAlign: 'center' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                              <div style={{ flex: 1, background: '#f0f2f8', borderRadius: 5, height: 8, overflow: 'hidden', minWidth: 50 }}>
-                                <div style={{ width: `${fillP}%`, height: '100%', background: fillP >= 100 ? '#52c41a' : fillP >= 60 ? '#c9962a' : '#faad14' }} />
-                              </div>
-                              <span style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>{l.placed}/{l.quota}</span>
-                            </div>
-                          </td>
-                          <td style={{ padding: '9px 12px', textAlign: 'center', fontWeight: 700, color: l.min ? '#722ed1' : 'var(--muted)' }}>{l.min ? l.min.toFixed(1) : '—'}</td>
-                          <td style={{ padding: '9px 12px', textAlign: 'center', fontWeight: 700, color: '#c9962a' }}>{l.avg ? l.avg.toFixed(1) : '—'}</td>
-                          <td style={{ padding: '9px 12px', textAlign: 'center', fontWeight: 700, color: l.max ? '#52c41a' : 'var(--muted)' }}>{l.max ? l.max.toFixed(1) : '—'}</td>
+                          <td style={{ padding: '9px 12px', textAlign: 'center', fontWeight: 700 }}>{l.placed}</td>
+                          {!A.hasSource && <>
+                            <td style={{ padding: '9px 12px', textAlign: 'center', fontWeight: 700, color: l.min ? '#722ed1' : 'var(--muted)', borderLeft: '1px solid #f0f2fa' }}>{l.min ? l.min.toFixed(1) : '—'}</td>
+                            <td style={{ padding: '9px 12px', textAlign: 'center', fontWeight: 700, color: l.max ? '#52c41a' : 'var(--muted)' }}>{l.max ? l.max.toFixed(1) : '—'}</td>
+                          </>}
+                          {A.hasSource && <>
+                            <td style={{ padding: '9px 12px', textAlign: 'center', fontWeight: 700, color: l.liseyMin ? '#722ed1' : 'var(--muted)', borderLeft: '1px solid #f0f2fa' }}>{l.liseyMin ? l.liseyMin.toFixed(1) : '—'}</td>
+                            <td style={{ padding: '9px 12px', textAlign: 'center', fontWeight: 700, color: l.liseyMax ? '#52c41a' : 'var(--muted)' }}>{l.liseyMax ? l.liseyMax.toFixed(1) : '—'}</td>
+                            <td style={{ padding: '9px 12px', textAlign: 'center', fontWeight: 700, color: l.mülkiMin ? '#722ed1' : 'var(--muted)', borderLeft: '1px solid #f0f2fa' }}>{l.mülkiMin ? l.mülkiMin.toFixed(1) : '—'}</td>
+                            <td style={{ padding: '9px 12px', textAlign: 'center', fontWeight: 700, color: l.mülkiMax ? '#52c41a' : 'var(--muted)' }}>{l.mülkiMax ? l.mülkiMax.toFixed(1) : '—'}</td>
+                          </>}
                         </tr>
                       )
                     })}
@@ -845,7 +1046,7 @@ export default function Dashboard() {
           {/* Sıra 4: rəqabət highlight */}
           {A.byLeaf.length > 0 && (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 14 }}>
-              <Card title="Ən rəqabətli ixtisaslar" icon="🔥">
+              <Card title="Ən çox rəqabətli ixtisaslar" icon="🔥">
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 9, maxHeight: 340, overflowY: 'auto' }}>
                   {A.mostCompetitive.map((l: any, i: number) => (
                     <div key={l.id} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13 }}>
@@ -857,7 +1058,7 @@ export default function Dashboard() {
                   ))}
                 </div>
               </Card>
-              <Card title="Ən az tələb olunan ixtisaslar" icon="❄️">
+              <Card title="Ən az rəqabətli olan ixtisaslar" icon="❄️">
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 9, maxHeight: 340, overflowY: 'auto' }}>
                   {A.leastDemanded.map((l: any, i: number) => (
                     <div key={l.id} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13 }}>
@@ -870,6 +1071,61 @@ export default function Dashboard() {
                 </div>
               </Card>
             </div>
+          )}
+
+          {/* Sıra 5: maraq sıralaması — kvota nəzərə alınmadan, xam tələb */}
+          {A.byInterest.length > 0 && (
+            <Card title="İxtisaslara maraq sıralaması" icon="📌">
+              <div style={{ color: 'var(--muted)', fontSize: 12, marginBottom: 12 }}>
+                Sıralama 1-ci seçim sayına görədir. Faiz — həmin ixtisası seçə bilənlərin
+                neçə faizinin onu 1-ci yazdığını göstərir.
+              </div>
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5, minWidth: 640 }}>
+                  <thead>
+                    <tr style={{ background: '#f8f9fd', color: 'var(--muted)', textAlign: 'left' }}>
+                      <th style={{ padding: '9px 12px', fontWeight: 700, width: 34, textAlign: 'center' }}>#</th>
+                      {([['name', 'İxtisas', 'left']] as const).map(([k, lbl, al]) => (
+                        <th key={k}
+                          onClick={() => setIntSort(v => v.k === k ? { k, asc: !v.asc } : { k: k as any, asc: true })}
+                          title="Sıralamaq üçün klikləyin"
+                          style={{ padding: '9px 12px', fontWeight: 700, cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap', textAlign: al as any, color: intSort.k === k ? '#c9962a' : undefined }}>
+                          {lbl}<span style={{ opacity: intSort.k === k ? 1 : 0.25, marginLeft: 4 }}>{intSort.k === k ? (intSort.asc ? '▴' : '▾') : '▾'}</span>
+                        </th>
+                      ))}
+                      <th style={{ padding: '9px 12px', fontWeight: 700, textAlign: 'center' }}>Kvota</th>
+                      {([['eligible', 'Uyğun namizəd', 'center'], ['ratio', '1-ci seçim %', 'center'],
+                         ['demand', '1-ci seçim', 'center'], ['top3', 'İlk 3 seçim', 'center']] as const).map(([k, lbl, al]) => (
+                        <th key={k}
+                          onClick={() => setIntSort(v => v.k === k ? { k, asc: !v.asc } : { k: k as any, asc: false })}
+                          title="Sıralamaq üçün klikləyin"
+                          style={{ padding: '9px 12px', fontWeight: 700, cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap', textAlign: al as any, color: intSort.k === k ? '#c9962a' : undefined }}>
+                          {lbl}<span style={{ opacity: intSort.k === k ? 1 : 0.25, marginLeft: 4 }}>{intSort.k === k ? (intSort.asc ? '▴' : '▾') : '▾'}</span>
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sortedInterest.map((l: any, i: number) => (
+                      <tr key={l.id} style={{ borderTop: '1px solid #f0f2fa', background: i % 2 ? '#fafbff' : '#fff' }}>
+                        <td style={{ padding: '9px 12px', textAlign: 'center', fontWeight: 800, color: 'var(--muted)' }}>{i + 1}</td>
+                        <td style={{ padding: '9px 12px' }}>
+                          <div style={{ fontWeight: 700, color: 'var(--text)' }}>{l.name}</div>
+                          {l.path && <div style={{ fontSize: 11, color: 'var(--muted)' }}>{l.path}</div>}
+                        </td>
+                        <td style={{ padding: '9px 12px', textAlign: 'center', fontWeight: 700 }}>{l.quota}</td>
+                        <td style={{ padding: '9px 12px', textAlign: 'center', fontWeight: 700, color: '#2f54eb' }}>{l.eligible}</td>
+                        <td style={{ padding: '9px 12px', textAlign: 'center', fontWeight: 800, color: '#722ed1' }}>
+                          {l.eligible > 0 ? `${((l.demand / l.eligible) * 100).toFixed(1)}%` : '—'}
+                        </td>
+                        <td style={{ padding: '9px 12px', textAlign: 'center', fontWeight: 800, color: '#cf1322' }}>{l.demand}</td>
+                        <td style={{ padding: '9px 12px', textAlign: 'center', fontWeight: 700, color: '#c9962a' }}>{l.top3}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
           )}
         </>
       )}

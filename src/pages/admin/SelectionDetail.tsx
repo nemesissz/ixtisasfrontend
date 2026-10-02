@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
-import { selectionDb, treeDb, institutionDb, userDb, resetAndAutoSeedSubmissions, addLog, usePoll } from '../../db'
+import { selectionDb, treeDb, institutionDb, userDb, submissionDb, resetAndAutoSeedSubmissions, clearSubmissions, addLog, usePoll, selectionParticipants } from '../../db'
 import { AppDialog, useDialog } from '../../components/AppDialog'
+import { balanceReport } from '../../quota-pool'
 import InstIcon from '../../components/InstIcon'
 import { FlatView, NestedView, treeToNested, nestedToFlat } from '../../components/SpecialtyViews'
 
@@ -110,7 +111,7 @@ function PreviewOverlay({ sel, tree, onClose, onSaveView }: {
 
           {/* ── Görünüş (statik önizlə) ── */}
           {view === 'list'
-            ? <FlatView flat={flat} submitted={true} />
+            ? <FlatView flat={flat} submitted={true} levelNames={tree?.levelNames} />
             : <NestedView nested={nested} submitted={true} />
           }
 
@@ -137,31 +138,36 @@ export default function SelectionDetail() {
   const [preview,       setPreview]       = useState(false)
   const [previewInEdit, setPreviewInEdit] = useState(false)
   const [resetDone,     setResetDone]     = useState(false)
+  const [clearDone, setClearDone] = useState(false)
   const [editing,       setEditing]       = useState(searchParams.get('edit') === 'true')
   const [editForm,      setEditForm]      = useState<{ name: string; treeId: string; viewMode: 'list' | 'nested'; sourceProportional: boolean; status: string } | null>(null)
-  const { dialog, showConfirm, closeDialog } = useDialog()
+  const { dialog, showConfirm, showInfo, closeDialog } = useDialog()
 
   const [sel, setSel] = useState<any>(null)
   const [tree, setTree] = useState<any>(null)
   const [insts, setInsts] = useState<any[]>([])
   const [allTrees, setAllTrees] = useState<any[]>([])
   const [instUsers, setInstUsers] = useState<any[]>([])
+  const [subs, setSubs] = useState<any[]>([])
   const [loaded, setLoaded] = useState(false)
 
   const refresh = useCallback(async () => {
     const s = await selectionDb.get(id!)
     if (!s) { setSel(null); setLoaded(true); return }
-    const [t, i, at, users] = await Promise.all([
+    const [t, i, at, users, subsList] = await Promise.all([
       treeDb.get(s.treeId),
       institutionDb.getAll(),
       treeDb.getAll(),
       userDb.getAll(),
+      submissionDb.getBySelection(s.id).catch(() => []),
     ])
     setSel(s)
     setTree(t)
     setInsts(i)
     setAllTrees(at as any[])
-    setInstUsers((users as any[]).filter((u: any) => u.institution === s.institution))
+    // İştirakçılar strukturun təhsilalan qrupundan gəlir
+    setInstUsers(selectionParticipants(s, t, users as any[]))
+    setSubs(subsList as any[])
     setLoaded(true)
   }, [id])
 
@@ -251,16 +257,54 @@ export default function SelectionDetail() {
     draft: 'Qaralama', published: 'Yayımlanıb', closed: 'Bağlanıb',
   }
 
+  // Yayım qapısı: proporsional bölgü aktivdirsə, manual kvotalar bir-birini
+  // kompensasiya etməlidir. Balans pozulubsa yayımlamağa icazə verilmir —
+  // əks halda bir mənbənin yerləri itir (bax: src/quota-pool.ts).
+  const balRep = tree?.sourceProportional
+    ? balanceReport(instUsers, tree.nodes || [])
+    : null
+  const balanceBlocked = !!balRep && !balRep.ok
+
+  function showBalanceBlock() {
+    const lost: string[] = []
+    if (balRep && balRep.lostMülki > 0) lost.push(`${balRep.lostMülki} mülki`)
+    if (balRep && balRep.lostLisey > 0) lost.push(`${balRep.lostLisey} lisey`)
+    showInfo({
+      icon: '⚖️', iconBg: '#fff2f0', iconColor: '#cf1322',
+      title: 'Yayım mümkün deyil — balans pozulub',
+      message: `Strukturda ${balRep?.broken.length} namizəd qrupunda manual kvotalar bir-birini kompensasiya etmir`
+        + (lost.length ? ` və ${lost.join(' · ')} yer kənarda qalır` : '')
+        + `. Müəssisə/İxtisaslar səhifəsində strukturun başlığındakı "Balans pozulub" nişanına basıb hansı ixtisaslarda düzəliş lazım olduğunu görə bilərsiniz.`,
+    })
+  }
+
+  // Düymələrin aktivliyi üçün: neçə sıralama var, neçə təhsilalan hələ seçim etməyib
+  // Başqa seçimdən qalmış köhnə siyahı sayılmasın deyə selectionId yoxlanılır
+  const subCount     = subs.filter((x: any) => x.selectionId === sel.id).length
+  const pendingCount = Math.max(0, instUsers.length - subCount)
+
   function handleReset() {
     showConfirm({
       icon: '🗑️', iconBg: '#fff0f0', iconColor: '#ff4d4f',
       title: 'Seçimləri sıfırla',
-      message: `"${sel!.name}" seçimi üçün ${instUsers.length} təhsilalanın bütün mövcud seçimləri silinəcək. Bu əməliyyat geri alına bilməz.`,
+      message: `"${sel!.name}" seçimi üzrə bütün sıralamalar silinəcək — həm təhsilalanların özlərinin göndərdiyi, `
+        + `həm də avtomatik doldurulmuş seçimlər. Yerlərinə yenisi YARADILMIR. Bu əməliyyat geri alına bilməz.`,
       confirmLabel: 'Sıfırla', confirmColor: '#ff4d4f',
       onConfirm: async () => {
-        const { count } = await resetAndAutoSeedSubmissions(sel!.id)
-        addLog('selection', 'warning', `Seçimlər sıfırlandı: "${sel!.name}"`, `${count} təhsilalan üçün seçim yaradıldı`)
+        const r = await clearSubmissions(sel!.id)
+        addLog('selection', 'warning', `Seçimlər sıfırlandı: "${sel!.name}"`,
+          `${r.deleted} sıralama silindi${r.reverted ? ` · ${r.reverted} təhsilalan "seçim etmədi" statusuna qaytarıldı` : ''}`)
         await refresh()
+        setClearDone(true)
+        setTimeout(() => setClearDone(false), 4000)
+        showInfo({
+          icon: '🗑️', iconBg: '#fff0f0', iconColor: '#ff4d4f',
+          title: 'Seçimlər sıfırlandı',
+          message: r.deleted === 0
+            ? 'Bu seçim üzrə silinəcək sıralama yox idi.'
+            : `${r.deleted} sıralama silindi.`
+              + (r.reverted ? ` ${r.reverted} təhsilalan "seçim etmədi" statusuna qaytarıldı.` : ''),
+        })
       },
     })
   }
@@ -269,14 +313,24 @@ export default function SelectionDetail() {
     showConfirm({
       icon: '🔄', iconBg: '#fff7e6', iconColor: '#d46b08',
       title: 'Seçimləri avtomatik doldur',
-      message: `"${sel!.name}" seçimi üçün ${instUsers.length} təhsilalana avtomatik seçim yaradılacaq. Mövcud seçimlər silinəcək.`,
+      message: `Yalnız hələ seçim etməmiş təhsilalanlar üçün təsadüfi sıralama yaradılacaq. `
+        + `Təhsilalanın özünün göndərdiyi seçimlərə toxunulmayacaq. `
+        + `Sıralama strukturdakı məhdudiyyətlərə (qrup, cins, əvvəlcədən təyin edilmiş budaq) uyğun qurulur.`,
       confirmLabel: 'Doldur', confirmColor: '#d46b08',
       onConfirm: async () => {
-        const { count } = await resetAndAutoSeedSubmissions(sel!.id)
-        addLog('selection', 'info', `Seçimlər avtomatik dolduruldu: "${sel!.name}"`, `${count} təhsilalan üçün seçim yaradıldı`)
+        const r = await resetAndAutoSeedSubmissions(sel!.id, true)
+        addLog('selection', 'info', `Seçimlər avtomatik dolduruldu: "${sel!.name}"`,
+          `${r.count} təhsilalan dolduruldu · ${r.kept} öz seçimi qorundu${r.empty ? ` · ${r.empty} uyğun ixtisas tapılmadı` : ''}`)
         setResetDone(true)
         setTimeout(() => setResetDone(false), 4000)
         await refresh()
+        showInfo({
+          icon: '🔄', iconBg: '#fff7e6', iconColor: '#d46b08',
+          title: 'Avtomatik doldurma bitdi',
+          message: `${r.count} təhsilalan üçün təsadüfi sıralama yaradıldı.`
+            + (r.kept ? ` ${r.kept} təhsilalanın öz seçimi olduğu üçün toxunulmadı.` : '')
+            + (r.empty ? ` ${r.empty} təhsilalana məhdudiyyətlərə uyğun ixtisas tapılmadı.` : ''),
+        })
       },
     })
   }
@@ -317,21 +371,38 @@ export default function SelectionDetail() {
           {/* Sıfırla */}
           <button
             onClick={handleReset}
-            style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 16px', borderRadius:10, fontWeight:700, fontSize:13, cursor:'pointer', border:'1.5px solid #ffccc7', background:'#fff0f0', color:'#cf1322', transition:'all .2s' }}
+            disabled={subCount === 0}
+            title={subCount === 0 ? 'Bu seçim üzrə silinəcək sıralama yoxdur' : `${subCount} sıralama silinəcək`}
+            style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 16px', borderRadius:10, fontWeight:700, fontSize:13,
+              cursor: subCount === 0 ? 'not-allowed' : 'pointer', opacity: subCount === 0 ? .5 : 1,
+              border:`1.5px solid ${clearDone ? '#b7eb8f' : '#ffccc7'}`, background: clearDone ? '#f0fff4' : '#fff0f0', color: clearDone ? '#237804' : '#cf1322', transition:'all .2s' }}
           >
-            🗑 Sıfırla
+            {clearDone ? '✅ Sıfırlandı!' : '🗑 Sıfırla'}
           </button>
           {/* Doldur */}
           <button
             onClick={handleSeed}
-            style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 16px', borderRadius:10, fontWeight:700, fontSize:13, cursor:'pointer', border:`1.5px solid ${resetDone ? '#52c41a' : '#ffa940'}`, background: resetDone ? '#f0fff4' : '#fff8ec', color: resetDone ? '#237804' : '#d46b08', transition:'all .2s' }}
+            disabled={pendingCount === 0}
+            title={pendingCount === 0
+              ? 'Bütün təhsilalanların seçimi var — doldurulacaq kimsə qalmayıb'
+              : `${pendingCount} təhsilalan seçim etməyib`}
+            style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 16px', borderRadius:10, fontWeight:700, fontSize:13,
+              cursor: pendingCount === 0 ? 'not-allowed' : 'pointer', opacity: pendingCount === 0 ? .5 : 1,
+              border:`1.5px solid ${resetDone ? '#52c41a' : '#ffa940'}`, background: resetDone ? '#f0fff4' : '#fff8ec', color: resetDone ? '#237804' : '#d46b08', transition:'all .2s' }}
           >
-            {resetDone ? '✅ Dolduruldu!' : '🔄 Doldur'}
+            {resetDone ? '✅ Dolduruldu!' : `🔄 Doldur${pendingCount ? ` (${pendingCount})` : ''}`}
           </button>
 
           {sel.status === 'draft' && (
-            <button className="btn btn-green" onClick={async () => { await selectionDb.publish(sel.id); await refresh(); addLog('selection', 'success', `Seçim yayımlandı: "${sel.name}"`, `id: ${sel.id}`) }}>
-              🚀 Yayımla
+            <button className="btn btn-green"
+              title={balanceBlocked ? 'Mənbə balansı pozulub — əvvəlcə kvotaları tarazlayın' : 'Seçimi təhsilalanlara aç'}
+              style={balanceBlocked ? { opacity: .55, cursor: 'not-allowed' } : undefined}
+              onClick={async () => {
+                if (balanceBlocked) { showBalanceBlock(); return }
+                await selectionDb.publish(sel.id); await refresh()
+                addLog('selection', 'success', `Seçim yayımlandı: "${sel.name}"`, `id: ${sel.id}`)
+              }}>
+              {balanceBlocked ? '⚖️ Balans pozulub' : '🚀 Yayımla'}
             </button>
           )}
           {sel.status === 'published' && (

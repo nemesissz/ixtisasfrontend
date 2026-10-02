@@ -1,19 +1,41 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { selectionDb, treeDb, userDb, institutionDb, addLog } from '../../db'
+import { selectionDb, treeDb, userDb, institutionDb, cohortDb, addLog } from '../../db'
 import { FlatView, NestedView, treeToNested, nestedToFlat } from '../../components/SpecialtyViews'
 import InstIcon from '../../components/InstIcon'
+import { filterTreeByBranch, collapseLevel } from '../student/SelectionPage'
 
 // ── Təhsilalan görünüşü önizləmə overlay ─────────────────────────────────────────
 function ViewPreviewOverlay({
-  tree, viewMode, onClose, onSelect,
+  tree: fullTree, viewMode, onClose, onSelect, preAssignLevel,
 }: {
   tree: any
   viewMode: 'list' | 'nested'
   onClose: () => void
   onSelect: (v: 'list' | 'nested') => void
+  /** Əvvəlcədən bölgü səviyyəsi — təhsilalan yalnız öz bölməsini görür */
+  preAssignLevel?: number | null
 }) {
   const current = viewMode
+  // Bölgü səviyyəsindəki bölmə adları (məs. bütün mülki ixtisaslar)
+  const branches = (() => {
+    if (preAssignLevel == null) return [] as string[]
+    const out: string[] = []
+    const walk = (ns: any[], d: number) => ns.forEach(n => {
+      if (d === preAssignLevel) { if (!out.includes(n.name)) out.push(n.name) }
+      else if (n.children?.length) walk(n.children, d + 1)
+    })
+    walk(fullTree?.nodes || [], 0)
+    return out
+  })()
+  const [branch, setBranch] = useState<string>(branches[0] || '')
+  // Tələbə səhifəsi ilə eyni: bölmə süzülür, bölgü səviyyəsi yığışdırılır
+  const tree = preAssignLevel != null && branch
+    ? collapseLevel(filterTreeByBranch(fullTree, branch, preAssignLevel), preAssignLevel)
+    : fullTree
+  const levelNames: string[] = preAssignLevel != null && branch
+    ? (fullTree?.levelNames || []).filter((_: string, i: number) => i !== preAssignLevel)
+    : fullTree?.levelNames
   const nested = treeToNested(tree)
   const flat   = nestedToFlat(nested)
 
@@ -26,6 +48,12 @@ function ViewPreviewOverlay({
             <div className="preview-head-title">👁 Təhsilalan Görünüşü — Önizləmə</div>
           </div>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            {branches.length > 0 && (
+              <select value={branch} onChange={e => setBranch(e.target.value)} title="Hansı bölmənin təhsilalanı kimi baxılsın"
+                style={{ padding: '5px 8px', borderRadius: 8, border: '1px solid #ffffff55', background: '#fff', fontSize: 12.5, maxWidth: 220 }}>
+                {branches.map(b => <option key={b} value={b}>{(fullTree?.levelNames?.[preAssignLevel!] || 'Bölmə') + ': ' + b}</option>)}
+              </select>
+            )}
             <button className="btn btn-outline btn-sm" style={{ color: '#fff', background: '#ffffff22', borderColor: '#ffffff55' }} onClick={onClose}>
               ✕ Bağla
             </button>
@@ -35,7 +63,7 @@ function ViewPreviewOverlay({
         <div className="preview-body">
           {/* Görünüş */}
           {current === 'list'
-            ? <FlatView flat={flat} submitted={true} levelNames={tree?.levelNames} />
+            ? <FlatView flat={flat} submitted={true} levelNames={levelNames} />
             : <NestedView nested={nested} submitted={true} />
           }
 
@@ -51,6 +79,7 @@ export default function SelectionNew() {
   const [trees, setTrees]             = useState<any[]>([])
   const [institutions, setInstitutions] = useState<any[]>([])
   const [allUsers, setAllUsers]       = useState<any[]>([])
+  const [cohorts, setCohorts]         = useState<any[]>([])
   const [loaded, setLoaded]           = useState(false)
 
   const [form, setForm] = useState({
@@ -66,9 +95,9 @@ export default function SelectionNew() {
 
   useEffect(() => {
     let cancelled = false
-    Promise.all([treeDb.getAll(), institutionDb.getAll(), userDb.getAll()]).then(([t, i, u]) => {
+    Promise.all([treeDb.getAll(), institutionDb.getAll(), userDb.getAll(), cohortDb.getAll()]).then(([t, i, u, c]) => {
       if (cancelled) return
-      setTrees(t); setInstitutions(i); setAllUsers(u); setLoaded(true)
+      setTrees(t); setInstitutions(i); setAllUsers(u); setCohorts(c); setLoaded(true)
     })
     return () => { cancelled = true }
   }, [])
@@ -83,9 +112,17 @@ export default function SelectionNew() {
 
   // ── Hesablamalar ─────────────────────────────────────────────────────────────
   const instStudents = allUsers.filter((u: any) => u.institution === form.institution)
-  const studentCount = instStudents.length
   const instTrees    = trees.filter((t: any) => !t.institution || t.institution === form.institution)
   const selectedTree = trees.find((t: any) => t.id === form.treeId)
+  // İştirakçılar STRUKTURDAN gəlir: qrup strukturda təyin olunur, seçim sadəcə
+  // struktur seçməklə kimin üçün açıldığını müəyyənləşdirir.
+  const selectedCohort = selectedTree?.cohort
+    ? cohorts.find((c: any) => c.id === selectedTree.cohort) || null
+    : null
+  const participants = selectedCohort
+    ? instStudents.filter((u: any) => u.cohort === selectedCohort.id)
+    : instStudents
+  const studentCount = selectedTree ? participants.length : instStudents.length
   const totalQuota   = selectedTree ? treeDb.totalQuota(selectedTree)       : 0
   const totalSpec    = selectedTree ? treeDb.countSpecialties(selectedTree) : 0
   const activeInst   = institutions.find((i: any) => i.id === form.institution)
@@ -125,7 +162,7 @@ export default function SelectionNew() {
       preAssignLevel:     form.preAssignLevel,
     })
     addLog('selection', 'success', `Yeni seçim yaradıldı: "${form.name.trim()}"`,
-      `Müəssisə: ${activeInst?.label || form.institution} · Təhsilalan: ${studentCount} · Kvota: ${totalQuota} · Görünüş: ${form.viewMode}${form.sourceProportional ? ' · Proporsional bölgü aktiv' : ''}`)
+      `Müəssisə: ${activeInst?.label || form.institution} · Qrup: ${selectedCohort?.label || 'bütün müəssisə'} · Təhsilalan: ${studentCount} · Kvota: ${totalQuota} · Görünüş: ${form.viewMode}${form.sourceProportional ? ' · Proporsional bölgü aktiv' : ''}`)
     navigate(`/admin/selections/${sel.id}`)
   }
 
@@ -137,6 +174,7 @@ export default function SelectionNew() {
         <ViewPreviewOverlay
           tree={selectedTree}
           viewMode={previewMode}
+          preAssignLevel={form.preAssignLevel}
           onClose={() => setShowPreview(false)}
           onSelect={v => set('viewMode', v)}
         />
@@ -220,6 +258,28 @@ export default function SelectionNew() {
               }
             </select>
           </div>
+
+          {/* ── Strukturun təhsilalan qrupu (yalnız məlumat üçün) ──
+              Qrup strukturda təyin olunur; burada dəyişdirilmir. */}
+          {selectedTree && (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 10, marginTop: -6, marginBottom: 16,
+              padding: '10px 14px', borderRadius: 10,
+              background: selectedCohort ? '#f0f5ff' : '#fff7e6',
+              border: '1.5px solid ' + (selectedCohort ? '#adc6ff' : '#ffd591'),
+            }}>
+              <span style={{ fontSize: 15 }}>{selectedCohort ? '👥' : '🏛️'}</span>
+              <div style={{ flex: 1, lineHeight: 1.45 }}>
+                <div style={{ fontSize: 12.5, fontWeight: 800, color: selectedCohort ? '#0958d9' : '#d46b08' }}>
+                  {selectedCohort ? selectedCohort.label : 'Bütün müəssisə'}
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--muted)' }}>
+                  Bu seçim <b>{studentCount}</b> təhsilalan üçün açılacaq — struktur onlar üçün qurulub.
+                  Qrupu dəyişmək üçün İxtisas Strukturu səhifəsinə keçin.
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* ── Əvvəlcədən bölgü səviyyəsi ── */}
           {selectedTree && (selectedTree.levelNames?.length > 0) && (

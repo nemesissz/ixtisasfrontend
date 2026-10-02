@@ -1,9 +1,14 @@
-import { useState, useEffect } from 'react'
-import { treeDb, userDb, treeArchiveDb, institutionDb, systemSettingsDb, useLocalState, addLog } from '../../db'
+import { useState, useEffect, useMemo } from 'react'
+import { useActiveInst } from '../../activeInst'
+import { treeDb, userDb, institutionDb, cohortDb, systemSettingsDb, useLocalState, addLog } from '../../db'
 import { AppDialog, useDialog } from '../../components/AppDialog'
 import InstIcon, { isImageIcon } from '../../components/InstIcon'
 import InstTabs from '../../components/InstTabs'
 import { can } from '../../permissions'
+import { useBalanceSim } from '../../quota-sim'
+import { poolCounts, checkManual, leavesWithPath, balanceForLeaf, genderPool, balanceReport, feasibility, globalSourceSplitCached, autoSplit, BALANCE_TOLERANCE, sourceBalance, fragileRisks, groupBlocks } from '../../quota-pool'
+import type { SourceSlotCheck } from '../../quota-pool'
+import { UMUMI_KEY, SUM_SEP, isSumCrit, critParts } from '../../tiebreak'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type TNode = {
@@ -11,6 +16,12 @@ type TNode = {
   tiebreaker?: string[];
   groupTiebreakers?: { [group: string]: string[] }
   groups?: string[]
+  /**
+   * Qrupdan ƏLAVƏ məhdudiyyətlər: kanonik sütun açarı -> icazə verilən dəyərlər.
+   * Açarlar: group | source | gender | year | lv0, lv1, ... (bax: quota-pool.ts).
+   * Məsələn { lv0: ['QQ'] } — yalnız qoşun növü QQ olanlar bu node-u görür.
+   */
+  filters?: { [col: string]: string[] }
   quotaMode?: 'auto' | 'manual'
   mülkiQuota?: number
   liseyQuota?: number
@@ -25,7 +36,6 @@ const DEFAULT_SUBJECTS    = ['Riyaziyyat', 'Fizika', 'Dil']
 const DEFAULT_LEVEL_NAMES = ['Qoşun növü', 'Mülki ixtisas', 'Hərbi uçot ixtisası']
 
 // ── Prioritet modalı köməkçi: bir qrupun siyahısı ────────────────────────────
-const UMUMI_KEY = 'Ümumi imtahan nəticəsi'
 
 function SubjectList({ items, onChange, autoSubjects, autoScores }: {
   items: string[]
@@ -35,6 +45,9 @@ function SubjectList({ items, onChange, autoSubjects, autoScores }: {
 }) {
   const [dragIdx, setDragIdx] = useState<number | null>(null)
   const [overIdx, setOverIdx] = useState<number | null>(null)
+  // Cəm (toplama) qurucusunun vəziyyəti
+  const [sumOpen, setSumOpen]     = useState(false)
+  const [sumPicked, setSumPicked] = useState<string[]>([])
   const RANK_COLORS = ['#c9962a', '#b8860b', '#52c41a', '#f5a623', '#ff4d4f', '#722ed1']
 
   function remove(i: number) { onChange(items.filter((_, idx) => idx !== i)) }
@@ -47,8 +60,17 @@ function SubjectList({ items, onChange, autoSubjects, autoScores }: {
     setDragIdx(null); setOverIdx(null)
   }
 
-  // Əlavə edilə bilən fənlər: Ümumi + autoSubjects, hələ siyahıda olmayanlar
-  const available = [UMUMI_KEY, ...(autoSubjects ?? [])].filter((s, i, arr) => arr.indexOf(s) === i && !items.includes(s))
+  // Bütün mövcud sütunlar (cəm qurucusu üçün — artıq siyahıda olanlar da toplana bilər)
+  const allCols = [UMUMI_KEY, ...(autoSubjects ?? [])].filter((s, i, arr) => arr.indexOf(s) === i)
+  // Əlavə edilə bilən fənlər: hələ siyahıda olmayanlar
+  const available = allCols.filter(s => !items.includes(s))
+
+  function addSum() {
+    // Cəm meyarı tək sətir kimi saxlanılır: "A + B" — baza sxemi dəyişmir
+    const crit = sumPicked.join(SUM_SEP)
+    if (crit && !items.includes(crit)) onChange([...items, crit])
+    setSumOpen(false); setSumPicked([])
+  }
 
   return (
     <div>
@@ -63,6 +85,7 @@ function SubjectList({ items, onChange, autoSubjects, autoScores }: {
           const isDragging = dragIdx === i
           const isOver     = overIdx === i && dragIdx !== i
           const isUmumi    = subject === UMUMI_KEY
+          const isSum      = isSumCrit(subject)
           return (
             <div key={subject} draggable
               onDragStart={() => setDragIdx(i)}
@@ -72,8 +95,8 @@ function SubjectList({ items, onChange, autoSubjects, autoScores }: {
               style={{
                 display: 'flex', alignItems: 'center', gap: 10,
                 padding: '8px 12px', borderRadius: 10,
-                background: isDragging ? '#eef0fa' : isUmumi ? '#f0f7ff' : '#f8f9fd',
-                border: isOver ? '2px dashed var(--blue)' : isUmumi ? '1.5px solid #bfdbfe' : '1.5px solid #efe1bd',
+                background: isDragging ? '#eef0fa' : isSum ? '#f6fff2' : isUmumi ? '#f0f7ff' : '#f8f9fd',
+                border: isOver ? '2px dashed var(--blue)' : isSum ? '1.5px solid #b7e3a0' : isUmumi ? '1.5px solid #bfdbfe' : '1.5px solid #efe1bd',
                 opacity: isDragging ? 0.45 : 1, cursor: 'grab',
                 transition: 'opacity .15s, border .1s', userSelect: 'none',
               }}>
@@ -84,8 +107,15 @@ function SubjectList({ items, onChange, autoSubjects, autoScores }: {
                 color: '#fff', fontWeight: 800, fontSize: 12,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>{i + 1}</span>
-              <span style={{ flex: 1, fontWeight: 600, fontSize: 13, color: isUmumi ? '#1d4ed8' : 'inherit' }}>
-                {isUmumi ? '📊 ' : ''}{subject}
+              <span style={{ flex: 1, minWidth: 0, fontWeight: 600, fontSize: 13, color: isSum ? '#3f7a24' : isUmumi ? '#1d4ed8' : 'inherit' }}>
+                {isSum ? (
+                  <>
+                    <span style={{ fontWeight: 800 }}>Σ Cəm</span>
+                    <div style={{ fontSize: 11.5, fontWeight: 600, color: '#5f8c46', marginTop: 2, lineHeight: 1.4 }}>
+                      {critParts(subject).join(' + ')}
+                    </div>
+                  </>
+                ) : (<>{isUmumi ? '📊 ' : ''}{subject}</>)}
               </span>
               <button onClick={() => remove(i)} onMouseDown={e => e.stopPropagation()}
                 style={{ padding: '3px 7px', borderRadius: 6, border: '1.5px solid #ffd0d0', background: '#fff5f5', color: '#ff4d4f', fontWeight: 700, cursor: 'pointer', flexShrink: 0, fontSize: 12 }}
@@ -93,6 +123,64 @@ function SubjectList({ items, onChange, autoSubjects, autoScores }: {
             </div>
           )
         })}
+      </div>
+
+      {/* Cəm (toplama) qurucusu — bir neçə sütunu tək meyar kimi toplamaq üçün */}
+      <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1.5px dashed #efe1bd' }}>
+        {!sumOpen ? (
+          <button onClick={() => { setSumOpen(true); setSumPicked([]) }}
+            style={{
+              padding: '5px 14px', borderRadius: 20, border: '1.5px solid #b7e3a0',
+              background: '#f6fff2', color: '#3f7a24', fontWeight: 700, fontSize: 12, cursor: 'pointer',
+            }}>
+            Σ Cəm meyarı əlavə et
+          </button>
+        ) : (
+          <div style={{ border: '1.5px solid #b7e3a0', background: '#f9fff6', borderRadius: 10, padding: 12 }}>
+            <div style={{ fontSize: 11.5, color: '#5f8c46', fontWeight: 700, marginBottom: 8 }}>
+              Toplanacaq sütunları seçin — onların cəmi tək prioritet meyarı kimi işlədiləcək
+              (məs. ümumi imtahan nəticəsi + semestr balı).
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {allCols.map(c => {
+                const on = sumPicked.includes(c)
+                return (
+                  <button key={c} onClick={() => setSumPicked(prev => on ? prev.filter(x => x !== c) : [...prev, c])}
+                    style={{
+                      padding: '4px 12px', borderRadius: 20, cursor: 'pointer', fontSize: 12, fontWeight: 600,
+                      border: '1.5px solid ' + (on ? '#3f7a24' : '#d8e8cf'),
+                      background: on ? '#3f7a24' : '#fff', color: on ? '#fff' : '#5f8c46',
+                    }}>
+                    {on ? '✓ ' : '+ '}{c === UMUMI_KEY ? '📊 ' : ''}{c}
+                  </button>
+                )
+              })}
+            </div>
+            {sumPicked.length > 0 && (
+              <div style={{ marginTop: 10, fontSize: 12, color: '#3f7a24', fontWeight: 700 }}>
+                Nəticə: Σ {sumPicked.join(' + ')}
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 10 }}>
+              <button onClick={() => setSumOpen(false)}
+                style={{ padding: '5px 14px', borderRadius: 8, border: '1.5px solid var(--border)', background: '#fff', color: 'var(--muted)', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>
+                Ləğv
+              </button>
+              <button disabled={sumPicked.length < 2} onClick={addSum}
+                style={{
+                  padding: '5px 14px', borderRadius: 8, border: 'none', fontWeight: 800, fontSize: 12,
+                  cursor: sumPicked.length < 2 ? 'not-allowed' : 'pointer',
+                  background: sumPicked.length < 2 ? '#dfe3dd' : '#3f7a24',
+                  color: sumPicked.length < 2 ? '#98a292' : '#fff',
+                }}>
+                Siyahıya əlavə et
+              </button>
+            </div>
+            {sumPicked.length === 1 && (
+              <div style={{ fontSize: 11, color: '#9a7b1e', marginTop: 6 }}>Ən azı iki sütun seçin.</div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Əlavə et chipləri */}
@@ -253,11 +341,61 @@ function PriorityModal({ node, onSave, onClose, groupSubjectsMap, groupScoresMap
   )
 }
 
+// ── Node filtrində istifadə oluna bilən sütunlar ─────────────────────────────
+// Kanonik açar (bazada saxlanılan) + insana görünən ad. Səviyyə sütunlarının adı
+// strukturun levelNames sahəsindən gəlir, ona görə siyahı ağaca görə qurulur.
+// "Qrup" burada YOXDUR — onun öz bölməsi var.
+// Strukturun səviyyə adları — boş qalan səviyyələr üçün default adlar işlənir.
+// Ağacın FAKTİKİ dərinliyi levelNames-dən uzun ola bilər, ona görə hər ikisinə baxılır.
+function levelNamesOf(tree: any): string[] {
+  const depth = (function d(nodes: any[]): number {
+    let max = 0
+    for (const n of nodes || []) max = Math.max(max, 1 + d(n.children || []))
+    return max
+  })(tree?.nodes || [])
+  const count = Math.max(depth, tree?.levelNames?.length || 0)
+  return Array.from({ length: count }, (_, i) =>
+    tree?.levelNames?.[i] || DEFAULT_LEVEL_NAMES[i] || `Səviyyə ${i + 1}`)
+}
+
+function filterableCols(levelNames: string[], extraKeys: string[] = []): { key: string; label: string }[] {
+  return [
+    ...levelNames.map((ln, i) => ({ key: 'lv' + i, label: ln })),
+    { key: 'source', label: 'Mənbə' },
+    { key: 'gender', label: 'Cins' },
+    { key: 'year',   label: 'Tədris ili' },
+    // Excel-dən gələn sərbəst mətn sütunları (məs. "dil") — ExtraFields
+    ...extraKeys.map(k => ({ key: 'ex:' + k, label: k.charAt(0).toUpperCase() + k.slice(1) })),
+  ]
+}
+
+// Təhsilalanın kanonik açar üzrə dəyəri — quota-pool.ts/studentColValue ilə eyni
+// məntiq (burada UI üçün, orada hesablama üçün istifadə olunur).
+function colValueOf(u: any, key: string): string {
+  const mx = /^ex:(.+)$/i.exec(String(key ?? '').trim())
+  if (mx) {
+    const want = mx[1].trim().toLowerCase()
+    const ef = u?.extraFields || {}
+    for (const k of Object.keys(ef)) if (k.trim().toLowerCase() === want) return String(ef[k] ?? '').trim()
+    return ''
+  }
+  if (key === 'group')  return String(u?.group  ?? '').trim()
+  if (key === 'source') return String(u?.source ?? '').trim()
+  if (key === 'gender') return String(u?.gender ?? '').trim()
+  if (key === 'year')   return String(u?.year   ?? '').trim()
+  const m = /^lv(\d+)$/.exec(key)
+  if (m) return String(u?.branchByLevel?.[Number(m[1])] ?? '').trim()
+  return ''
+}
+
 // ── Qrup təyinat modalı ───────────────────────────────────────────────────────
-function GroupModal({ node, users, onSave, onClose }: {
+function GroupModal({ node, users, levelNames, onSave, onClose }: {
   node: TNode
+  /** Bu strukturun təhsilalanları — dəyər siyahıları buradan yığılır */
   users: any[]
-  onSave: (groups: string[]) => void
+  /** Strukturun səviyyə adları — "Qoşun növü" kimi sütunların görünən adı */
+  levelNames: string[]
+  onSave: (groups: string[], filters: { [col: string]: string[] } | undefined) => void
   onClose: () => void
 }) {
   const allGroups = [...new Set(
@@ -270,11 +408,32 @@ function GroupModal({ node, users, onSave, onClose }: {
     setSelected(prev => prev.includes(g) ? prev.filter(x => x !== g) : [...prev, g])
   }
 
+  // ── Əlavə sütun filtrləri ──────────────────────────────────────────────────
+  // Yalnız bu strukturun təhsilalanlarında FAKTİKİ dəyəri olan sütunlar təklif
+  // olunur: qoşun növü sütunu, məsələn, hər təhsilalan qrupunda olmur.
+  const [filters, setFilters] = useState<{ [col: string]: string[] }>(node.filters || {})
+  // Bu strukturun təhsilalanlarında faktiki olan sərbəst mətn sütunları
+  const extraKeys = [...new Set(
+    users.flatMap((u: any) => Object.keys(u?.extraFields || {}).filter(k => String(u.extraFields[k] ?? '').trim()))
+  )].sort() as string[]
+  const availCols = filterableCols(levelNames, extraKeys)
+    .map(c => ({ ...c, values: [...new Set(users.map(u => colValueOf(u, c.key)).filter(Boolean))].sort() }))
+    .filter(c => c.values.length > 0)
+  const activeCols = availCols.filter(c => c.key in filters)
+  const freeCols   = availCols.filter(c => !(c.key in filters))
+
+  const addCol    = (key: string) => setFilters(prev => ({ ...prev, [key]: [] }))
+  const dropCol   = (key: string) => setFilters(prev => { const n = { ...prev }; delete n[key]; return n })
+  const toggleVal = (key: string, v: string) => setFilters(prev => {
+    const cur = prev[key] || []
+    return { ...prev, [key]: cur.includes(v) ? cur.filter(x => x !== v) : [...cur, v] }
+  })
+
   return (
     <div className="modal-overlay open" onClick={onClose}>
-      <div className="modal" style={{ maxWidth: 380 }} onClick={e => e.stopPropagation()}>
+      <div className="modal" style={{ maxWidth: 460 }} onClick={e => e.stopPropagation()}>
         <div className="modal-head">
-          <span className="modal-title">👥 Qrup Təyinatı — {node.name}</span>
+          <span className="modal-title">👥 Görünmə Məhdudiyyəti — {node.name}</span>
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>
         <div className="modal-body">
@@ -282,6 +441,7 @@ function GroupModal({ node, users, onSave, onClose }: {
             Seçilmiş qruplardan olan təhsilalanlar bu ixtisası görəcək.
             Heç biri seçilməsə — bütün qruplar üçün görünür.
           </div>
+          <div style={{ fontSize: 11.5, fontWeight: 800, color: 'var(--muted)', marginBottom: 8 }}>QRUP</div>
 
           {allGroups.length === 0 ? (
             <div style={{ fontSize: 13, color: 'var(--muted)', textAlign: 'center', padding: '20px 0' }}>
@@ -308,9 +468,82 @@ function GroupModal({ node, users, onSave, onClose }: {
             </div>
           )}
 
+          {/* ── Əlavə sütun üzrə məhdudiyyət ──────────────────────────────────
+              Qrupdan başqa istənilən mövcud sütun (məs. Qoşun növü) üzrə də
+              məhdudiyyət qoyula bilər. Seçilmiş dəyəri olmayan təhsilalana
+              məhdudiyyət tətbiq edilmir. */}
+          <div style={{ marginTop: 18, paddingTop: 14, borderTop: '1.5px solid var(--border)' }}>
+            <div style={{ fontSize: 11.5, fontWeight: 800, color: 'var(--muted)', marginBottom: 8 }}>ƏLAVƏ SÜTUN</div>
+
+            {activeCols.length === 0 && freeCols.length === 0 && (
+              <div style={{ fontSize: 12, color: 'var(--muted)' }}>
+                Bu strukturun təhsilalanlarında məhdudiyyət qoyula biləcək başqa sütun yoxdur.
+              </div>
+            )}
+
+            {activeCols.map(c => (
+              <div key={c.key} style={{
+                marginBottom: 10, padding: '10px 12px', borderRadius: 10,
+                background: '#f8f9fd', border: '1.5px solid #efe1bd',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', marginBottom: 8 }}>
+                  <span style={{ fontSize: 13, fontWeight: 800 }}>{c.label}</span>
+                  <button onClick={() => dropCol(c.key)} title="Bu sütun üzrə məhdudiyyəti sil"
+                    style={{
+                      marginLeft: 'auto', border: 'none', background: 'transparent',
+                      color: '#cf1322', cursor: 'pointer', fontSize: 12, fontWeight: 700,
+                    }}>✕ sil</button>
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {c.values.map(v => {
+                    const on = (filters[c.key] || []).includes(v)
+                    return (
+                      <button key={v} onClick={() => toggleVal(c.key, v)}
+                        title={users.filter(u => colValueOf(u, c.key) === v).length + ' təhsilalan'}
+                        style={{
+                          padding: '6px 12px', borderRadius: 8, cursor: 'pointer',
+                          fontSize: 12, fontWeight: 700,
+                          border: '1.5px solid ' + (on ? '#52c41a' : '#dde'),
+                          background: on ? '#f0fff4' : '#fff',
+                          color: on ? '#237804' : 'var(--muted)',
+                        }}>
+                        {on ? '✓ ' : ''}{v}
+                        <span style={{ marginLeft: 6, opacity: .65, fontWeight: 600 }}>
+                          {users.filter(u => colValueOf(u, c.key) === v).length}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+                {(filters[c.key] || []).length === 0 && (
+                  <div style={{ fontSize: 11, color: '#d46b08', marginTop: 8 }}>
+                    Heç bir dəyər seçilməyib — bu sütun üzrə məhdudiyyət tətbiq olunmayacaq.
+                  </div>
+                )}
+              </div>
+            ))}
+
+            {freeCols.length > 0 && (
+              <select value="" onChange={e => { if (e.target.value) addCol(e.target.value) }}
+                style={{
+                  fontSize: 12, fontWeight: 700, padding: '7px 10px', borderRadius: 8,
+                  border: '1.5px solid #dde', background: '#fff', cursor: 'pointer', width: '100%',
+                }}>
+                <option value="">+ Sütun əlavə et…</option>
+                {freeCols.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
+              </select>
+            )}
+          </div>
+
           <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 16 }}>
             <button className="btn btn-outline" onClick={onClose}>Ləğv et</button>
-            <button className="btn btn-primary" onClick={() => { onSave(selected); onClose() }}>
+            <button className="btn btn-primary" onClick={() => {
+              // Dəyəri seçilməmiş sütun saxlanılmır — yoxsa "boş filtr" kimi qalar.
+              const clean: { [col: string]: string[] } = {}
+              for (const k of Object.keys(filters)) if (filters[k]?.length) clean[k] = filters[k]
+              onSave(selected, Object.keys(clean).length ? clean : undefined)
+              onClose()
+            }}>
               ✓ Yadda Saxla
             </button>
           </div>
@@ -455,20 +688,29 @@ const DEPTH_COLORS = ['#c9962a', '#b8860b', '#ff7c4f', '#237804', '#c41d7f', '#d
 function depthColor(d: number) { return DEPTH_COLORS[Math.min(d, DEPTH_COLORS.length - 1)] }
 
 // ── Kvota bölgüsü modalı ─────────────────────────────────────────────────────
-function QuotaModeModal({ node, instUsers, onSave, onClose }: {
+function QuotaModeModal({ node, path, treeNodes, instUsers, onSave, onClose }: {
   node: TNode
+  /** kökdən bu yarpağa qədər node-lar — hovuzu süzmək üçün */
+  path: TNode[]
+  /** strukturun kök node-ları — eyni hovuzlu ixtisasları tapmaq üçün */
+  treeNodes: TNode[]
   instUsers: any[]
   onSave: (mode: 'auto' | 'manual', mülkiQ?: number, liseyQ?: number) => void
   onClose: () => void
 }) {
-  const quota      = node.quota || 0
-  const total      = instUsers.length || 1
-  const mülkiTotal = instUsers.filter(u => u.source === 'mülki').length
-  const liseyTotal = instUsers.filter(u => u.source === 'lisey').length
+  const quota = node.quota || 0
+
+  // Hovuz: bu ixtisası SEÇƏ BİLƏN təhsilalanlar (bütün səviyyələrin məhdudiyyətləri ilə)
+  const pool       = poolCounts(instUsers, path)
+  const mülkiTotal = pool.mülki
+  const liseyTotal = pool.lisey
   const hasSrc     = mülkiTotal + liseyTotal > 0
 
-  const autoMülki = hasSrc ? Math.round(quota * mülkiTotal / total) : Math.round(quota / 2)
-  const autoLisey = quota - autoMülki
+  // Avtomatik bölgü qlobal cədvəldən gəlir — bax: quota-pool.ts/globalSourceSplit
+  const gTable    = globalSourceSplitCached(instUsers, treeNodes || [])
+  const auto      = autoSplit(node, pool, gTable)
+  const autoMülki = hasSrc ? auto.mülki : Math.round(quota / 2)
+  const autoLisey = hasSrc ? auto.lisey : quota - Math.round(quota / 2)
 
   const [mode,      setMode]      = useState<'auto' | 'manual'>(node.quotaMode || 'auto')
   const [mülkiVal,  setMülkiVal]  = useState(node.quotaMode === 'manual' && node.mülkiQuota != null ? node.mülkiQuota : autoMülki)
@@ -476,6 +718,23 @@ function QuotaModeModal({ node, instUsers, onSave, onClose }: {
 
   const total2  = mülkiVal + liseyVal
   const overSum = total2 > quota
+
+  // Eyni namizəd hovuzuna malik ixtisaslar üzrə ümumi mülki/lisey balansı.
+  // Cari modaldakı dəyişiklik `override` kimi verilir ki, nəticə dərhal görünsün.
+  const allLeaves = leavesWithPath(treeNodes || [])
+  const bal = balanceForLeaf(instUsers, allLeaves, path, {
+    leafId: node.id, mode, mülki: mülkiVal, lisey: liseyVal,
+  }, undefined, gTable)
+
+  // Faktiki bölgü nisbəti xam hovuzdan yox, qlobal modeldən gəlir: eyni hovuzu
+  // paylaşan ixtisasların kvotası məhduddur, ona görə 22/367 deyil, 22/48 kimi
+  // real yer bölgüsü göstərilir.
+  const peerQuota = bal.peers.reduce((a, p) => a + p.quota, 0)
+  const shareM    = bal.autoMülki
+  const shareL    = bal.autoLisey
+  const shareTot  = shareM + shareL || 1
+  const pctM      = Math.round(shareM / shareTot * 100)
+  const pctL      = 100 - pctM
 
   function handleMülki(v: number) {
     const n = Math.max(0, Math.min(v, quota))
@@ -504,10 +763,16 @@ function QuotaModeModal({ node, instUsers, onSave, onClose }: {
               <div style={{ fontWeight: 700, fontSize: 13 }}>Ümumi kvota: <span style={{ color: 'var(--blue)' }}>{quota}</span></div>
               {hasSrc && (
                 <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
-                  Müəssisə nisbəti —{' '}
-                  <span style={{ color: '#1677ff', fontWeight: 700 }}>Mülki: {mülkiTotal} ({Math.round(mülkiTotal/total*100)}%)</span>
-                  {' · '}
-                  <span style={{ color: '#531dab', fontWeight: 700 }}>Lisey: {liseyTotal} ({Math.round(liseyTotal/total*100)}%)</span>
+                  Bu ixtisası <b>{pool.total}</b> nəfər seçə bilər (Mülki {mülkiTotal} · Lisey {liseyTotal})
+                  {instUsers.length !== pool.total && (
+                    <>, <span style={{ color: '#c47f0a' }}>{instUsers.length - pool.total} nəfər məhdudiyyətlərə görə kənardadır</span></>
+                  )}
+                  <div style={{ marginTop: 3 }}>
+                    Eyni hovuzu paylaşan ixtisasların ümumi kvotası <b>{peerQuota}</b> — yerlərin bölgüsü:{' '}
+                    <span style={{ color: '#1677ff', fontWeight: 700 }}>Mülki: {shareM} ({pctM}%)</span>
+                    {' · '}
+                    <span style={{ color: '#531dab', fontWeight: 700 }}>Lisey: {shareL} ({pctL}%)</span>
+                  </div>
                 </div>
               )}
             </div>
@@ -546,9 +811,19 @@ function QuotaModeModal({ node, instUsers, onSave, onClose }: {
               </div>
               <div style={{ fontSize: 11, color: hasSrc ? 'var(--muted)' : '#c47f0a', marginTop: 10, lineHeight: 1.5 }}>
                 {hasSrc
-                  ? <>Müəssisə nisbətinə görə (Mülki {Math.round(mülkiTotal/total*100)}% · Lisey {Math.round(liseyTotal/total*100)}%) hər yerləşdirmədə yenidən hesablanır.</>
-                  : <>⚠️ Müəssisədə hələ mənbəli təhsilalan yoxdur — yuxarıdakı dəyərlər müvəqqəti 50/50 bölgüdür. Təhsilalanlar import ediləndən sonra real nisbətə görə hesablanacaq.</>}
+                  ? <>Eyni hovuzu paylaşan ixtisaslar üzrə real yer bölgüsünə görə (Mülki {pctM}% · Lisey {pctL}%) hər yerləşdirmədə yenidən hesablanır. Yuxarıdakı səviyyələrin qrup, cins və budaq məhdudiyyətləri, həmçinin kvota tutumu nəzərə alınır.</>
+                  : <>⚠️ Bu ixtisası seçə bilən mənbəli təhsilalan yoxdur — yuxarıdakı dəyərlər müvəqqəti 50/50 bölgüdür.</>}
               </div>
+              {/* Xəbərdarlıq yalnız NAMİZƏD ÇATIŞMAZLIĞINDA verilir. Əvvəl şərt
+                  `auto.unfilled > 0` idi və qlobal modelin qalığını da namizəd
+                  çatışmazlığı kimi göstərirdi: 151 namizəd və 10 kvota olduğu halda
+                  "kvota namizəd sayından böyükdür" yazılırdı. */}
+              {pool.total < quota && (
+                <div style={{ marginTop: 10, padding: '9px 12px', borderRadius: 8, background: '#fff2f0', border: '1px solid #ffccc7', fontSize: 11.5, color: '#cf1322', lineHeight: 1.5 }}>
+                  ⚠️ Kvota namizəd sayından böyükdür — <b>{quota - pool.total} yer</b> heç kimlə dolmayacaq.
+                  Bu ixtisası cəmi {pool.total} nəfər seçə bilir.
+                </div>
+              )}
             </div>
           )}
 
@@ -624,6 +899,129 @@ function QuotaModeModal({ node, instUsers, onSave, onClose }: {
                 <span style={{ color: '#c9962a' }}>Mülki {quota > 0 ? Math.round(mülkiVal/quota*100) : 0}%</span>
                 <span style={{ color: '#531dab' }}>Lisey {quota > 0 ? Math.round(liseyVal/quota*100) : 0}%</span>
               </div>
+
+              {/* Manual bölgünün nəticəsi — boş qalan yer + eyni hovuz üzrə balans */}
+              {hasSrc && (() => {
+                const chk = checkManual(mülkiVal, liseyVal, pool)
+                const empty = chk.emptyMülki + chk.emptyLisey
+                // Yerləşdirmə mənbə slotlarını qarışdırmadığı üçün ölçü modelə
+                // yaxınlıq deyil, REAL icra olunabilirlikdir: bir mənbədə artıq
+                // slot yaranırsa, o yer boş qalacaq və digər mənbədən namizəd
+                // yerləşməmiş qalacaq. Tolerans yoxdur — 1 yer də real itkidir.
+                const sb = sourceBalance(instUsers, treeNodes, undefined,
+                  { leafId: node.id, mode, mülki: mülkiVal, lisey: liseyVal })
+                const balanced = sb.ok
+                // mənfi = əskik slot (namizəd yersiz), müsbət = artıq slot (yer boş)
+                const dM = sb.mülki.unfillable - sb.mülki.deficit
+                const dL = sb.lisey.unfillable - sb.lisey.deficit
+                return (
+                  <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {/* Namizəd çatmır → yer boş qalacaq */}
+                    {empty > 0 && (
+                      <div style={{ padding: '9px 12px', borderRadius: 8, background: '#fff2f0', border: '1px solid #ffccc7', fontSize: 11.5, color: '#cf1322', lineHeight: 1.6 }}>
+                        ⚠️ <b>{empty} yer boş qalacaq</b> — namizəd çatmır:
+                        {chk.emptyMülki > 0 && <> mülki üçün <b>{mülkiVal}</b> yer var, seçə bilən cəmi <b>{pool.mülki}</b> nəfər.</>}
+                        {chk.emptyLisey > 0 && <> lisey üçün <b>{liseyVal}</b> yer var, seçə bilən cəmi <b>{pool.lisey}</b> nəfər.</>}
+                      </div>
+                    )}
+
+                    {/* Eyni namizəd hovuzu üzrə ümumi balans */}
+                    <div style={{
+                      padding: '10px 12px', borderRadius: 8, fontSize: 11.5, lineHeight: 1.6,
+                      background: balanced ? '#f0fff4' : '#fffbe6',
+                      border: `1px solid ${balanced ? '#b7eb8f' : '#ffe58f'}`,
+                      color: balanced ? '#237804' : '#874d00',
+                    }}>
+                      {balanced ? (
+                        <>✅ <b>Balans yerindədir.</b> Eyni namizəd qrupundakı {bal.peers.length} ixtisas üzrə
+                        cəmi mülki <b>{bal.effMülki}</b> · lisey <b>{bal.effLisey}</b> — avtomatik bölgü ilə uyğundur.</>
+                      ) : (
+                        <>
+                          ⚠️ <b>Balans pozulur.</b>{' '}
+                          {dM > 0 && <><b>{dM} mülki yer</b> boş qalacaq. </>}
+                          {dL > 0 && <><b>{dL} lisey yer</b> boş qalacaq. </>}
+                          {dM < 0 && <><b>{-dM} mülki namizəd</b> yersiz qalacaq. </>}
+                          {dL < 0 && <><b>{-dL} lisey namizəd</b> yersiz qalacaq. </>}
+
+                          {/* Cins üzrə ayrıntı — kimin kənarda qaldığı dəqiq deyilir */}
+                          {(() => {
+                            const rows: string[] = []
+                            const add = (lbl: string, c: SourceSlotCheck) => {
+                              // Cins yalnız MƏCBURİ olduqda adlandırılır
+                              if (c.femaleForced > 0) rows.push(`${c.femaleForced} qadın (${lbl})`)
+                              if (c.maleForced   > 0) rows.push(`${c.maleForced} kişi (${lbl})`)
+                              if (c.unattributedOut > 0)
+                                rows.push(`${c.unattributedOut} namizəd (${lbl} — qadın da, kişi də ola bilər; bal sıralaması həll edir)`)
+                            }
+                            add('mülki', sb.mülki); add('lisey', sb.lisey)
+                            return rows.length
+                              ? <>Kənarda qalanlar: <b>{rows.join(' · ')}</b>. </>
+                              : null
+                          })()}
+
+                          {/* Səbəb cins limitidirsə — birbaşa göstər */}
+                          {sb.capIssues.length > 0 && (
+                            <>Cins limiti kvotadan azdır:{' '}
+                              {sb.capIssues.slice(0, 3).map(c =>
+                                `${c.name} (qadın ${c.maxFemale ?? '—'} + kişi ${c.maxMale ?? '—'} = ${c.capacity} < kvota ${c.quota}, ${c.shortfall} yer heç vaxt dolmayacaq)`
+                              ).join(' · ')}
+                              {sb.capIssues.length > 3 ? ` və daha ${sb.capIssues.length - 3}` : ''}. </>
+                          )}
+                          {sb.capIssues.length === 0 && sb.genderTight.length > 0 && (
+                            <>Cins limiti darboğazdır:{' '}
+                              {sb.genderTight.slice(0, 3).map(g =>
+                                `${g.name} — ${g.gender} limiti ${g.cap} (kvota ${g.quota}) tam dolub`
+                              ).join(' · ')}
+                              {sb.genderTight.length > 3 ? ` və daha ${sb.genderTight.length - 3}` : ''}. </>
+                          )}
+
+                          {sb.capIssues.length > 0
+                            ? ' Həmin ixtisasda qadın/kişi limitini artırın və ya kvotanı azaldın.'
+                            : sb.genderTight.length > 0
+                              ? ' Darboğaz olan cins limitini artırın və ya kvotanı digər ixtisasa keçirin.'
+                              : ` Aşağıdakı ixtisaslardan birində${dM > 0 ? ' mülki kvotanı azaltmaqla' : dL > 0 ? ' lisey kvotanı azaltmaqla' : ' düzəlişlə'} kompensasiya edin.`}
+                        </>
+                      )}
+                    </div>
+
+                    {/* Eyni hovuzlu ixtisaslar — kompensasiya haradan mümkündür */}
+                    {bal.peers.length > 1 && (
+                      <div style={{ border: '1px solid #e8eaf5', borderRadius: 8, overflow: 'hidden' }}>
+                        <div style={{ padding: '7px 10px', background: '#f8f9fd', fontSize: 10.5, fontWeight: 800, color: '#5a6070', letterSpacing: .3 }}>
+                          EYNİ NAMİZƏD QRUPU ({bal.pool.total} nəfər) — {bal.peers.length} İXTİSAS
+                        </div>
+                        <div style={{ maxHeight: 168, overflowY: 'auto' }}>
+                          {bal.peers.map(pr => {
+                            const chg = pr.effMülki !== pr.autoMülki
+                            return (
+                              <div key={pr.id} style={{
+                                display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px',
+                                borderTop: '1px solid #f2f4fa', fontSize: 11,
+                                background: pr.isTarget ? '#fffbe6' : '#fff',
+                              }}>
+                                <span style={{ flex: 1, minWidth: 0, fontWeight: pr.isTarget ? 800 : 600, color: '#3a4560', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                                  title={pr.pathLabel ? `${pr.pathLabel} → ${pr.name}` : pr.name}>
+                                  {pr.isTarget ? '▸ ' : ''}{pr.name}
+                                  {pr.isManual && <span style={{ color: '#c41d7f', fontWeight: 700 }}> ✏️</span>}
+                                </span>
+                                <span style={{ color: 'var(--muted)', flexShrink: 0 }}>kvota {pr.quota}</span>
+                                <span style={{ flexShrink: 0, fontWeight: 700 }}>
+                                  <span style={{ color: '#1677ff' }}>M {pr.effMülki}</span>
+                                  {' · '}
+                                  <span style={{ color: '#531dab' }}>L {pr.effLisey}</span>
+                                </span>
+                                <span style={{ flexShrink: 0, width: 62, textAlign: 'right', color: chg ? '#d46b08' : '#bbb' }}>
+                                  {chg ? `avto ${pr.autoMülki}/${pr.autoLisey}` : 'avto'}
+                                </span>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
+              })()}
             </div>
           )}
 
@@ -645,9 +1043,481 @@ function QuotaModeModal({ node, instUsers, onSave, onClose }: {
   )
 }
 
+// ── Struktur üzrə balans təfsilatı ───────────────────────────────────────────
+function BalanceModal({ tree, instUsers, onClose, onQuotaMode, onGenderConfig }: {
+  tree: any; instUsers: any[]; onClose: () => void
+  /** Balansı elə bu pəncərədən düzəltmək üçün — mülki/lisey bölgüsü */
+  onQuotaMode?: (nodeId: string, mode: 'auto' | 'manual', mülkiQ?: number, liseyQ?: number) => void
+  /** Balansı elə bu pəncərədən düzəltmək üçün — qadın/kişi məhdudiyyəti */
+  onGenderConfig?: (nodeId: string, cfg: { allowFemale: boolean; allowMale: boolean; maxFemale: number | null; maxMale: number | null } | null) => void
+}) {
+  // Düzəliş üçün açılan alt-pəncərə: hansı ixtisas və hansı növ
+  const [fix, setFix] = useState<{ nodeId: string; kind: 'source' | 'gender' } | null>(null)
+  const leafRefs  = useMemo(() => leavesWithPath(tree.nodes || []), [tree])
+  const fixTarget = fix ? leafRefs.find((x: any) => x.leaf.id === fix.nodeId) : null
+
+  /** Sətirdəki kiçik düzəliş düymələri — yalnız handler verilibsə görünür */
+  const FixBtns = ({ id, gender = true }: { id: string; gender?: boolean }) => (
+    <span style={{ display: 'inline-flex', gap: 4, flexShrink: 0 }}>
+      {onQuotaMode && (
+        <button onClick={e => { e.stopPropagation(); setFix({ nodeId: id, kind: 'source' }) }}
+          title="Mülki / lisey bölgüsünü düzəlt"
+          style={{ border: '1px solid #d6e4ff', background: '#f0f5ff', color: '#1677ff', borderRadius: 6, cursor: 'pointer', fontSize: 10.5, fontWeight: 800, padding: '1px 6px', lineHeight: 1.5 }}>
+          ⚖️ M/L
+        </button>
+      )}
+      {gender && onGenderConfig && (
+        <button onClick={e => { e.stopPropagation(); setFix({ nodeId: id, kind: 'gender' }) }}
+          title="Qadın / kişi məhdudiyyətini düzəlt"
+          style={{ border: '1px solid #ffd6e7', background: '#fff0f6', color: '#c41d7f', borderRadius: 6, cursor: 'pointer', fontSize: 10.5, fontWeight: 800, padding: '1px 6px', lineHeight: 1.5 }}>
+          ⚥ Cins
+        </button>
+      )}
+    </span>
+  )
+
+  const rep = balanceReport(instUsers, tree.nodes || [])
+  // Yekun hökm: model müqayisəsi deyil, real icra olunabilirlik (bax: sourceBalance)
+  const sb = sourceBalance(instUsers, tree.nodes || [])
+  const fea = feasibility(instUsers, tree.nodes || [])
+  // Kövrək bölgü: model "olur" desə də, yalnız MƏCBURİ paylanmada oturur
+  const fr = fragileRisks(instUsers, tree.nodes || [])
+  const frSeats = fr.reduce((a, x) => a + x.riskSeats, 0)
+  const gbk = groupBlocks(instUsers, tree.nodes || [])
+  // Real seçimlərlə neçə nəfər kənarda qala bilər — sadə üsulun simulyasiyası
+  const sim = useBalanceSim(gbk.conflicts.length ? instUsers : [], tree)
+  const segLabel = (x: { group: string; gender: string; source: string; branch: string }) =>
+    [x.group || null, x.gender || null, x.source && x.source !== x.group ? x.source : null, x.branch || null]
+      .filter(Boolean).join(' · ') || 'qrupsuz'
+  return (
+    <div className="modal-overlay open" onClick={onClose}>
+      <div className="modal" style={{ maxWidth: 640 }} onClick={e => e.stopPropagation()}>
+        <div className="modal-head">
+          <span className="modal-title">📐 Kvota yoxlaması — {tree.name}</span>
+          <button className="modal-close" onClick={onClose}>✕</button>
+        </div>
+        <div className="modal-body" style={{ maxHeight: '74vh', overflowY: 'auto' }}>
+
+          {/* ── 0. Kövrək bölgü xəbərdarlığı ─────────────────────────────────
+              Ən yuxarıda göstərilir: kvota rəqəmləri düz olsa belə, bölgü
+              məcburi olduqda nəticə pozula bilər və bu, digər yoxlamalarda
+              görünmür. */}
+          {frSeats > 0 && (
+            <>
+              <div style={{ fontSize: 11, fontWeight: 800, color: '#5a6070', letterSpacing: .3, marginBottom: 8 }}>
+                0. KÖVRƏK BÖLGÜ
+              </div>
+              <div style={{
+                padding: '10px 14px', borderRadius: 10, marginBottom: 12, fontSize: 12, lineHeight: 1.6,
+                background: '#fff7e6', border: '1.5px solid #ffd591', color: '#874d00',
+              }}>
+                ⚠️ <b>{frSeats} yer risk altındadır.</b> Kvota rəqəmləri uyğun olsa da, bölgü yalnız
+                <b> məcburi</b> halda oturur: aşağıdakı budaqlarda ehtiyat namizəd yoxdur, üstəlik
+                namizədlər budaqdan kənar ixtisasları da seçə bilir. Kənara gedən hər namizəd
+                <b> bir boş yer</b> və <b>bir yerləşməyən namizəd</b> deməkdir.
+                <div style={{ marginTop: 6, fontSize: 11.5 }}>
+                  Həlli: həmin budağın namizədlərinin kənara çıxmasını bağlayın — qonşu budaqlara da
+                  görünmə məhdudiyyəti (👥 düyməsi) qoyun.
+                </div>
+              </div>
+              <div style={{ border: '1px solid #ffd591', borderRadius: 10, marginBottom: 16, overflow: 'hidden' }}>
+                {fr.map((x, i) => (
+                  <div key={i} style={{
+                    padding: '8px 12px', fontSize: 11.5, color: '#3a4560', lineHeight: 1.6,
+                    borderTop: i ? '1px solid #ffe7ba' : 'none',
+                  }}>
+                    <b>{x.pathLabel ? x.pathLabel + ' → ' : ''}{x.nodeName}</b>
+                    {' — '}{x.capacity} yer · {x.candidates} namizəd · bunlardan <b>{x.leakers}</b> nəfər
+                    kənar ixtisasa da gedə bilir → <b style={{ color: '#d46b08' }}>{x.riskSeats} yer risk altında</b>
+                    {/* Sızmanın dəqiq ünvanı — məhdudiyyət qoyulmalı olan yer budur */}
+                    <div style={{ marginTop: 5, paddingLeft: 10, borderLeft: '2px solid #ffd591' }}>
+                      <div style={{ fontSize: 10.5, fontWeight: 800, color: '#874d00', marginBottom: 2 }}>
+                        AÇIQ QALAN İXTİSASLAR — cəmi {x.leakCapacity} yer
+                      </div>
+                      {x.leakTargets.slice(0, 6).map((t, k) => (
+                        <div key={k} style={{ fontSize: 11 }}>{t.label} <b>({t.quota} yer)</b></div>
+                      ))}
+                      {x.leakTargets.length > 6 && (
+                        <div style={{ fontSize: 11, color: 'var(--muted)' }}>
+                          və daha {x.leakTargets.length - 6} ixtisas…
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+
+          {/* ── 1. Kvota rəqəmləri strukturla uyğundurmu ── */}
+          <div style={{ fontSize: 11, fontWeight: 800, color: '#5a6070', letterSpacing: .3, marginBottom: 8 }}>
+            1. KVOTA RƏQƏMLƏRİ
+          </div>
+          <div style={{
+            padding: '10px 14px', borderRadius: 10, marginBottom: 12, fontSize: 12, lineHeight: 1.6,
+            background: fea.ok ? '#f0fff4' : '#fffbe6',
+            border: `1.5px solid ${fea.ok ? '#b7eb8f' : '#ffe58f'}`,
+            color: fea.ok ? '#237804' : '#874d00',
+          }}>
+            {fea.ok
+              ? <>✅ <b>Kvotalar uyğundur.</b> {fea.students} təhsilalanın hamısı üçün seçə bildiyi ixtisaslarda yer var.</>
+              : <>⚠️ <b>{fea.deficit} təhsilalan heç bir halda yerləşə bilməyəcək</b> və <b>{fea.unfillable} yer</b> boş qalacaq —
+                  bu, alqoritmin yox, kvota rəqəmlərinin nəticəsidir: bir qrup namizədə yer çatmır,
+                  artıq qalan yerlər isə onların girə bilmədiyi ixtisaslardadır.</>}
+          </div>
+
+          {!fea.ok && (
+            <div style={{ border: '1px solid #ffe58f', borderRadius: 10, marginBottom: 16, overflow: 'hidden' }}>
+              <div style={{ padding: '7px 12px', background: '#fffbe6', fontSize: 10.5, fontWeight: 800, color: '#874d00' }}>
+                YER ÇATMAYAN NAMİZƏDLƏR — {fea.tightCandidates} nəfər, cəmi {fea.tightCapacity} yer
+                {' '}(çatışmır: {fea.tightCandidates - fea.tightCapacity})
+              </div>
+              <div style={{ padding: '8px 12px', fontSize: 11, color: '#3a4560', lineHeight: 1.7, borderTop: '1px solid #fff1b8' }}>
+                Bu namizədlər <b>yalnız {fea.tightLeaves.length} ixtisasa girə bilir</b> və orada cəmi {fea.tightCapacity} yer var.
+                Ya həmin ixtisaslarda kvotanı artırın, ya da aşağıdakı artıq yerlərin kvotasını azaldın.
+              </div>
+
+              {/* Qrup üzrə kimin neçə nəfəri kənarda qala bilər */}
+              <div style={{ borderTop: '1px solid #fff1b8' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 12px', background: '#fffdf5', fontSize: 10, fontWeight: 800, color: '#8a8ab0', letterSpacing: .2 }}>
+                  <span style={{ flex: 1 }}>QRUP</span>
+                  <span style={{ width: 62, textAlign: 'right' }}>NAMİZƏD</span>
+                  <span style={{ width: 96, textAlign: 'right' }}>KƏNARDA QALIR</span>
+                </div>
+                {fea.segments.filter(x => x.maxUnplaced > 0 || x.count > 0).map((x, i) => {
+                  const risk = x.maxUnplaced > 0
+                  return (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 12px', borderTop: '1px solid #fff7e6', fontSize: 11 }}>
+                      <span style={{ flex: 1, minWidth: 0, fontWeight: risk ? 700 : 500, color: risk ? '#874d00' : '#8a8ab0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {segLabel(x)}
+                      </span>
+                      <span style={{ width: 62, textAlign: 'right', color: 'var(--muted)' }}>{x.count}</span>
+                      <span style={{ width: 96, textAlign: 'right', fontWeight: 800, color: risk ? '#cf1322' : '#52c41a' }}>
+                        {!risk
+                          ? '—'
+                          : x.minUnplaced === x.maxUnplaced
+                            ? `${x.maxUnplaced} nəfər`
+                            : `${x.minUnplaced}–${x.maxUnplaced} nəfər`}
+                      </span>
+                    </div>
+                  )
+                })}
+                <div style={{ padding: '6px 12px', borderTop: '1px solid #fff7e6', fontSize: 10.5, color: 'var(--muted)', lineHeight: 1.6 }}>
+                  Aralıq göstərilirsə, çatışmazlığın kimin üzərinə düşəcəyi qabaqcadan bilinmir —
+                  bu qruplar eyni yerlər uğrunda yarışır və nəticə balların sıralamasından asılıdır.
+                  Cəmi kənarda qalan: <b>{fea.deficit} nəfər</b>.
+                </div>
+              </div>
+              {fea.surplusLeaves.length > 0 && (
+                <div style={{ borderTop: '1px solid #fff1b8' }}>
+                  <div style={{ padding: '6px 12px', background: '#fff7e6', fontSize: 10.5, fontWeight: 800, color: '#874d00' }}>
+                    ARTIQ YERLƏR — {fea.surplusCandidates} namizəd üçün {fea.surplusCapacity} yer
+                    {' '}(artıq: {fea.surplusCapacity - fea.surplusCandidates})
+                  </div>
+                  <div style={{ padding: '7px 12px', fontSize: 11, color: '#3a4560', lineHeight: 1.6, borderTop: '1px solid #fff7e6' }}>
+                    Boş qalacaq yer bu ixtisaslardan birində olacaq. <b>Hansında olacağı əvvəlcədən müəyyən deyil</b> —
+                    təhsilalanların sıralamasından asılıdır, çünki bu ixtisaslar eyni namizədlərə açıqdır və bir-birini əvəz edir.
+                  </div>
+                  {fea.surplusLeaves.map(l => (
+                    <div key={l.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 12px', borderTop: '1px solid #fff7e6', fontSize: 11 }}>
+                      <span style={{ flex: 1, minWidth: 0, color: '#3a4560', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                        title={l.pathLabel ? `${l.pathLabel} → ${l.name}` : l.name}>
+                        {l.pathLabel ? `${l.pathLabel} → ` : ''}<b>{l.name}</b>
+                      </span>
+                      <span style={{ color: 'var(--muted)', flexShrink: 0 }}>kvota {l.quota}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          <div style={{ fontSize: 11, fontWeight: 800, color: '#5a6070', letterSpacing: .3, marginBottom: 8 }}>
+            2. MƏNBƏ BALANSI (MÜLKİ / LİSEY)
+          </div>
+
+          <div style={{
+            padding: '10px 14px', borderRadius: 10, marginBottom: 14, fontSize: 12, lineHeight: 1.6,
+            background: sb.ok ? '#f0fff4' : '#fff2f0',
+            border: `1.5px solid ${sb.ok ? '#b7eb8f' : '#ffccc7'}`,
+            color: sb.ok ? '#237804' : '#cf1322',
+          }}>
+            {sb.ok
+              ? <>✅ <b>Balans yerindədir.</b> Mülki <b>{sb.mülki.seats}</b> yer / <b>{sb.mülki.candidates}</b> namizəd ·
+                  lisey <b>{sb.lisey.seats}</b> yer / <b>{sb.lisey.candidates}</b> namizəd — hər ikisi tam oturur.</>
+              : <>⚠️ <b>Mənbə slotları uyğun gəlmir.</b>{' '}
+                  {sb.mülki.unfillable > 0 && <><b>{sb.mülki.unfillable} mülki yer</b> boş qalacaq. </>}
+                  {sb.lisey.unfillable > 0 && <><b>{sb.lisey.unfillable} lisey yer</b> boş qalacaq. </>}
+                  {sb.mülki.deficit > 0 && <><b>{sb.mülki.deficit} mülki namizəd</b> yersiz qalacaq. </>}
+                  {sb.lisey.deficit > 0 && <><b>{sb.lisey.deficit} lisey namizəd</b> yersiz qalacaq. </>}
+                  (mülki {sb.mülki.seats} yer / {sb.mülki.candidates} namizəd · lisey {sb.lisey.seats} yer / {sb.lisey.candidates} namizəd).
+                  Manual kvotaları düzəldin; balans bərpa olunmayana qədər seçimi yayımlamaq mümkün deyil.</>}
+          </div>
+
+          {/* ── Qrup blokları: dəstələr ya tam eyni, ya tam ayrı olmalıdır ── */}
+          {(() => {
+            const hasConf = gbk.conflicts.length > 0
+            const tone = hasConf ? { bg: '#fff7e6', bd: '#ffd591', fg: '#874d00' }
+              : !gbk.ok ? { bg: '#fff2f0', bd: '#ffccc7', fg: '#cf1322' } : { bg: '#f0fff4', bd: '#b7eb8f', fg: '#237804' }
+            const lvTxt = (l: { name: string; seats: number }[]) => l.map(x => `${x.name} (${x.seats})`).join(', ')
+            const srcTxt = (s: string) => s === 'mülki' ? 'Mülki' : 'Lisey'
+            return (
+              <>
+                <div style={{ fontSize: 11, fontWeight: 800, color: '#5a6070', letterSpacing: .3, marginBottom: 8 }}>
+                  QRUP BLOKLARI (QRUP × CİNS × MƏNBƏ)
+                </div>
+                <div style={{ padding: '10px 14px', borderRadius: 10, marginBottom: 8, fontSize: 12, lineHeight: 1.6, background: tone.bg, border: `1.5px solid ${tone.bd}`, color: tone.fg }}>
+                  {hasConf
+                    ? <>⚠️ <b>Qrup məhdudiyyətləri kəsişir ({gbk.conflicts.length})</b> — eyni adamlar həm geniş, həm dar dəstəyə açıq ixtisaslara gedə bilir,
+                        dar ixtisaslar boş qala bilər. Dəqiq hesablamaq mümkün deyil, aşağıda simulyasiya ilə təxmin verilir.
+                        Düzəltmək üçün hər qrupu yalnız bir bloka salın (məs. «1, 2, lisey» / «3» / «4, lisey»).</>
+                    : gbk.ok
+                      ? <>✅ <b>Bloklar tam oturur.</b> Qrup dəstələri kəsişmir, hər blokda nəfər = yer — hamı yerləşir.</>
+                      : <>⚠️ <b>Dəqiq nəticə: {gbk.exactOut} nəfər kənarda qalacaq</b>
+                          {gbk.blocks.some(x => x.over > 0) && <>, {gbk.blocks.reduce((a, x) => a + x.over, 0)} yer boş qalacaq</>}. Aşağıdakı bloklara baxın.</>}
+                </div>
+                {hasConf && (
+                  <div style={{ border: '1px solid #ffe7ba', borderRadius: 10, marginBottom: 8, overflow: 'hidden' }}>
+                    <div style={{ padding: '6px 12px', background: '#fffbf0', fontSize: 10, fontWeight: 800, color: '#ad6800' }}>KƏSİŞMƏLƏR</div>
+                    {gbk.conflicts.map((c, i) => (
+                      <div key={i} style={{ borderTop: '1px solid #fff1d6', padding: '6px 12px', fontSize: 11.5, color: '#3a4560' }}>
+                        <b>{srcTxt(c.source)}</b> <span style={{ fontSize: 10, fontWeight: 800, color: '#d46b08' }}>[QRUP]</span>: «{c.a.label}» ↔ «{c.b.label}» — <b>{c.shared}</b> nəfər hər ikisinə gedə bilir
+                        <div style={{ fontSize: 10.5, color: '#874d00', marginTop: 2 }}>
+                          {lvTxt(c.a.leaves)} <span style={{ color: '#aaa' }}>↔</span> {lvTxt(c.b.leaves)}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {gbk.liseyNoCand.length > 0 && (
+                  <div style={{ padding: '8px 14px', borderRadius: 10, marginBottom: 8, fontSize: 11.5, background: '#fff2f0', border: '1.5px solid #ffccc7', color: '#cf1322' }}>
+                    ⚠️ Lisey qrupu olmayan ixtisaslarda lisey yeri var — lisey kvotasını 0 edin: {lvTxt(gbk.liseyNoCand)}
+                  </div>
+                )}
+                {hasConf && (
+                  <div style={{ padding: '10px 14px', borderRadius: 10, marginBottom: 8, fontSize: 12, lineHeight: 1.6,
+                    background: sim === undefined ? '#f6f7fb' : sim && sim.max > 0 ? '#fff7e6' : '#f0fff4',
+                    border: `1.5px solid ${sim === undefined ? '#e6e8f0' : sim && sim.max > 0 ? '#ffd591' : '#b7eb8f'}`,
+                    color: sim === undefined ? '#8a909c' : sim && sim.max > 0 ? '#874d00' : '#237804' }}>
+                    {sim === undefined ? <>⏳ Simulyasiya hesablanır…</>
+                      : !sim ? <>—</>
+                      : sim.max === 0 ? <>✅ Simulyasiya: {sim.runs} sınaqda heç kim kənarda qalmadı.</>
+                      : <>Simulyasiya ({sim.runs} sınaq, hər kəs ona açıq ixtisasları təsadüfi sırada seçir): <b>kənarda qala bilər {sim.min === sim.max ? sim.max : `${sim.min}–${sim.max}`}</b>
+                          {sim.min !== sim.max && <> (adətən <b>{sim.median}</b>)</>}
+                          {sim.emptyLeaves.length > 0 && <div style={{ fontSize: 11, marginTop: 4 }}><b>Ən çox boş qalan:</b> {sim.emptyLeaves.slice(0, 6).map(l => `${l.name} (~${l.avgEmpty.toFixed(1)})`).join(', ')}</div>}
+                        </>}
+                  </div>
+                )}
+                <div style={{ border: '1px solid #eef0f5', borderRadius: 10, marginBottom: 16, overflow: 'hidden' }}>
+                  <div style={{ display: 'flex', gap: 8, padding: '6px 12px', background: '#fafbfd', fontSize: 10, fontWeight: 800, color: '#8a8ab0', letterSpacing: .2 }}>
+                    <span style={{ flex: 1 }}>BLOK (KİMƏ AÇIQDIR)</span>
+                    <span style={{ width: 52, textAlign: 'right' }}>NƏFƏR</span>
+                    <span style={{ width: 52, textAlign: 'right' }}>YER</span>
+                    <span style={{ width: 130, textAlign: 'right' }}>NƏTİCƏ</span>
+                  </div>
+                  {gbk.blocks.map((x, i) => {
+                    const v = gbk.conflicts.some(c => c.source === x.source && (c.a.label === x.label || c.b.label === x.label))
+                      ? { t: 'kəsişir', c: '#d46b08' }
+                      : x.short > 0 ? { t: `${x.short} nəfər kənarda`, c: '#cf1322' }
+                      : x.over > 0 ? { t: `${x.over} yer boş`, c: '#cf1322' }
+                      : { t: '✓ oturur', c: '#237804' }
+                    return (
+                      <div key={i} style={{ borderTop: '1px solid #f3f4f8', padding: '6px 12px', fontSize: 11.5 }}>
+                        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                          <span style={{ flex: 1, fontWeight: 700, color: '#3a4560' }}>{srcTxt(x.source)} · {x.label}</span>
+                          <span style={{ width: 52, textAlign: 'right' }}>{x.count}</span>
+                          <span style={{ width: 52, textAlign: 'right', fontWeight: 800, color: '#874d00' }}>{x.seats}</span>
+                          <span style={{ width: 130, textAlign: 'right', fontWeight: 800, color: v.c }}>{v.t}</span>
+                        </div>
+                        <div style={{ fontSize: 10.5, color: '#874d00', marginTop: 2 }}>{lvTxt(x.leaves)}</div>
+                      </div>
+                    )
+                  })}
+                  {(gbk.noPlace.mülki + gbk.noPlace.lisey) > 0 && (
+                    <div style={{ borderTop: '1px solid #f3f4f8', padding: '6px 12px', fontSize: 11.5, color: '#cf1322', fontWeight: 700 }}>
+                      Heç bir ixtisasa açıq deyil: mülki {gbk.noPlace.mülki}, lisey {gbk.noPlace.lisey}
+                    </div>
+                  )}
+                </div>
+              </>
+            )
+          })()}
+
+          {/* ── Cins limitləri — ayrıca və konkret ── */}
+          {(() => {
+            // Yalnız məcburi itkilər cinsə bağlanır (bax: quota-pool → femaleForced)
+            const femOut = sb.mülki.femaleForced + sb.lisey.femaleForced
+            const malOut = sb.mülki.maleForced   + sb.lisey.maleForced
+            const anyOut = sb.mülki.unattributedOut + sb.lisey.unattributedOut
+            const hasIssue = sb.capIssues.length > 0 || sb.genderTight.length > 0 || femOut > 0 || malOut > 0
+            return (
+              <>
+                <div style={{ fontSize: 11, fontWeight: 800, color: '#5a6070', letterSpacing: .3, margin: '4px 0 8px' }}>
+                  3. CİNS MƏHDUDİYYƏTLƏRİ (QADIN / KİŞİ)
+                </div>
+                <div style={{
+                  padding: '10px 14px', borderRadius: 10, marginBottom: 14, fontSize: 12, lineHeight: 1.6,
+                  background: hasIssue ? '#fff2f0' : '#f0fff4',
+                  border: `1.5px solid ${hasIssue ? '#ffccc7' : '#b7eb8f'}`,
+                  color: hasIssue ? '#cf1322' : '#237804',
+                }}>
+                  {!hasIssue && <>✅ <b>Cins limitləri qaydasındadır.</b> Hər limit üçün yetərli namizəd var,
+                    limitlər heç bir yeri bağlamır.
+                    {anyOut > 0 && <> Yer sayı {anyOut} nəfər azdır, amma bu, cins limitindən deyil —
+                      kimin kənarda qalacağını bal sıralaması müəyyən edir.</>}</>}
+
+                  {hasIssue && <>
+                    {(femOut > 0 || malOut > 0) && <>⚠️ <b>Cins limitinə görə kənarda qalanlar:</b>{' '}
+                      {femOut > 0 && <><b>{femOut} qadın</b> </>}
+                      {femOut > 0 && malOut > 0 && '· '}
+                      {malOut > 0 && <><b>{malOut} kişi</b> </>}
+                      namizəd. </>}
+                    {anyOut > 0 && <>Bundan başqa <b>{anyOut} nəfər</b> sadəcə yer çatmadığına görə kənarda
+                      qalacaq — cinsi qabaqcadan demək olmaz, bal sıralaması həll edir. </>}
+
+                    {sb.capIssues.length > 0 && (
+                      <div style={{ marginTop: 8 }}>
+                        <b>Limit cəmi kvotadan azdır</b> — bu yerlər heç bir halda dolmayacaq:
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5, marginTop: 6 }}>
+                          <thead>
+                            <tr style={{ background: '#fff', color: '#5a6070', textAlign: 'left' }}>
+                              <th style={{ padding: '5px 8px', fontWeight: 700 }}>İxtisas</th>
+                              <th style={{ padding: '5px 8px', fontWeight: 700, textAlign: 'center' }}>Kvota</th>
+                              <th style={{ padding: '5px 8px', fontWeight: 700, textAlign: 'center' }}>Qadın limiti</th>
+                              <th style={{ padding: '5px 8px', fontWeight: 700, textAlign: 'center' }}>Kişi limiti</th>
+                              <th style={{ padding: '5px 8px', fontWeight: 700, textAlign: 'center' }}>Boş qalacaq</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {sb.capIssues.map(c => (
+                              <tr key={c.id} style={{ borderTop: '1px solid #ffccc7' }}>
+                                <td style={{ padding: '5px 8px' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                                    <span>{c.name}</span>
+                                    <FixBtns id={c.id} />
+                                  </div>
+                                  {c.pathLabel && <div style={{ fontSize: 10, color: 'var(--muted)' }}>{c.pathLabel}</div>}
+                                </td>
+                                <td style={{ padding: '5px 8px', textAlign: 'center' }}>{c.quota}</td>
+                                <td style={{ padding: '5px 8px', textAlign: 'center' }}>{c.maxFemale ?? '—'}</td>
+                                <td style={{ padding: '5px 8px', textAlign: 'center' }}>{c.maxMale ?? '—'}</td>
+                                <td style={{ padding: '5px 8px', textAlign: 'center', fontWeight: 800 }}>{c.shortfall}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+
+                    {sb.genderTight.length > 0 && (
+                      <div style={{ marginTop: 8 }}>
+                        <b>Limiti tam dolmuş ixtisaslar</b> — daha çox namizəd var, limit buraxmır:
+                        <ul style={{ margin: '4px 0 0', paddingLeft: 18 }}>
+                          {sb.genderTight.map(g => (
+                            <li key={`${g.id}-${g.gender}`}>
+                              {g.name}{g.pathLabel ? ` (${g.pathLabel})` : ''} — <b>{g.gender}</b> limiti{' '}
+                              <b>{g.cap}</b>, ixtisasın kvotası {g.quota} <FixBtns id={g.id} />
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </>}
+                </div>
+              </>
+            )
+          })()}
+
+          {rep.groups.map((g, gi) => {
+            // Eyni qayda: qərar yuvarlaqlaşdırılmamış sapma + tolerans ilə verilir
+            const overG = (v: number) => Math.abs(v) > BALANCE_TOLERANCE + 1e-9
+            const bad = overG(g.driftMülki) || overG(g.driftLisey)
+            return (
+              <div key={g.key || gi} style={{ border: `1.5px solid ${bad ? '#ffccc7' : '#e8eaf5'}`, borderRadius: 10, marginBottom: 10, overflow: 'hidden' }}>
+                <div style={{ padding: '8px 12px', background: bad ? '#fff2f0' : '#f8f9fd', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 11, fontWeight: 800, color: bad ? '#cf1322' : '#5a6070' }}>
+                    {bad ? '⚠️' : '✅'} Namizəd qrupu: {g.pool.total} nəfər
+                    <span style={{ fontWeight: 600, color: 'var(--muted)' }}> (mülki {g.pool.mülki} · lisey {g.pool.lisey})</span>
+                  </span>
+                  <span style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 700 }}>
+                    <span style={{ color: '#1677ff' }}>M {g.effMülki}</span>
+                    <span style={{ color: 'var(--muted)', fontWeight: 500 }}> / avto {g.autoMülki}</span>
+                    {' · '}
+                    <span style={{ color: '#531dab' }}>L {g.effLisey}</span>
+                    <span style={{ color: 'var(--muted)', fontWeight: 500 }}> / avto {g.autoLisey}</span>
+                    {bad && (
+                      <span style={{ color: '#cf1322' }}>
+                        {' '}({g.driftMülki > 0 ? '+' : ''}{Math.round(g.driftMülki)} M · {g.driftLisey > 0 ? '+' : ''}{Math.round(g.driftLisey)} L)
+                      </span>
+                    )}
+                  </span>
+                </div>
+                {g.leaves.map(l => {
+                  const chg = l.effMülki !== l.autoMülki || l.effLisey !== l.autoLisey
+                  return (
+                    <div key={l.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 12px', borderTop: '1px solid #f2f4fa', fontSize: 11 }}>
+                      <span style={{ flex: 1, minWidth: 0, color: '#3a4560', fontWeight: chg ? 800 : 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                        title={l.pathLabel ? `${l.pathLabel} → ${l.name}` : l.name}>
+                        {l.name}{l.isManual && <span style={{ color: '#c41d7f' }}> ✏️</span>}
+                      </span>
+                      <FixBtns id={l.id} />
+                      <span style={{ color: 'var(--muted)', flexShrink: 0 }}>kvota {l.quota}</span>
+                      <span style={{ flexShrink: 0, fontWeight: 700, width: 92, textAlign: 'right' }}>
+                        <span style={{ color: '#1677ff' }}>M {l.effMülki}</span>
+                        {' · '}
+                        <span style={{ color: '#531dab' }}>L {l.effLisey}</span>
+                      </span>
+                      <span style={{ flexShrink: 0, width: 74, textAlign: 'right', color: chg ? '#d46b08' : '#ccc' }}>
+                        {chg ? `avto ${l.autoMülki}/${l.autoLisey}` : 'avto'}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            )
+          })}
+        </div>
+        <div className="modal-foot" style={{ display: 'flex', justifyContent: 'flex-end', padding: '12px 18px' }}>
+          <button className="btn btn-outline" onClick={onClose}>Bağla</button>
+        </div>
+      </div>
+
+      {/* ── Düzəliş alt-pəncərələri: yoxlama pəncərəsini bağlamadan balansı bərpa etmək üçün.
+          Kliklər saxlanılır ki, alt-pəncərə ilə iş yoxlama pəncərəsini bağlamasın. */}
+      <div onClick={e => e.stopPropagation()}>
+      {fix && fixTarget && fix.kind === 'source' && (
+        <QuotaModeModal
+          node={fixTarget.leaf as any}
+          path={fixTarget.path as any}
+          treeNodes={(tree.nodes || []) as any}
+          instUsers={instUsers}
+          onClose={() => setFix(null)}
+          onSave={(mode, mülkiQ, liseyQ) => { onQuotaMode?.(fix.nodeId, mode, mülkiQ, liseyQ); setFix(null) }}
+        />
+      )}
+      {fix && fixTarget && fix.kind === 'gender' && (
+        <GenderModal
+          node={fixTarget.leaf as any}
+          path={fixTarget.path as any}
+          instUsers={instUsers}
+          treeNodes={(tree.nodes || []) as any}
+          onClose={() => setFix(null)}
+          onSave={cfg => { onGenderConfig?.(fix.nodeId, cfg); setFix(null) }}
+        />
+      )}
+      </div>
+    </div>
+  )
+}
+
 // ── Cinsə görə məhdudiyyət modalı (yalnız leaf) ──────────────────────────────
-function GenderModal({ node, instUsers, onSave, onClose }: {
-  node: TNode; instUsers: any[]
+function GenderModal({ node, path, instUsers, treeNodes, onSave, onClose }: {
+  node: TNode
+  /** kökdən bu yarpağa qədər node-lar — namizəd hovuzunu süzmək üçün */
+  path: TNode[]
+  instUsers: any[]
+  /** strukturun kök node-ları — struktur üzrə təsiri qabaqcadan hesablamaq üçün */
+  treeNodes?: TNode[]
   onSave: (cfg: { allowFemale: boolean; allowMale: boolean; maxFemale: number | null; maxMale: number | null } | null) => void
   onClose: () => void
 }) {
@@ -656,10 +1526,38 @@ function GenderModal({ node, instUsers, onSave, onClose }: {
   const [maxF, setMaxF] = useState<string>(node.maxFemale != null ? String(node.maxFemale) : '')
   const [maxM, setMaxM] = useState<string>(node.maxMale != null ? String(node.maxMale) : '')
 
-  const femCount = instUsers.filter(u => u.gender === 'qadın').length
-  const malCount = instUsers.filter(u => u.gender === 'kişi').length
+  // Müəssisənin ümumi sayı deyil — bu ixtisasa namizəd ola bilənlər.
+  // Yarpağın öz cins bayraqları sayılmır (elə burada təyin olunur), qrup və
+  // budaq məhdudiyyətləri isə tətbiq edilir.
+  const gp       = genderPool(instUsers, path)
+  const femCount = gp.qadın
+  const malCount = gp.kişi
+  const outCount = instUsers.length - gp.total
   const quota = node.quota || 0
   const valid = allowF || allowM
+
+  // ── Seçim yadda saxlanmadan ƏVVƏL təsiri göstər ───────────────────────────
+  // Bu ixtisasa qalan namizəd: söndürülmüş cins çıxılır, cinsi yazılmayanlar qalır
+  const genderless = Math.max(0, gp.total - femCount - malCount)
+  const capF       = allowF && maxF.trim() !== '' ? Math.max(0, parseInt(maxF, 10) || 0) : null
+  const capM       = allowM && maxM.trim() !== '' ? Math.max(0, parseInt(maxM, 10) || 0) : null
+  const reachCap   = (allowF ? Math.min(femCount, capF ?? femCount) : 0)
+                   + (allowM ? Math.min(malCount, capM ?? malCount) : 0) + genderless
+  const unfilled   = Math.max(0, quota - reachCap)
+
+  // Struktur üzrə təsir: cari vəziyyət ilə bu konfiqurasiya arasındakı fərq.
+  // Qeyd: feasibility() maxFemale/maxMale limitlərini nəzərə almır — bu hesab
+  // yalnız cins bayraqlarının (allowFemale/allowMale) təsirini göstərir.
+  const fea = useMemo(() => {
+    if (!treeNodes?.length || !instUsers.length || !valid) return null
+    const patch = (ns: TNode[]): TNode[] => ns.map(n => n.id === node.id
+      ? { ...n, allowFemale: allowF, allowMale: allowM, maxFemale: capF, maxMale: capM }
+      : { ...n, children: n.children ? patch(n.children) : n.children })
+    const before = feasibility(instUsers, treeNodes as any[])
+    const after  = feasibility(instUsers, patch(treeNodes) as any[])
+    return { before: before.deficit, after: after.deficit, diff: after.deficit - before.deficit }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [treeNodes, instUsers, node.id, allowF, allowM, capF, capM, valid])
 
   function save() {
     if (!valid) return
@@ -676,7 +1574,7 @@ function GenderModal({ node, instUsers, onSave, onClose }: {
       <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontWeight: 700, fontSize: 13 }}>
         <input type="checkbox" checked={allow} onChange={e => setAllow(e.target.checked)} style={{ width: 18, height: 18, cursor: 'pointer', accentColor: color }} />
         <span style={{ color: allow ? color : '#aaa' }}>{label}</span>
-        <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--muted)', fontWeight: 500 }}>müəssisədə {count} nəfər</span>
+        <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--muted)', fontWeight: 500 }}>namizəd: {count} nəfər</span>
       </label>
       {allow && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, paddingLeft: 28 }}>
@@ -700,7 +1598,13 @@ function GenderModal({ node, instUsers, onSave, onClose }: {
         <div className="modal-body">
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, padding: '10px 14px', background: '#f4f7ff', borderRadius: 10, border: '1.5px solid #f3e3b8' }}>
             <span style={{ fontSize: 20 }}>🎯</span>
-            <div style={{ fontWeight: 700, fontSize: 13 }}>Ümumi kvota: <span style={{ color: 'var(--blue)' }}>{quota}</span></div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 13 }}>Ümumi kvota: <span style={{ color: 'var(--blue)' }}>{quota}</span></div>
+              <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
+                Bu ixtisasa namizəd ola bilən <b>{gp.total}</b> nəfər
+                {outCount > 0 && <> · <span style={{ color: '#c47f0a' }}>{outCount} nəfər qrup/budaq məhdudiyyətinə görə kənardadır</span></>}
+              </div>
+            </div>
           </div>
 
           {row('Qadın daxil ola bilər', femCount, '#c41d7f', allowF, setAllowF, maxF, setMaxF)}
@@ -709,6 +1613,28 @@ function GenderModal({ node, instUsers, onSave, onClose }: {
           {!valid && (
             <div style={{ fontSize: 12, color: '#cf1322', fontWeight: 600, marginBottom: 8 }}>
               ⚠ Ən azı bir cins seçilməlidir.
+            </div>
+          )}
+
+          {/* Bu ixtisasda boş qalacaq yerlər */}
+          {valid && unfilled > 0 && (
+            <div style={{ marginBottom: 10, padding: '9px 12px', borderRadius: 8, background: '#fff2f0', border: '1px solid #ffccc7', fontSize: 11.5, color: '#cf1322', lineHeight: 1.5 }}>
+              ⚠️ Bu ixtisasa cəmi <b>{reachCap} nəfər</b> düşə bilər, kvota isə <b>{quota}</b> —{' '}
+              <b>{unfilled} yer</b> boş qalacaq.
+            </div>
+          )}
+
+          {/* Struktur üzrə təsir */}
+          {fea && fea.diff > 0 && (
+            <div style={{ marginBottom: 10, padding: '9px 12px', borderRadius: 8, background: '#fffbe6', border: '1px solid #ffe58f', fontSize: 11.5, color: '#874d00', lineHeight: 1.5 }}>
+              ⚠️ Yadda saxlasan struktur üzrə kənarda qalanlar <b>{fea.before} → {fea.after}</b> olacaq
+              (<b>+{fea.diff} nəfər</b> heç bir ixtisasa yerləşə bilməyəcək).
+            </div>
+          )}
+          {fea && fea.diff < 0 && (
+            <div style={{ marginBottom: 10, padding: '9px 12px', borderRadius: 8, background: '#f0fff4', border: '1px solid #b7eb8f', fontSize: 11.5, color: '#237804', lineHeight: 1.5 }}>
+              ✅ Yadda saxlasan struktur üzrə kənarda qalanlar <b>{fea.before} → {fea.after}</b> olacaq
+              ({-fea.diff} nəfər az).
             </div>
           )}
 
@@ -730,8 +1656,12 @@ function GenderModal({ node, instUsers, onSave, onClose }: {
 }
 
 // ── Tək node sətiri (rekursiv render, açıb-bağlanan) ─────────────────────────
-function NodeRow({ node, depth, onAdd, onEdit, onDelete, onPriority, onDeactivatePriority, onGroup, onDeactivateGroup, sourceProportional, instUsers, onQuotaMode, levelNames, hasGender, onGenderConfig }: {
+function NodeRow({ node, depth, ancestors, treeNodes, onAdd, onEdit, onDelete, onPriority, onDeactivatePriority, onGroup, onDeactivateGroup, sourceProportional, instUsers, onQuotaMode, levelNames, hasGender, onGenderConfig }: {
   node: TNode; depth: number
+  /** kökdən bu node-a qədərki əcdadlar (bu node daxil deyil) */
+  ancestors?: TNode[]
+  /** strukturun kök node-ları */
+  treeNodes?: TNode[]
   onAdd: (parentId: string, childDepth: number) => void
   levelNames: string[]
   onEdit: (node: TNode) => void
@@ -875,33 +1805,61 @@ function NodeRow({ node, depth, onAdd, onEdit, onDelete, onPriority, onDeactivat
               </button>
             )}
           </div>
-          {/* Qrup düyməsi */}
-          <div style={{ display: 'flex', gap: 2 }}>
-            <button
-              onClick={() => onGroup(node)}
-              style={{
-                fontSize: 11, padding: '5px 11px',
-                borderRadius: node.groups?.length ? '6px 0 0 6px' : '6px',
-                border: `1.5px solid ${node.groups?.length ? '#52c41a' : '#dde'}`,
-                background: node.groups?.length ? '#f0fff4' : '#f8f9fd',
-                color: node.groups?.length ? '#237804' : '#bbb',
-                fontWeight: 700, cursor: 'pointer', transition: 'all .15s',
-              }}
-              title={node.groups?.length ? 'Qrupları düzəlt' : 'Qrup təyin et'}>
-              👥 <span className="spec-btn-label">{node.groups?.length ? `Q:${node.groups.join(',')} ✓` : 'Qrup'}</span>
-            </button>
-            {!!node.groups?.length && (
-              <button
-                onClick={() => onDeactivateGroup(node.id)}
-                style={{
-                  fontSize: 11, padding: '5px 8px', borderRadius: '0 6px 6px 0',
-                  border: '1.5px solid #52c41a', borderLeft: 'none',
-                  background: '#f0fff4', color: '#237804',
-                  fontWeight: 700, cursor: 'pointer',
-                }}
-                title="Qrup təyinatını sil">✕</button>
-            )}
-          </div>
+          {/* Görünmə məhdudiyyəti düyməsi — qrup və/və ya əlavə sütun filtrləri */}
+          {(() => {
+            const grp     = node.groups ?? []
+            const flt     = node.filters ?? {}
+            const fltKeys = Object.keys(flt).filter(k => flt[k]?.length)
+            const on      = grp.length > 0 || fltKeys.length > 0
+            // Düymənin etiketi: qrup varsa "Q:…", əlavə sütun varsa onun dəyərləri.
+            // Sütunun görünən adı NodeRow-a ötürülən levelNames-dən gəlir.
+            const colLabel = (k: string) => {
+              const m = /^lv(\d+)$/.exec(k)
+              if (m) return levelNames[Number(m[1])] || k
+              const mx = /^ex:(.+)$/i.exec(k)   // sərbəst mətn sütunu — adın özü
+              if (mx) return mx[1].charAt(0).toUpperCase() + mx[1].slice(1)
+              return ({ source: 'Mənbə', gender: 'Cins', year: 'Tədris ili' } as any)[k] || k
+            }
+            const parts = [
+              ...(grp.length ? [`Q:${grp.join(',')}`] : []),
+              ...fltKeys.map(k => flt[k].join(',')),
+            ]
+            const tip = on
+              ? 'Görünmə məhdudiyyəti: ' + [
+                  grp.length ? `Qrup — ${grp.join(', ')}` : null,
+                  ...fltKeys.map(k => `${colLabel(k)} — ${flt[k].join(', ')}`),
+                ].filter(Boolean).join(' · ')
+              : 'Qrup və ya əlavə sütun üzrə məhdudiyyət təyin et'
+            return (
+              <div style={{ display: 'flex', gap: 2 }}>
+                <button
+                  onClick={() => onGroup(node)}
+                  style={{
+                    fontSize: 11, padding: '5px 11px',
+                    borderRadius: on ? '6px 0 0 6px' : '6px',
+                    border: `1.5px solid ${on ? '#52c41a' : '#dde'}`,
+                    background: on ? '#f0fff4' : '#f8f9fd',
+                    color: on ? '#237804' : '#bbb',
+                    fontWeight: 700, cursor: 'pointer', transition: 'all .15s',
+                    maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  }}
+                  title={tip}>
+                  👥 <span className="spec-btn-label">{on ? `${parts.join(' · ')} ✓` : 'Qrup'}</span>
+                </button>
+                {on && (
+                  <button
+                    onClick={() => onDeactivateGroup(node.id)}
+                    style={{
+                      fontSize: 11, padding: '5px 8px', borderRadius: '0 6px 6px 0',
+                      border: '1.5px solid #52c41a', borderLeft: 'none',
+                      background: '#f0fff4', color: '#237804',
+                      fontWeight: 700, cursor: 'pointer',
+                    }}
+                    title="Bütün görünmə məhdudiyyətlərini sil">✕</button>
+                )}
+              </div>
+            )
+          })()}
 
           {/* Cins məhdudiyyəti düyməsi — yalnız leaf + datada cins varsa */}
           {hasGender && isLeaf && (() => {
@@ -939,6 +1897,8 @@ function NodeRow({ node, depth, onAdd, onEdit, onDelete, onPriority, onDeactivat
       {quotaModal && isLeaf && (
         <QuotaModeModal
           node={node}
+          path={[...(ancestors || []), node]}
+          treeNodes={treeNodes || []}
           instUsers={instUsers || []}
           onClose={() => setQuotaModal(false)}
           onSave={(mode, mülkiQ, liseyQ) => onQuotaMode?.(node.id, mode, mülkiQ, liseyQ)}
@@ -949,7 +1909,9 @@ function NodeRow({ node, depth, onAdd, onEdit, onDelete, onPriority, onDeactivat
       {genderModal && isLeaf && (
         <GenderModal
           node={node}
+          path={[...(ancestors || []), node]}
           instUsers={instUsers || []}
+          treeNodes={treeNodes}
           onClose={() => setGenderModal(false)}
           onSave={cfg => { onGenderConfig?.(node.id, cfg); setGenderModal(false) }}
         />
@@ -958,6 +1920,8 @@ function NodeRow({ node, depth, onAdd, onEdit, onDelete, onPriority, onDeactivat
       {/* Uşaqlar — yalnız açıq olduqda */}
       {open && (node.children || []).map(child => (
         <NodeRow key={child.id} node={child} depth={depth + 1}
+          ancestors={[...(ancestors || []), node]}
+          treeNodes={treeNodes}
           onAdd={onAdd} onEdit={onEdit} onDelete={onDelete}
           onPriority={onPriority} onDeactivatePriority={onDeactivatePriority}
           onGroup={onGroup} onDeactivateGroup={onDeactivateGroup}
@@ -978,7 +1942,7 @@ export default function Specialties() {
   const [trees, refreshTrees]   = useLocalState(treeDb.getAll)
   const [insts]                 = useLocalState(institutionDb.getAll)
   const [students]              = useLocalState(userDb.getAll)
-  const [tab, setTab]           = useState<string>('')
+  const [tab, setTab]           = useActiveInst(insts as any[])
 
   // Tədris ili seçimləri — cari ildən başlayaraq 5 il
   const currentYear = new Date().getFullYear()
@@ -988,10 +1952,37 @@ export default function Specialties() {
   })
   const [openTreeId, setOpenTreeId] = useState<string | null>(null)
   const [modal, setModal] = useState<any>(null)
-  const { dialog: appDialog, showConfirm: showAppConfirm, closeDialog } = useDialog()
+  const { dialog: appDialog, showConfirm: showAppConfirm, showInfo: showAppInfo, closeDialog } = useDialog()
   const [confirm, setConfirm] = useState<{ message: string; onConfirm: () => void } | null>(null)
   const [priorityNode, setPriorityNode] = useState<{ treeId: string; node: TNode } | null>(null)
   const [groupNode,    setGroupNode]    = useState<{ treeId: string; node: TNode } | null>(null)
+  const [balanceTree, setBalanceTree] = useState<any>(null)
+
+  // ── Strukturun təhsilalan qrupu ─────────────────────────────────────────────
+  // Qrup STRUKTURDA təyin olunur və bazada saxlanılır: struktur kimin üçün
+  // qurulubsa, ona bağlı seçim də həmin təhsilalanları əhatə edir. Seçim
+  // ekranında ayrıca qrup seçimi yoxdur — struktur seçilməklə qrup da gəlir.
+  const [cohorts, setCohorts] = useState<any[]>([])
+  useEffect(() => { cohortDb.getAll().then(setCohorts) }, [])
+  const pickCohort = async (treeId: string, cohortId: string) => {
+    await treeDb.update(treeId, { cohort: cohortId || null })
+    const t = getTree(treeId)
+    const c = cohorts.find((x: any) => x.id === cohortId)
+    await addLog('admin', 'info', `Strukturun təhsilalan qrupu dəyişdi: "${t?.name || treeId}"`,
+      c ? `Yeni qrup: ${c.label}` : 'Qrup silindi — bütün müəssisə')
+    await refreshTrees()
+  }
+  // Müəssisənin aktiv qrupları
+  const cohortsOf = (instId: string) =>
+    cohorts.filter((c: any) => c.institution === instId && !c.isArchived)
+  // Strukturun hesablamalarında istifadə olunan təhsilalanlar
+  const usersForTree = (t: any): any[] => {
+    const instId = t?.institution || ''
+    if (!instId) return []
+    const inInst = (students as any[]).filter((u: any) => u.institution === instId)
+    const cid = t?.cohort || ''
+    return cid ? inInst.filter((u: any) => u.cohort === cid) : inInst
+  }
 
   if (!trees || !insts || !students) {
     return <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted)' }}>Yüklənir...</div>
@@ -1023,19 +2014,33 @@ export default function Specialties() {
     await addLog('admin', 'info', `Prioritet deaktiv edildi`, `Struktur: ${t?.name} · nodeId: ${nodeId}`)
   }
 
-  async function handleSaveGroups(groups: string[]) {
+  async function handleSaveGroups(groups: string[], filters?: { [col: string]: string[] }) {
     if (!groupNode) return
     const { treeId, node } = groupNode
     const t = getTree(treeId)
-    await saveNodes(treeId, updateNode(t.nodes || [], node.id, { groups: groups.length ? groups : undefined }))
-    await addLog('admin', 'info', `Qrup təyinatı yeniləndi: "${node.name}"`, groups.length ? `Qruplar: ${groups.join(', ')}` : 'Qrup silindi')
+    await saveNodes(treeId, updateNode(t.nodes || [], node.id, {
+      groups: groups.length ? groups : undefined,
+      filters,
+    }))
+    // Jurnal üçün sütunun görünən adı: lvN -> strukturun səviyyə adı
+    const lvl = levelNamesOf(t)
+    const filterText = filters
+      ? Object.keys(filters).map(k => {
+          const m = /^lv(\d+)$/.exec(k)
+          const label = m ? (lvl[Number(m[1])] || k) : ({ source: 'Mənbə', gender: 'Cins', year: 'Tədris ili' } as any)[k] || k
+          return `${label}: ${filters[k].join(', ')}`
+        }).join(' · ')
+      : ''
+    await addLog('admin', 'info', `Görünmə məhdudiyyəti yeniləndi: "${node.name}"`,
+      [groups.length ? `Qruplar: ${groups.join(', ')}` : 'Qrup məhdudiyyəti yoxdur',
+       filterText || 'Əlavə sütun məhdudiyyəti yoxdur'].join(' · '))
     setGroupNode(null)
   }
 
   async function handleDeactivateGroup(treeId: string, nodeId: string) {
     const t = getTree(treeId)
-    await saveNodes(treeId, updateNode(t.nodes || [], nodeId, { groups: undefined }))
-    await addLog('admin', 'info', `Qrup təyinatı silindi`, `Struktur: ${t?.name} · nodeId: ${nodeId}`)
+    await saveNodes(treeId, updateNode(t.nodes || [], nodeId, { groups: undefined, filters: undefined }))
+    await addLog('admin', 'info', `Görünmə məhdudiyyəti silindi`, `Struktur: ${t?.name} · nodeId: ${nodeId}`)
   }
 
   async function handleQuotaMode(treeId: string, nodeId: string, mode: 'auto' | 'manual', mülkiQ?: number, liseyQ?: number) {
@@ -1099,10 +2104,29 @@ export default function Specialties() {
     await refreshTrees(); setModal(null)
   }
 
+  // Backend 409/500 qaytaranda istifadeciye aydin mesaj gosterilsin
+  function apiErrorText(e: any): string {
+    const raw = String(e?.message ?? e ?? '')
+    try { const j = JSON.parse(raw); if (j?.message) return j.message } catch { /* JSON deyil */ }
+    if (/DbUpdateException|foreign key|constraint/i.test(raw))
+      return 'Bu struktur başqa qeydlərdə (seçimlərdə) istifadə olunur, ona görə silinə bilmir.'
+    return raw || 'Naməlum xəta baş verdi.'
+  }
+
+  function showApiError(title: string, e: any) {
+    showAppInfo({ icon: '⚠️', iconBg: '#fdecea', iconColor: '#c0392b', title, message: apiErrorText(e) })
+  }
+
   function deleteTree(id: string) {
     const t = getTree(id)
     askConfirm('Bu struktur və içindəki bütün ixtisaslar silinəcək. Bu əməliyyat geri alına bilməz.', async () => {
-      await treeDb.delete(id)
+      try {
+        await treeDb.delete(id)
+      } catch (e) {
+        setConfirm(null)
+        showApiError('Struktur silinmədi', e)
+        return
+      }
       if (openTreeId === id) setOpenTreeId(null)
       await addLog('admin', 'warning', `İxtisas strukturu silindi: "${t?.name || id}"`, 'Bütün ixtisaslar da silindi')
       await refreshTrees()
@@ -1239,7 +2263,8 @@ export default function Specialties() {
       {groupNode && (
         <GroupModal
           node={groupNode.node}
-          users={students as any[]}
+          users={usersForTree(getTree(groupNode.treeId))}
+          levelNames={levelNamesOf(getTree(groupNode.treeId))}
           onSave={handleSaveGroups}
           onClose={() => setGroupNode(null)}
         />
@@ -1325,25 +2350,60 @@ export default function Specialties() {
           {(modal.type === 'createTree' || modal.type === 'renameTree') && (
             <>
               <div className="form-group">
-                <label className="form-label">Tədris İli</label>
-                {modal.year ? (
-                  <div style={{
-                    display: 'flex', alignItems: 'center', gap: 8,
-                    padding: '11px 14px', borderRadius: 10,
-                    background: '#f0fff4', border: '1.5px solid #b7eb8f',
-                    fontWeight: 700, fontSize: 14, color: '#237804',
-                  }}>
-                    📅 {modal.year}
-                  </div>
-                ) : (
-                  <div style={{
-                    padding: '11px 14px', borderRadius: 10,
-                    background: '#fff8e6', border: '1.5px solid #ffd591',
-                    fontSize: 13, color: '#d46b08',
-                  }}>
-                    ⚠️ Bu müəssisədə tədris ili olan təhsilalan tapılmadı
-                  </div>
-                )}
+                <label className="form-label">📅 Tədris İli</label>
+                {(() => {
+                  // Siyahı: standart illər + strukturun mövcud ili (siyahıdan kənar ola bilər)
+                  const opts = [...yearOptions]
+                  if (modal.year && !opts.includes(modal.year)) opts.unshift(modal.year)
+                  const custom = !!modal.yearCustom
+                  return (<>
+                    <select className="form-input" style={{ cursor: 'pointer' }}
+                      value={custom ? '__custom__' : (modal.year || '')}
+                      onChange={e => {
+                        const v = e.target.value
+                        if (v === '__custom__') setModal((m: any) => ({ ...m, yearCustom: true, year: '' }))
+                        else setModal((m: any) => ({ ...m, yearCustom: false, year: v }))
+                      }}>
+                      <option value="">— seçilməyib —</option>
+                      {opts.map(y => <option key={y} value={y}>{y}</option>)}
+                      <option value="__custom__">✏️ Özüm yazım...</option>
+                    </select>
+                    {custom && (
+                      <input className="form-input" style={{ marginTop: 8 }} autoFocus
+                        placeholder="2031–2032" maxLength={9}
+                        value={modal.year || ''}
+                        onChange={e => {
+                          let v = e.target.value.replace(/[^\d\-–]/g, '')
+                          if (/^\d{5,}$/.test(v)) v = v.slice(0, 4) + '–' + v.slice(4, 8)
+                          setModal((m: any) => ({ ...m, year: v }))
+                        }} />
+                    )}
+                    {(() => {
+                      // Təhsilalanlara görə təklif — fərqlidirsə bir kliklə tətbiq et
+                      const sug = getInstYear(modal.instId || '')
+                      if (!sug || sug === modal.year) return null
+                      return (
+                        <div style={{ fontSize: 11, marginTop: 6, color: 'var(--muted)' }}>
+                          Təhsilalanlara görə: <b>{sug}</b>{' '}
+                          <button type="button"
+                            onClick={() => setModal((m: any) => ({ ...m, year: sug, yearCustom: false }))}
+                            style={{ border: 'none', background: 'none', padding: 0, color: 'var(--blue)', fontWeight: 700, fontSize: 11, cursor: 'pointer', textDecoration: 'underline' }}>
+                            tətbiq et
+                          </button>
+                        </div>
+                      )
+                    })()}
+                    {!modal.year && !custom && (
+                      <div style={{
+                        marginTop: 8, padding: '9px 12px', borderRadius: 10,
+                        background: '#fff8e6', border: '1.5px solid #ffd591',
+                        fontSize: 12, color: '#d46b08',
+                      }}>
+                        ⚠️ Tədris ili seçilməyib
+                      </div>
+                    )}
+                  </>)
+                })()}
               </div>
             </>
           )}
@@ -1410,6 +2470,21 @@ export default function Specialties() {
           </button>
         ) : undefined}
       />
+
+      {balanceTree && (() => {
+        // Düzəlişdən sonra rəqəmlər dərhal yenilənsin deyə ağac hər dəfə
+        // siyahıdan təzə götürülür (balanceTree yalnız id daşıyıcısıdır).
+        const bt = (trees as any[]).find((t: any) => t.id === balanceTree.id) || balanceTree
+        return (
+          <BalanceModal
+            tree={bt}
+            instUsers={usersForTree(bt)}
+            onClose={() => setBalanceTree(null)}
+            onQuotaMode={(nodeId, mode, mülkiQ, liseyQ) => handleQuotaMode(bt.id, nodeId, mode, mülkiQ, liseyQ)}
+            onGenderConfig={(nodeId, cfg) => handleGenderConfig(bt.id, nodeId, cfg)}
+          />
+        )
+      })()}
 
       {/* ── Kart siyahısı ── */}
       {(() => {
@@ -1511,15 +2586,160 @@ export default function Specialties() {
                         </span>
                       )}
                     </div>
-                    <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
-                      {rootCount} {lvN[0] || 'qoşun növü'}
-                      {midCount > 0 && ` · ${midCount} ${lvN[1] || 'mülki ixtisas'}`}
-                      {` · ${leaves} ${lvN[2] || 'hərbi uçot ixtisası'} · Ümumi kvota: ${quota}`}
+                    <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      <span>
+                        {rootCount} {lvN[0] || 'qoşun növü'}
+                        {midCount > 0 && ` · ${midCount} ${lvN[1] || 'mülki ixtisas'}`}
+                        {` · ${leaves} ${lvN[2] || 'hərbi uçot ixtisası'} · Ümumi kvota: ${quota}`}
+                      </span>
+
+                      {/* ── Mənbə balansı — kompakt nişan, təfsilat klikləyəndə açılır ── */}
+                      {t.sourceProportional && (() => {
+                        const tUsers = t.institution
+                          ? usersForTree(t)
+                          : []
+                        if (!(t.nodes || []).length) return null
+                        // Yerləşdirmə mənbə slotlarını qarışdırmır → ölçü real
+                        // icra olunabilirlikdir: boş qalacaq yer / yersiz qalacaq namizəd
+                        const sb = sourceBalance(tUsers, t.nodes || [])
+                        // Max-flow "qaydasındadır" desə də, bölgü MƏCBURİ ola bilər:
+                        // ehtiyat namizədi olmayan budağın namizədləri kənara da
+                        // gedə bilirsə, hər gedən bir boş yer + bir kənarda qalan
+                        // namizəd deməkdir. Bunu ayrıca xəbərdarlıq kimi göstəririk.
+                        const fr = fragileRisks(tUsers, t.nodes || [])
+                        const frSeats = fr.reduce((a, x) => a + x.riskSeats, 0)
+                        const gbk = groupBlocks(tUsers, t.nodes || [])
+                        const chip = {
+                          display: 'inline-flex', alignItems: 'center', gap: 4,
+                          fontSize: 10, fontWeight: 700, borderRadius: 6,
+                          padding: '1px 7px', whiteSpace: 'nowrap' as const,
+                        }
+                        if (sb.ok && !gbk.ok) {
+                          const conf = gbk.conflicts.length
+                          return (
+                            <span onClick={e => { e.stopPropagation(); setBalanceTree(t) }}
+                              title={conf ? 'Qrup məhdudiyyətləri kəsişir: ' + gbk.conflicts.slice(0, 3).map(c => `«${c.a.label}» ↔ «${c.b.label}»`).join(', ') + ' — təfsilat üçün klikləyin'
+                                : 'Bloklarda nəfər və yer uyğun deyil — təfsilat üçün klikləyin'}
+                              style={{ ...chip, color: conf ? '#d46b08' : '#cf1322', background: conf ? '#fff7e6' : '#fff2f0', border: `1px solid ${conf ? '#ffd591' : '#ffccc7'}`, cursor: 'pointer' }}>
+                              {conf ? `⚠️ Qrup kəsişməsi: ${conf}` : `⚠️ Blok: ${gbk.exactOut} nəfər kənarda`}
+                            </span>
+                          )
+                        }
+                        if (sb.ok && frSeats === 0) {
+                          return (
+                            <span title="Hər mənbənin yer sayı namizəd sayı ilə tam oturur"
+                              style={{ ...chip, color: '#237804', background: '#f0fff4', border: '1px solid #b7eb8f' }}>
+                              ✅ Balans
+                            </span>
+                          )
+                        }
+                        // Mənbə balansı özü qaydasındadırsa, amma bölgü kövrəkdirsə —
+                        // ayrıca sarı xəbərdarlıq (səhv deyil, risk).
+                        if (sb.ok) {
+                          return (
+                            <span onClick={e => { e.stopPropagation(); setBalanceTree(t) }}
+                              title={'Bölgü yalnız məcburi halda oturur: ' +
+                                fr.map(x => `"${x.nodeName}" — ${x.capacity} yerə ${x.candidates} namizəd; açıq qalan: ${x.leakTargets.map(t => t.label + ' (' + t.quota + ')').join(', ')}`).join(' · ') +
+                                ' — təfsilat üçün klikləyin'}
+                              style={{ ...chip, color: '#d46b08', background: '#fff7e6', border: '1px solid #ffd591', cursor: 'pointer' }}>
+                              ⚠️ Kövrək bölgü — {frSeats} yer risk altında
+                            </span>
+                          )
+                        }
+                        const parts: string[] = []
+                        if (sb.mülki.unfillable > 0) parts.push(`M +${sb.mülki.unfillable}`)
+                        if (sb.mülki.deficit    > 0) parts.push(`M −${sb.mülki.deficit}`)
+                        if (sb.lisey.unfillable > 0) parts.push(`L +${sb.lisey.unfillable}`)
+                        if (sb.lisey.deficit    > 0) parts.push(`L −${sb.lisey.deficit}`)
+                        // Səbəb cins limitidirsə, nişanda dərhal görünsün
+                        const genderCause = sb.capIssues.length > 0 || sb.genderTight.length > 0
+                        const femOut = sb.mülki.femaleForced + sb.lisey.femaleForced
+                        const malOut = sb.mülki.maleForced   + sb.lisey.maleForced
+                        if (femOut > 0) parts.push(`♀ −${femOut}`)
+                        if (malOut > 0) parts.push(`♂ −${malOut}`)
+                        if (frSeats > 0) parts.push(`kövrək ${frSeats}`)
+                        const tip = genderCause
+                          ? (sb.capIssues.length > 0
+                              ? `Cins limiti kvotadan azdır: ${sb.capIssues.map(c => c.name).slice(0, 3).join(', ')} — təfsilat üçün klikləyin`
+                              : `Cins limiti darboğazdır: ${sb.genderTight.map(g => `${g.name} (${g.gender})`).slice(0, 3).join(', ')} — təfsilat üçün klikləyin`)
+                          : '+ boş qalacaq yer · − yersiz qalacaq namizəd — təfsilat üçün klikləyin'
+                        return (
+                          <span onClick={e => { e.stopPropagation(); setBalanceTree(t) }}
+                            title={tip}
+                            style={{ ...chip, color: '#cf1322', background: '#fff2f0', border: '1px solid #ffccc7', cursor: 'pointer' }}>
+                            ⚠️ Balans{parts.length ? ` ${parts.join(' · ')}` : ' pozulub'}
+                          </span>
+                        )
+                      })()}
+
+                      {/* Real seçimlərlə kənarda qala biləcəklər — arxa planda simulyasiya */}
+                      {t.institution && (t.nodes || []).length > 0 && (
+                        <SimChip users={usersForTree(t)} tree={t} onOpen={() => setBalanceTree(t)} />
+                      )}
+
+                      {/* Kvota rəqəmləri strukturla uyğundurmu (mənbə bölgüsündən asılı deyil) */}
+                      {(() => {
+                        const tUsers = t.institution
+                          ? usersForTree(t)
+                          : []
+                        if (tUsers.length === 0 || !(t.nodes || []).length) return null
+                        const f = feasibility(tUsers, t.nodes || [])
+                        if (f.ok) return null
+                        return (
+                          <span onClick={e => { e.stopPropagation(); setBalanceTree(t) }}
+                            title={`Kvota rəqəmlərinə görə ${f.deficit} təhsilalan heç bir halda yerləşə bilmir — təfsilat üçün klikləyin`}
+                            style={{
+                              display: 'inline-flex', alignItems: 'center', gap: 4,
+                              fontSize: 10, fontWeight: 700, borderRadius: 6, padding: '1px 7px',
+                              whiteSpace: 'nowrap', color: '#874d00', background: '#fffbe6',
+                              border: '1px solid #ffe58f', cursor: 'pointer',
+                            }}>
+                            ⚠️ Kvota: {f.deficit} nəfər kənarda
+                          </span>
+                        )
+                      })()}
                     </div>
                   </div>
 
                   {/* Düymələr */}
                   <div className="spec-tree-actions" onClick={e => e.stopPropagation()} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+
+                    {/* ── Hesablamaların aparıldığı təhsilalan qrupu ──────────
+                        Struktur qrupa aid deyil; bu seçici yalnız balans/kvota
+                        rəqəmlərinin hansı qrupun namizədləri üzrə hesablanacağını
+                        müəyyən edir. */}
+                    {(() => {
+                      const list = cohortsOf(t.institution || '')
+                      if (list.length < 1) return null
+                      const cid = t.cohort || ''
+                      const cnt = usersForTree(t).length
+                      return (
+                        <div title="Bu struktur hansı təhsilalan qrupu üçündür — ona bağlı seçimlər də bu qrupu əhatə edəcək"
+                          style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--muted)', whiteSpace: 'nowrap' }}>Qrup:</span>
+                          <select
+                            value={cid}
+                            onChange={e => pickCohort(t.id, e.target.value)}
+                            style={{
+                              fontSize: 11.5, fontWeight: 700, padding: '4px 8px', borderRadius: 8,
+                              border: '1.5px solid ' + (cid ? '#adc6ff' : '#ffd591'),
+                              background: cid ? '#f0f5ff' : '#fff7e6',
+                              color: cid ? '#0958d9' : '#d46b08',
+                              cursor: 'pointer', maxWidth: 220,
+                            }}>
+                            <option value="">— Bütün müəssisə —</option>
+                            {list.map((c: any) => (
+                              <option key={c.id} value={c.id}>{c.label}</option>
+                            ))}
+                          </select>
+                          <span style={{
+                            fontSize: 10, fontWeight: 800, padding: '2px 7px', borderRadius: 10,
+                            background: cid ? '#e6f0ff' : '#ffe7ba',
+                            color: cid ? '#0958d9' : '#d46b08', whiteSpace: 'nowrap',
+                          }}>{cnt}</span>
+                        </div>
+                      )
+                    })()}
 
                     {/* ── Proporsional bölgü toggle ── */}
                     <div
@@ -1570,11 +2790,16 @@ export default function Specialties() {
                       onClick={() => showAppConfirm({
                         icon: '🗄️', iconBg: '#f0f2fa', iconColor: '#9a7b1e',
                         title: 'Strukturu arxivlə',
-                        message: `"${t.name}" ixtisas strukturunun snapshotunu arxivə göndərmək istəyirsiniz?`,
+                        message: `"${t.name}" ixtisas strukturu və ona bağlı bütün seçimlər arxivə köçürüləcək. Heç nə silinmir — nəticələr və təhsilalanlar olduğu kimi qalır, bərpa edəndə hər şey geri qayıdır.`,
                         confirmLabel: 'Arxivlə', confirmColor: '#9a7b1e',
                         onConfirm: async () => {
-                          await treeArchiveDb.save({ name: t.name, year: t.year || '', icon: t.icon || '', institution: t.institution || '', nodes: t.nodes || [] })
-                          await treeDb.delete(t.id)
+                          try {
+                            await treeDb.archive(t.id)
+                          } catch (e) {
+                            showApiError('Struktur arxivlənmədi', e)
+                            return
+                          }
+                          if (openTreeId === t.id) setOpenTreeId(null)
                           await addLog('admin', 'info', `İxtisas strukturu arxivləndi: "${t.name}"`, `İl: ${t.year || '—'}`)
                           await refreshTrees()
                         },
@@ -1634,14 +2859,15 @@ export default function Specialties() {
                       {/* Rekursiv node siyahısı */}
                       {(() => {
                         const tInstId   = t.institution || ''
-                        const allUsers  = students as any[]
-                        const instUsers = tInstId ? allUsers.filter((u: any) => u.institution === tInstId) : []
+                        // Yalnız seçilmiş təhsilalan qrupunun namizədləri
+                        const instUsers = tInstId ? usersForTree(t) : []
                         const hasGender = instUsers.some((u: any) => u.gender)
                         return nodes.map((node: TNode) => (
                           <NodeRow
                             key={node.id}
                             node={node}
                             depth={0}
+                            treeNodes={t.nodes || []}
                             onAdd={(parentId, childDepth) => setModal({ type: 'addNode', treeId: t.id, parentId, name: '', quota: '', depth: childDepth, levelName: '' })}
                             onEdit={n => setModal({ type: 'editNode', treeId: t.id, nodeId: n.id, name: n.name, quota: n.quota ?? '' })}
                             onDelete={nodeId => handleDeleteNode(t.id, nodeId)}
@@ -1668,5 +2894,27 @@ export default function Specialties() {
       )
       })()}
     </>
+  )
+}
+
+/** Struktur kartındakı nişan: sadə üsulun simulyasiyasına görə kənarda qala biləcəklər */
+function SimChip({ users, tree, onOpen }: { users: any[]; tree: any; onOpen: () => void }) {
+  // Simulyasiya yalnız qrup kəsişməsi olanda lazımdır (yoxsa blok hesabı dəqiqdir)
+  const conf = groupBlocks(users, tree?.nodes || []).conflicts.length > 0
+  const sim = useBalanceSim(conf ? users : [], tree)
+  if (!sim || sim.max === 0) return null   // hesablanır və ya hamı yerləşir
+  const chip = {
+    display: 'inline-flex', alignItems: 'center', gap: 4,
+    fontSize: 10, fontWeight: 700, borderRadius: 6,
+    padding: '1px 7px', whiteSpace: 'nowrap' as const,
+  }
+  const range = sim.min === sim.max ? String(sim.max) : `${sim.min}–${sim.max}`
+  return (
+    <span onClick={e => { e.stopPropagation(); onOpen() }}
+      title={`Sadə üsul ${sim.runs} dəfə təsadüfi seçimlərlə işlədildi (hər kəs ona açıq bütün ixtisasları seçir): ${range} nəfər kənarda qalır` +
+        (sim.emptyLeaves.length ? `. Ən çox boş qalan: ${sim.emptyLeaves.slice(0, 3).map(l => l.name).join(', ')}` : '') + ' — təfsilat üçün klikləyin'}
+      style={{ ...chip, color: '#d46b08', background: '#fff7e6', border: '1px solid #ffd591', cursor: 'pointer' }}>
+      ⚠️ Kənarda qala bilər: {range}{sim.min !== sim.max ? ` (adətən ${sim.median})` : ''}
+    </span>
   )
 }
