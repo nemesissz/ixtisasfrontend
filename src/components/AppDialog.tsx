@@ -57,7 +57,7 @@ export function AppDialog({ cfg, onClose }: { cfg: DialogCfg; onClose: () => voi
         {/* Mesaj */}
         <div style={{
           fontSize: 13, color: 'var(--muted)', textAlign: 'center',
-          lineHeight: 1.65, marginBottom: 26, maxWidth: 300,
+          lineHeight: 1.65, marginBottom: 26, maxWidth: 300, whiteSpace: 'pre-line',
         }}>
           {cfg.message}
         </div>

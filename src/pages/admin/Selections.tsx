@@ -50,12 +50,20 @@ export default function Selections() {
     })
   }
 
-  function handlePublish(s: any, e: React.MouseEvent) {
+  async function handlePublish(s: any, e: React.MouseEvent) {
     e.stopPropagation()
+    // Eyni FİN-li təhsilalanın başqa yayımdakı seçimdə də qeydi varsa xəbər ver (bloklamır)
+    let finWarn = ''
+    try {
+      const fc = await selectionDb.finConflicts(s.id)
+      if (fc.length) finWarn = `\n\n⚠ Diqqət: ${fc.length} təhsilalanın eyni FİN ilə başqa aktiv seçimdə də qeydi var — ` +
+        fc.slice(0, 5).map(c => `${c.fin} ${c.name} (${c.otherInstitution}${c.otherCohort ? ' → ' + c.otherCohort : ''}, «${c.otherSelectionName}»${c.otherStatus === 'submitted' ? ', göndərib' : ''})`).join('; ') +
+        (fc.length > 5 ? ` və daha ${fc.length - 5}` : '') + '.'
+    } catch { /* yoxlama alınmasa yayım adi qaydada davam edir */ }
     showConfirm({
-      icon: '🚀', iconBg: '#f0fff4', iconColor: '#52c41a',
+      icon: finWarn ? '⚠️' : '🚀', iconBg: finWarn ? '#fffbe6' : '#f0fff4', iconColor: finWarn ? '#ad6800' : '#52c41a',
       title: 'Seçimi yayımla',
-      message: `"${s.name}" seçimi yayımlanacaq. Təhsilalanlar öz seçimlərini edə biləcək.`,
+      message: `"${s.name}" seçimi yayımlanacaq. Təhsilalanlar öz seçimlərini edə biləcək.${finWarn}`,
       confirmLabel: 'Yayımla', confirmColor: '#52c41a',
       onConfirm: async () => {
         try {
@@ -74,7 +82,7 @@ export default function Selections() {
           return
         }
         await refresh()
-        addLog('selection', 'success', `Seçim yayımlandı: "${s.name}"`, `id: ${s.id}`)
+        addLog('selection', 'success', `Seçim yayımlandı: "${s.name}"`, `id: ${s.id}${finWarn ? ' · eyni FİN başqa aktiv seçimdə də var' : ''}`)
       },
     })
   }

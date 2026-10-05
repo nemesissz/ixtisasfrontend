@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { useActiveInst } from '../../activeInst'
 import { useSearchParams } from 'react-router-dom'
 import * as XLSX from 'xlsx'
-import { userDb, submissionDb, institutionDb, userArchiveDb, selectionDb, treeDb, adminDb, cohortDb, buildNameMap, useLocalState, usePoll, addLog, systemSettingsDb } from '../../db'
+import { userDb, submissionDb, institutionDb, userArchiveDb, selectionDb, treeDb, adminDb, cohortDb, buildNameMap, useLocalState, usePoll, addLog, systemSettingsDb, finConflictsOf, normFin } from '../../db'
 import InstIcon, { isImageIcon } from '../../components/InstIcon'
 import InstTabs from '../../components/InstTabs'
 import { AppDialog, useDialog } from '../../components/AppDialog'
@@ -567,6 +567,7 @@ function parseExcel(file: File, instId: string, subjectCols: string[] = [], leve
           if (!norm.fin)  { errors.push(`Sətir ${i + 2}: FİN boşdur`); return }
           const score = parseFloat(norm.score || '0')
           ok.push({
+            _row: i + 2,
             institution: instId, name: norm.name, parentName: norm.parentName || '',
             workNumber: norm.workNumber || '', fin: norm.fin,
             score: isNaN(score) ? 0 : score, group: norm.group || null,
@@ -596,13 +597,20 @@ function parseExcel(file: File, instId: string, subjectCols: string[] = [], leve
   })
 }
 
-function ImportModal({ instId, instLabel, onClose, onImported }: {
-  instId: string; instLabel: string; onClose: () => void; onImported: () => void
+function ImportModal({ instId, instLabel, cohortId, cohortLabel, institutions, cohorts, onClose, onImported }: {
+  instId: string; instLabel: string
+  // İdxal açıq olan qrupa düşür (null = qrupsuz). FİN yalnız qrup daxilində unikaldır.
+  cohortId: string | null; cohortLabel: string | null
+  institutions: any[]; cohorts: any[]
+  onClose: () => void; onImported: () => void
 }) {
   const fileRef = useRef<HTMLInputElement>(null)
   const [preview,    setPreview]    = useState<any[]>([])
   const [errors,     setErrors]     = useState<string[]>([])
   const [warnings,   setWarnings]   = useState<string[]>([])
+  // FİN toqquşmaları: eyni qrupda (bloklayır) və başqa yerdə (yalnız məlumat)
+  const [finErrors,  setFinErrors]  = useState<string[]>([])
+  const [finElse,    setFinElse]    = useState<string[]>([])
   const [impError,   setImpError]   = useState('')
   const [loading,    setLoading]    = useState(false)
   const [done,       setDone]       = useState(false)
@@ -668,9 +676,44 @@ function ImportModal({ instId, instLabel, onClose, onImported }: {
     const f = e.target.files?.[0]; if (!f) return
     setLoading(true)
     const trees = await treeDb.getAll()
-    const instTree = trees.find((t: any) => t.institution === instId)
+    const instTree = trees.find((t: any) => t.institution === instId && (t.cohort ?? null) === cohortId)
+      || trees.find((t: any) => t.institution === instId)
     const { ok, errors: errs, warnings: warns } = await parseExcel(f, instId, subjectCols, effectiveLevelNames(instTree))
+    const fc = await checkFins(ok)
+    setFinErrors(fc.errors); setFinElse(fc.elsewhere)
     setPreview(ok); setErrors(errs); setWarnings(warns); setImpError(''); setLoading(false)
+  }
+
+  // Eyni qrupda eyni FİN olmaz (həm faylın içində, həm bazada) → idxal bloklanır.
+  // Başqa qrupda / müəssisədə eyni FİN → yeni ayrıca qeyd kimi əlavə olunur, sadəcə xəbər verilir.
+  async function checkFins(rows: any[]) {
+    const existing = await userDb.getAll()
+    const sameScope = (u: any) => u.institution === instId && (u.cohort ?? null) === cohortId
+    const here = new Map<string, any>()
+    const elsewhere = new Map<string, any[]>()
+    for (const u of existing) {
+      const k = normFin(u.fin); if (!k) continue
+      if (sameScope(u)) here.set(k, u)
+      else elsewhere.set(k, [...(elsewhere.get(k) || []), u])
+    }
+    const where = (u: any) => {
+      const inst = institutions.find((x: any) => x.id === u.institution)?.label || u.institution
+      const coh = u.cohort ? (cohorts.find((c: any) => c.id === u.cohort)?.label || 'başqa qrup') : 'qrupsuz'
+      return `${inst} → ${coh}${u.status === 'submitted' ? ' (seçimi göndərib)' : ''}`
+    }
+    const errors: string[] = []; const other: string[] = []
+    const seen = new Map<string, any>()
+    for (const r of rows) {
+      const k = normFin(r.fin)
+      if (seen.has(k)) errors.push(`Sətir ${r._row}: ${k} — faylda təkrarlanır (sətir ${seen.get(k)._row}, ${seen.get(k).name})`)
+      else if (here.has(k)) errors.push(`Sətir ${r._row}: ${k} (${r.name}) — bu qrupda artıq var: ${here.get(k).name}`)
+      else {
+        seen.set(k, r)
+        const ex = elsewhere.get(k)
+        if (ex?.length) other.push(`${k} (${r.name}) — ${ex.map(where).join('; ')}`)
+      }
+    }
+    return { errors, elsewhere: other }
   }
 
   // Backend-in xam validasiya JSON-unu istifadəçinin başa düşəcəyi cümləyə çevirir
@@ -692,36 +735,38 @@ function ImportModal({ instId, instLabel, onClose, onImported }: {
     try {
       await runImport()
     } catch (e: any) {
-      setImpError(importErrorText(e))
+      const fc = finConflictsOf(e)
+      if (fc) {
+        setFinErrors(fc.conflicts.map(c => `Sətir ${preview[c.row - 1]?._row ?? c.row}: ${c.fin} (${c.name}) — ` +
+          (c.inFile ? 'faylda təkrarlanır' : `bu qrupda artıq var: ${c.existingName}`)))
+        setImpError('FİN toqquşması — heç bir təhsilalan idxal edilmədi.')
+      } else setImpError(importErrorText(e))
     }
   }
 
   async function runImport() {
     const yr = useCustom ? customYear : year
-    const existing = await userDb.getAll()
-    const withYear = preview.map(u => ({ ...u, year: yr || null }))
+    // Yoxlama yenidən (pəncərə açıq olarkən başqası əlavə edə bilərdi); backend də yoxlayır
+    const fc = await checkFins(preview)
+    setFinErrors(fc.errors); setFinElse(fc.elsewhere)
+    if (fc.errors.length) { setImpError('FİN toqquşması — heç bir təhsilalan idxal edilmədi.'); return }
+    const withYear = preview.map(u => ({ ...u, year: yr || null, cohort: cohortId }))
+    const stamp = Date.now()
     if (mode === 'replace') {
-      const existingInInst = existing.filter((u: any) => u.institution === instId)
-      const newUsers = withYear.map((u, i) => ({ ...u, id: `imp_${instId}_${Date.now()}_${i}` }))
-      if (existingInInst.length) await userDb.deleteMany(existingInInst.map((u: any) => u.id))
-      await userDb.bulkCreate(newUsers)
-    } else {
-      const fins  = new Set(existing.filter((u: any) => u.institution === instId).map((u: any) => u.fin))
-      const toAdd = withYear.filter(u => !fins.has(u.fin)).map((u, i) => ({ ...u, id: `imp_${instId}_${Date.now()}_${i}` }))
-      const toUpdate = existing
-        .filter((u: any) => u.institution === instId)
-        .map((u: any) => ({ u, match: withYear.find(p => p.fin === u.fin) }))
-        .filter((x: any) => x.match)
-      if (toAdd.length) await userDb.bulkCreate(toAdd)
-      for (const { u, match } of toUpdate) await userDb.update(u.id, { ...u, ...match })
+      // Əvəzləmə yalnız açıq qrupun siyahısına aiddir
+      const existing = await userDb.getAll()
+      const inScope = existing.filter((u: any) => u.institution === instId && (u.cohort ?? null) === cohortId)
+      if (inScope.length) await userDb.deleteMany(inScope.map((u: any) => u.id))
     }
+    await userDb.bulkCreate(withYear.map((u, i) => ({ ...u, id: `imp_${instId}_${stamp}_${i}` })))
     // Prioritet fənlərini qlobal yadda saxla
     if (subjectCols.length > 0) {
       await systemSettingsDb.setPrioritySubjects(subjectCols)
     }
     setDone(true); onImported()
     addLog('user', 'success', `Excel idxal: ${preview.length} təhsilalan (${mode === 'replace' ? 'əvəzlə' : 'əlavə et'})`,
-      `Müəssisə: ${instLabel} · İl: ${selectedYear}`)
+      `Müəssisə: ${instLabel} · Qrup: ${cohortLabel || 'qrupsuz'} · İl: ${selectedYear}` +
+      (finElse.length ? ` · Başqa yerdə eyni FİN: ${finElse.length}` : ''))
   }
 
   return (
@@ -736,7 +781,7 @@ function ImportModal({ instId, instLabel, onClose, onImported }: {
       )}
       <div className="modal" style={{ maxWidth: 600 }} onClick={e => e.stopPropagation()}>
         <div className="modal-head">
-          <span className="modal-title">📤 Excel İdxal — {instLabel}</span>
+          <span className="modal-title">📤 Excel İdxal — {instLabel}{cohortLabel ? ` → ${cohortLabel}` : cohorts.length ? ' → qrupsuz' : ''}</span>
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>
         <div className="modal-body">
@@ -1129,6 +1174,26 @@ function ImportModal({ instId, instLabel, onClose, onImported }: {
                 {errors.slice(0, 5).map((e, i) => <div key={i} style={{ fontSize: 11, color: '#cf1322' }}>{e}</div>)}
               </div>
             )}
+            {finErrors.length > 0 && (
+              <div style={{ background: '#fff1f0', border: '1.5px solid #ffccc7', borderRadius: 8, padding: '10px 14px', marginBottom: 12 }}>
+                <div style={{ fontWeight: 700, fontSize: 12, color: '#cf1322', marginBottom: 4 }}>
+                  ⛔ FİN toqquşması ({finErrors.length}) — eyni qrupda eyni FİN-li təhsilalan ola bilməz, idxal mümkün deyil:
+                </div>
+                <div style={{ maxHeight: 120, overflowY: 'auto' }}>
+                  {finErrors.map((e, i) => <div key={i} style={{ fontSize: 11, color: '#cf1322', lineHeight: 1.5 }}>{e}</div>)}
+                </div>
+              </div>
+            )}
+            {finElse.length > 0 && (
+              <div style={{ background: '#fffbe6', border: '1.5px solid #ffe58f', borderRadius: 8, padding: '10px 14px', marginBottom: 12 }}>
+                <div style={{ fontWeight: 700, fontSize: 12, color: '#ad6800', marginBottom: 4 }}>
+                  🔁 {finElse.length} təhsilalan başqa qrupda / müəssisədə də var — yeni ayrıca qeyd kimi əlavə olunacaq:
+                </div>
+                <div style={{ maxHeight: 120, overflowY: 'auto' }}>
+                  {finElse.map((e, i) => <div key={i} style={{ fontSize: 11, color: '#ad6800', lineHeight: 1.5 }}>{e}</div>)}
+                </div>
+              </div>
+            )}
             {preview.length > 0 && (<>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                 <div style={{ fontWeight: 700, fontSize: 13, color: '#237804' }}>
@@ -1162,8 +1227,8 @@ function ImportModal({ instId, instLabel, onClose, onImported }: {
                 <button
                   className="btn btn-primary"
                   onClick={handleImport}
-                  disabled={useCustom && !customValid}
-                  style={{ opacity: (useCustom && !customValid) ? 0.5 : 1 }}
+                  disabled={(useCustom && !customValid) || finErrors.length > 0}
+                  style={{ opacity: ((useCustom && !customValid) || finErrors.length > 0) ? 0.5 : 1 }}
                 >
                   ✓ {preview.length} təhsilalanı idxal et
                 </button>
@@ -1261,8 +1326,11 @@ function EditUserModal({ user, instLabel, activeSel, hasSub, cohorts, onClose, o
   const setSubj = (k: string, v: string) => setSubjects(p => ({ ...p, [k]: v }))
   const setExtra = (k: string, v: string) => setExtraVals(p => ({ ...p, [k]: v }))
 
+  const [saveErr, setSaveErr] = useState('')
+
   async function handleSave() {
     const fullName = [form.firstName.trim(), form.lastName.trim()].filter(Boolean).join(' ')
+    setSaveErr('')
     const changed: string[] = []
     if (fullName         !== (user.name        || '')) changed.push(`Ad Soyad: "${user.name}" → "${fullName}"`)
     if (form.parentName  !== (user.parentName  || '')) changed.push(`Ata adı: "${user.parentName}" → "${form.parentName}"`)
@@ -1285,7 +1353,7 @@ function EditUserModal({ user, instLabel, activeSel, hasSub, cohorts, onClose, o
       if (String(user.subjects?.[k] ?? '') !== String(v ?? '')) changed.push(`${k}: ${user.subjects?.[k] ?? '—'} → ${v || '—'}`)
     }
 
-    await userDb.update(user.id, {
+    try { await userDb.update(user.id, {
       name:            fullName,
       parentName:      form.parentName,
       workNumber:      form.workNumber,
@@ -1313,7 +1381,12 @@ function EditUserModal({ user, instLabel, activeSel, hasSub, cohorts, onClose, o
         for (const i of branchLevelIdxs) { const v = branchMap[i]; if (v) m[i] = v; else delete m[i] }
         return m
       })() } : {}),
-    })
+    }) } catch (e) {
+      // Eyni qrupda eyni FİN-li təhsilalan varsa backend 409 qaytarır
+      const fc = finConflictsOf(e)
+      if (fc) { setSaveErr(`FİN toqquşması: seçilmiş qrupda ${fc.conflicts[0]?.fin} FİN-li təhsilalan artıq var (${fc.conflicts[0]?.existingName}). Yadda saxlanmadı.`); return }
+      throw e
+    }
 
     // ── Seçim statusu dəyişibsə submission yarat/sil ──
     if (selStatus !== (hasSub ? 'submitted' : 'pending')) {
@@ -1508,6 +1581,11 @@ function EditUserModal({ user, instLabel, activeSel, hasSub, cohorts, onClose, o
 
           </div>
 
+          {saveErr && (
+            <div style={{ background: '#fff1f0', border: '1.5px solid #ffccc7', borderRadius: 8, padding: '8px 12px', marginTop: 8, fontSize: 12, color: '#cf1322' }}>
+              ⛔ {saveErr}
+            </div>
+          )}
           <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 8 }}>
             <button className="btn btn-outline" onClick={onClose}>Ləğv et</button>
             <button className="btn btn-primary" disabled={!form.firstName.trim() || !form.fin.trim()} onClick={handleSave}
@@ -1979,6 +2057,22 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
 
   // Müəssisənin BÜTÜN təhsilalanları — yalnız qrup saylarını hesablamaq üçün.
   const instAllUsers = (users ?? []).filter((u: any) => u.institution === instId)
+
+  // Eyni FİN başqa qrupda / müəssisədə də varsa (yenidən idxal) — 🔁 nişanı və izah
+  const [allInsts]   = useLocalState(institutionDb.getAll)
+  const [allCohorts] = useLocalState(() => cohortDb.getAll())
+  const finPlaces = new Map<string, any[]>()
+  for (const u of users ?? []) {
+    const k = normFin(u.fin); if (!k) continue
+    finPlaces.set(k, [...(finPlaces.get(k) || []), u])
+  }
+  const placeLabel = (u: any) => {
+    const inst = (allInsts ?? []).find((x: any) => x.id === u.institution)?.label || u.institution
+    const coh = u.cohort ? ((allCohorts ?? []).find((c: any) => c.id === u.cohort)?.label || 'qrup') : 'qrupsuz'
+    const st = u.status === 'submitted' ? 'seçimi göndərib' : 'gözləyir'
+    return `${inst} → ${coh} (${st}${u.placedSpecialty ? `, yerləşib: ${u.placedSpecialty}` : ''})`
+  }
+  const otherPlaces = (u: any) => (finPlaces.get(normFin(u.fin)) || []).filter((x: any) => x.id !== u.id)
   // Səhifədə görünən siyahı HƏMİŞƏ tək bir qrupdur: fərqli qrupların
   // təhsilalanları qarışıq göstərilmir. Qrup yoxdursa köhnə davranış qalır.
   const instUsers = cohorts.length === 0
@@ -2132,6 +2226,9 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
 
       {showImport && (
         <ImportModal instId={instId} instLabel={instLabel}
+          cohortId={cohorts.length && cohFilter !== 'none' && cohFilter !== 'all' ? cohFilter : null}
+          cohortLabel={cohorts.find((c: any) => c.id === cohFilter)?.label ?? null}
+          institutions={allInsts ?? []} cohorts={allCohorts ?? []}
           onClose={() => setShowImport(false)}
           onImported={() => { refreshUsers(); setShowImport(false) }} />
       )}
@@ -2459,7 +2556,16 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
                       </div>
                     </td>
                     <td style={{ fontFamily: 'monospace' }}>{u.workNumber || '—'}</td>
-                    <td style={{ fontFamily: 'monospace', letterSpacing: 1 }}>{u.fin || '—'}</td>
+                    <td style={{ fontFamily: 'monospace', letterSpacing: 1 }}>
+                      {u.fin || '—'}
+                      {(() => {
+                        const others = otherPlaces(u)
+                        return others.length > 0 && (
+                          <span title={'Eyni FİN başqa yerdə də var:\n' + others.map(placeLabel).join('\n')}
+                            style={{ marginLeft: 6, cursor: 'help', fontFamily: 'inherit' }}>🔁</span>
+                        )
+                      })()}
+                    </td>
                     <td style={{ textAlign: 'center' }}>
                       {u.year
                         ? <span className="cell-badge" style={{ background: 'linear-gradient(145deg,#f0f3ff,#e4eaff)', color: '#9a7b1e', border: '1px solid #d0d8f8' }}>{u.year}</span>
@@ -2783,7 +2889,10 @@ function CohortManagerModal({ instId, cohorts, instUsers, filtered, onClose, onC
     // Xəta udulmamalıdır: 403/500 halda düyməni basan səbəbi görməlidir
     try { await fn(); onChanged() }
     catch (e: any) {
-      setErr(e?.status === 403
+      const fc = finConflictsOf(e)
+      setErr(fc
+        ? `${fc.message} Heç kim köçürülmədi.`
+        : e?.status === 403
         ? 'Bu əməliyyat üçün icazəniz yoxdur (qrup silmək «inst.delete» səlahiyyəti tələb edir).'
         : e?.message || 'Əməliyyat alınmadı.')
     }
@@ -2833,6 +2942,13 @@ function CohortManagerModal({ instId, cohorts, instUsers, filtered, onClose, onC
     if (!target) return
     const ids = filtered.map((u: any) => u.id)
     if (!ids.length) return
+    // Seçimini göndərmiş / yerləşdirilmiş təhsilalan köçürülürsə onun nəticəsi
+    // köhnə qrupun seçiminə aid olaraq qalır — admin bunu bilərək etməlidir
+    const done = filtered.filter((u: any) => u.status === 'submitted' || u.placedSpecialty)
+    if (done.length && !window.confirm(
+      `Köçürülənlərdən ${done.length} nəfər artıq seçimini göndərib və ya yerləşdirilib ` +
+      `(məs. ${done.slice(0, 3).map((u: any) => u.name).join(', ')}).\n` +
+      'Onların seçim və yerləşdirmə nəticələri köhnə seçimə aid olaraq qalacaq. Davam edilsin?')) return
     run(async () => {
       const r = await cohortDb.assign(target, ids)
       const lbl = target === 'none' ? 'qrupsuz' : (cohorts.find((c: any) => c.id === target)?.label || target)

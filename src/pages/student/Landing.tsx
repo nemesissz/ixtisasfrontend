@@ -32,7 +32,8 @@ export default function Landing() {
   useEffect(() => {
     const s = getStudentSession()
     if (!s || !allPublished.length) return
-    const mySelection = allPublished.find((sel: any) => sel.institution === s.institution)
+    const mySelection = (s.selectionId && allPublished.find((sel: any) => sel.id === s.selectionId))
+      || allPublished.find((sel: any) => sel.institution === s.institution)
     if (mySelection) navigate(`/student/${mySelection.id}`, { replace: true })
   }, [allPublished])
 
@@ -80,8 +81,11 @@ export default function Landing() {
       setStudentSession(found)
       addLog('user', 'success', `Təhsilalan daxil oldu: ${found.name}`, `FİN: ${found.fin || '—'}`, found.name)
 
-      // Təhsilalanın müəssisəsinə uyğun aktiv seçimi tap
-      const mySelection = allPublished.find((s: any) => s.institution === found.institution)
+      // Təhsilalanın qeydinə (müəssisə + qrup) uyğun aktiv seçim backend-dən gəlir.
+      // Eyni FİN başqa müəssisədə də ola bildiyi üçün müəssisəyə görə axtarış kifayət deyil.
+      const mySelection = found.selectionId
+        ? allPublished.find((s: any) => s.id === found.selectionId) || { id: found.selectionId }
+        : null
       if (mySelection) {
         navigate(`/student/${mySelection.id}`)
       } else {

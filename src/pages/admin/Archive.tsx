@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useActiveInst } from '../../activeInst'
 import * as XLSX from 'xlsx'
-import { selectionDb, treeDb, userDb, submissionDb, userArchiveDb, institutionDb, useLocalState, buildNameMap, addLog } from '../../db'
+import { selectionDb, treeDb, userDb, submissionDb, userArchiveDb, institutionDb, useLocalState, buildNameMap, addLog, cohortDb, normFin } from '../../db'
 import { AppDialog, useDialog } from '../../components/AppDialog'
 import { useTopbar } from '../../contexts/TopbarContext'
 import InstIcon from '../../components/InstIcon'
@@ -78,10 +78,21 @@ export default function Archive() {
         + (arc.submissions?.length ? ` Yerləşdirmə nəticələri və ${arc.submissions.length} göndərilmiş seçim də geri qaytarılır.` : ' Yerləşdirmə nəticələri də geri qaytarılır.'),
       confirmLabel: 'Bərpa et', confirmColor: '#c9962a',
       onConfirm: async () => {
-        const existing  = await userDb.getAll()
-        const existFins = new Set(existing.map((u: any) => u.fin).filter(Boolean))
+        const [existing, cohortList] = await Promise.all([userDb.getAll(), cohortDb.getAll()])
+        // FİN yalnız qrup daxilində unikaldır: eyni FİN başqa qrupda/müəssisədə ola bilər.
+        // Arxivdəki qrup sonradan silinibsə təhsilalan qrupsuz bərpa olunur.
+        const liveCohorts = new Set(cohortList.map((c: any) => c.id))
+        const scopeKey  = (u: any) => `${u.cohort ? 'c:' + u.cohort : 'i:' + u.institution}|${normFin(u.fin)}`
+        const existKeys = new Set(existing.filter((u: any) => normFin(u.fin)).map(scopeKey))
         const existIds  = new Set(existing.map((u: any) => u.id))
-        const toAdd     = (arc.snapshot || []).filter((u: any) => !existFins.has(u.fin) && !existIds.has(u.id))
+        const toAdd: any[] = []
+        for (const raw of arc.snapshot || []) {
+          const u = { ...raw, cohort: raw.cohort && liveCohorts.has(raw.cohort) ? raw.cohort : null }
+          if (existIds.has(u.id)) continue
+          if (normFin(u.fin) && existKeys.has(scopeKey(u))) continue
+          if (normFin(u.fin)) existKeys.add(scopeKey(u))
+          toAdd.push(u)
+        }
         // ID SAXLANILIR: arxivdəki seçimlər (Submission.userId) məhz bu ID-lərə bağlıdır.
         // Əvvəl id atılırdı → yeni ID yaranırdı → seçimlər və nəticələr qopurdu.
         await userDb.bulkCreate(toAdd)

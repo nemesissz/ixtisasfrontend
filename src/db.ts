@@ -129,6 +129,11 @@ export const selectionDb = {
   },
   delete: async (id: string) => { await http.delete(`/api/selections/${id}`) },
   publish: async (id: string) => { await http.post(`/api/selections/${id}/publish`) },
+  // Yayımdan əvvəl: iştirakçılardan eyni FİN-li qeydi başqa yayımdakı seçimdə olanlar
+  finConflicts: async (id: string) => http.get<Array<{
+    fin: string; name: string; otherStatus: string; otherInstitution: string;
+    otherCohort: string | null; otherSelectionName: string
+  }>>(`/api/selections/${id}/fin-conflicts`),
   close:   async (id: string) => { await http.post(`/api/selections/${id}/close`) },
   archive: async (id: string) => { await http.post(`/api/selections/${id}/archive`) },
   restore: async (id: string) => { await http.post(`/api/selections/${id}/restore`) },
@@ -202,6 +207,8 @@ export const userDb = {
     await http.put(`/api/students/${id}`, {
       name: merged.name, parentName: merged.parentName, workNumber: merged.workNumber,
       fin: merged.fin, score: merged.score, group: merged.group, source: merged.source,
+      // Qrup göndərilməsə backend onu null edirdi — hər redaktədə təhsilalan qrupsuz qalırdı
+      cohortId: ('cohort' in data ? data.cohort : current.cohortId) ?? null,
       gender: merged.gender, year: merged.year, packet: merged.packet,
       status: merged.status, printStatus: merged.printStatus,
       placedSpecialty: merged.placedSpecialty, placedSpecialtyId: merged.placedSpecialtyId,
@@ -285,8 +292,9 @@ export const adminDb = {
 export const authDb = {
   studentLogin: async (field1Value: string, field2Value: string) => {
     try {
-      const res = await http.post<{ token: string; student: any }>('/api/auth/student-login', { field1Value, field2Value })
-      return { token: res.token, ...mapStudent(res.student) }
+      const res = await http.post<{ token: string; student: any; selectionId?: string | null }>('/api/auth/student-login', { field1Value, field2Value })
+      // selectionId: bu qeydin (müəssisə + qrup) aid olduğu yayımdakı seçim
+      return { token: res.token, ...mapStudent(res.student), selectionId: res.selectionId ?? null }
     } catch (e) {
       if (e instanceof ApiError && e.status === 401) return null
       throw e
@@ -388,6 +396,19 @@ export const treeArchiveDb = {
 // Bütün panellər arxa planda müəyyən intervalla backend-dən data-nı yenidən
 // çəkir — istifadəçi əl ilə yeniləmədən dəyişikliklər (yeni tələbə, göndərilmiş
 // seçim, yerləşdirmə və s.) avtomatik görünür.
+// Backend-in FİN toqquşması cavabı (409, code: fin_conflict). Başqa xətalarda null.
+export interface FinConflict { fin: string; name: string | null; row: number; existingName: string | null; inFile: boolean }
+export function finConflictsOf(e: unknown): { message: string; conflicts: FinConflict[] } | null {
+  if (!(e instanceof ApiError) || e.status !== 409) return null
+  try {
+    const b = JSON.parse(e.message)
+    return b?.code === 'fin_conflict' ? { message: b.message, conflicts: b.conflicts || [] } : null
+  } catch { return null }
+}
+
+// FİN müqayisəsi üçün (backend FinRules.Norm ilə eyni)
+export const normFin = (v: any) => String(v ?? '').trim().replace(/İ/g, 'I').replace(/ı/g, 'I').replace(/i/g, 'I').toUpperCase()
+
 export const POLL_MS = 10000
 let pollSuspend = 0
 // Sürükləmə/aktiv əməliyyat zamanı yenilənməni müvəqqəti dayandırmaq üçün

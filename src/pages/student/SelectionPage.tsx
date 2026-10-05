@@ -269,6 +269,17 @@ export default function SelectionPage() {
     )
   }
 
+  // Struktur qrupa bağlıdırsa seçim yalnız həmin qrupun təhsilalanları üçündür
+  if (tree.cohort && tree.cohort !== student.cohort) {
+    return (
+      <div className="empty-state">
+        <div className="empty-icon">🚫</div>
+        <div className="empty-title">Giriş qadağandır</div>
+        <div className="empty-sub">Bu seçim sizin qrupa aid deyil</div>
+      </div>
+    )
+  }
+
 
 
   // ── Mərhələ 3/3: təsdiq səhifəsi ──
