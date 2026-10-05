@@ -24,16 +24,21 @@ export default function LiveMonitor() {
   // Son cavabın gəldiyi an (brauzer saatı) — sayğaclar buna nisbətən artırılır
   const fetchedAt = useRef(Date.now())
   const inFlight = useRef(false)
+  // Hər seçimin öz seansı var — admin hansına baxdığını seçir (null = ən son açıq)
+  const pickedRef = useRef<number | null>(null)
 
   async function load() {
     if (inFlight.current) return
     inFlight.current = true
     try {
-      const d = await monitorDb.live()
+      const want = pickedRef.current
+      const d = await monitorDb.live(want)
+      // Sorğu gedərkən başqa seans seçilibsə köhnə cavabı atırıq
+      if (want !== pickedRef.current) return
       fetchedAt.current = Date.now()
       setData(d); setErr('')
     } catch { setErr('Serverlə əlaqə yoxdur — yenidən cəhd edilir…') }
-    inFlight.current = false
+    finally { inFlight.current = false }
   }
 
   useEffect(() => {
@@ -42,6 +47,12 @@ export default function LiveMonitor() {
     const t = setInterval(() => setTick(x => x + 1), 1000)
     return () => { clearInterval(iv); clearInterval(t) }
   }, [])
+
+  function pick(id: number) {
+    pickedRef.current = id
+    inFlight.current = false
+    load()
+  }
 
   if (session?.role !== 'superadmin') {
     return <div className="card" style={{ padding: 40, textAlign: 'center', color: 'var(--muted)' }}>Bu bölmə yalnız baş admin üçündür.</div>
@@ -56,13 +67,16 @@ export default function LiveMonitor() {
   const active: any[] = data.active || []
   const abandoned: any[] = data.abandoned || []
   const st = data.stats || {}
+  const sessions: any[] = data.sessions || []
+  const selName = (x: any) => x?.selectionName || 'Adsız seçim'
 
   async function act(op: 'pause' | 'resume' | 'end') {
-    if (op === 'end' && !confirm('Seans bitirilsin? Sayğac dayanacaq, statistika qalacaq. Yeni təhsilalan girəndə yeni seans başlayacaq.')) return
+    if (!sess) return
+    if (op === 'end' && !confirm(`"${selName(sess)}" seansı bitirilsin? Sayğac dayanacaq, statistika qalacaq. Bu seçimə yeni təhsilalan girəndə yeni seans başlayacaq.`)) return
     setBusy(true)
     try {
-      await monitorDb.session(op)
-      addLog('system', 'info', `Canlı nəzarət seansı: ${op === 'pause' ? 'dayandırıldı' : op === 'resume' ? 'davam etdirildi' : 'bitirildi'}`)
+      await monitorDb.session(sess.id, op)
+      addLog('system', 'info', `Canlı nəzarət seansı (${selName(sess)}): ${op === 'pause' ? 'dayandırıldı' : op === 'resume' ? 'davam etdirildi' : 'bitirildi'}`)
       await load()
     } catch { setErr('Əməliyyat alınmadı') }
     setBusy(false)
@@ -94,9 +108,27 @@ export default function LiveMonitor() {
       )}
       {err && <div style={{ fontSize: 12.5, color: '#c0392b', fontWeight: 700 }}>{err}</div>}
 
+      {/* Seans seçicisi — hər seçimin öz seansı */}
+      {sessions.length > 1 && (
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {sessions.map(x => {
+            const on = sess?.id === x.id
+            return (
+              <button key={x.id} className={on ? 'btn btn-primary' : 'btn'} onClick={() => pick(x.id)}
+                style={{ fontWeight: 700, color: !on && x.status === 'ended' ? 'var(--muted)' : undefined }}>
+                {x.status === 'running' ? '● ' : x.status === 'paused' ? '❚❚ ' : '■ '}{selName(x)}
+              </button>
+            )
+          })}
+        </div>
+      )}
+
       {/* Seans sayğacı */}
       <div className="card" style={{ padding: '18px 22px', display: 'flex', alignItems: 'center', gap: 18, flexWrap: 'wrap' }}>
         <div style={{ flex: '1 1 220px' }}>
+          {sess && (
+            <div style={{ fontSize: 18, fontWeight: 800, color: '#2b2f3a', marginBottom: 6 }}>📋 {selName(sess)}</div>
+          )}
           <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)' }}>⏱️ Seansın ümumi müddəti</div>
           <div style={{ fontSize: 34, fontWeight: 800, color: '#2b2f3a', fontVariantNumeric: 'tabular-nums', lineHeight: 1.2 }}>{fmt(sessSec)}</div>
           <span style={{ display: 'inline-block', marginTop: 4, padding: '3px 10px', borderRadius: 20, fontSize: 11.5, fontWeight: 800, background: statusBadge.bg, color: statusBadge.c }}>{statusBadge.t}</span>
@@ -107,7 +139,7 @@ export default function LiveMonitor() {
           {sess && sess.status !== 'ended' && <button className="btn" disabled={busy} onClick={() => act('end')} style={{ color: '#c0392b' }}>■ Bitir</button>}
         </div>
         <div style={{ fontSize: 11.5, color: 'var(--muted)', flexBasis: '100%' }}>
-          Seans ilk təhsilalan seçimə girəndə başlayır, sonuncu təsdiqləyəndə avtomatik bitir.
+          Hər seçimin öz seansı var: seçimə ilk təhsilalan girəndə başlayır, yalnız «Bitir» basılanda bitir.
         </div>
       </div>
 

@@ -579,8 +579,8 @@ export function studentColValue(u: any, key: string): string {
 // ── Canlı nəzarət (docs/PLAN-canli-nezaret.md) ──────────────────────────────
 export interface MonitorConfig { enabled: boolean; heartbeatSec: number; offlineSec: number; abandonMin: number }
 export const monitorDb = {
-  live:      () => http.get<any>('/api/monitor/live'),
+  live:      (sessionId?: number | null) => http.get<any>(`/api/monitor/live${sessionId ? `?sessionId=${sessionId}` : ''}`),
   getConfig: () => http.get<MonitorConfig>('/api/monitor/config'),
   setConfig: (c: MonitorConfig) => http.put('/api/monitor/config', c),
-  session:   (op: 'pause' | 'resume' | 'end') => http.post(`/api/monitor/session/${op}`),
+  session:   (id: number, op: 'pause' | 'resume' | 'end') => http.post(`/api/monitor/session/${id}/${op}`),
 }

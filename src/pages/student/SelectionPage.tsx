@@ -80,7 +80,8 @@ function filterTreeByGender(tree: any, gender: string | null | undefined): any {
 // Seçimi HEÇ VAXT bloklamır: gözlənilmir, 4 san timeout, xəta udulur, 401-də
 // yönləndirmə etmir (ümumi http helper-dən fərqli olaraq). Növbəti interval
 // serverdən gəlir — superadmin dəyişəndə açıq səhifələr özü uyğunlaşır.
-async function sendBeat(submitted: boolean): Promise<number | null> {
+// selectionId: hər seçimin öz seansı olur, canlı ekranda seçimin adı görünür.
+async function sendBeat(submitted: boolean, selectionId: string | undefined): Promise<number | null> {
   const token = getStudentSession()?.token
   if (!token) return null
   const ctl = new AbortController()
@@ -89,7 +90,7 @@ async function sendBeat(submitted: boolean): Promise<number | null> {
     const res = await fetch(`${BASE_URL}/api/monitor/beat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ submitted }),
+      body: JSON.stringify({ submitted, selectionId }),
       signal: ctl.signal,
       keepalive: submitted,
     })
@@ -197,7 +198,7 @@ export default function SelectionPage() {
     let stop = false
     let timer: ReturnType<typeof setTimeout> | undefined
     const tick = async () => {
-      const next = await sendBeat(false)
+      const next = await sendBeat(false, selId)
       if (stop) return
       timer = setTimeout(tick, Math.min(600, Math.max(5, next ?? 30)) * 1000)
     }
@@ -217,7 +218,7 @@ export default function SelectionPage() {
     const ranking = viewMode === 'list' ? flat.map(r => r.specId) : nestedToFlat(nested).map(r => r.specId)
     await submissionDb.save({ selectionId: selId!, userId: student!.id, userName: student!.name, ranking })
     await userDb.update(student!.id, { status: 'submitted' })
-    void sendBeat(true)   // canlı nəzarət: siyahıdan çıxar (gözlənilmir)
+    void sendBeat(true, selId)   // canlı nəzarət: siyahıdan çıxar (gözlənilmir)
     addLog('selection', 'success', `Təhsilalan seçimini göndərdi: ${student!.name}`,
       `FİN: ${student!.fin || '—'} · ${ranking.length} ixtisas sıralandı`, student!.name)
     setSaving(false)
