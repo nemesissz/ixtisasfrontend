@@ -1,10 +1,10 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useActiveInst } from '../../activeInst'
-import { userDb, submissionDb, selectionDb, treeDb, institutionDb, useLocalState, addLog } from '../../db'
+import { userDb, submissionDb, selectionDb, treeDb, institutionDb, systemSettingsDb, useLocalState, addLog } from '../../db'
 import InstTabs from '../../components/InstTabs'
 import { AppDialog, useDialog } from '../../components/AppDialog'
 import { can } from '../../permissions'
-import { critValue } from '../../tiebreak'
+import { makeMeritCompare, buildDefaultTiebreaker, setDefaultTiebreaker } from '../../placement'
 
 // ── Tiebreaker köməkçiləri (Yerləşdirmə ilə eyni məntiq) ──────────────────────
 function getLeavesWithPath(nodes: any[], anc: any[] = []): Array<{ leaf: any; path: any[] }> {
@@ -27,28 +27,6 @@ function genderCapReached(leaf: any, gender: any, femCount: number, malCount: nu
   if (gender === 'kişi'  && leaf.maxMale   != null && malCount >= leaf.maxMale)   return true
   return false
 }
-function getTiebreakerSubjects(specId: string, userGroup: string | null, pathMap: Record<string, any[]>): string[] {
-  const path = pathMap[specId] || []
-  for (let i = path.length - 1; i >= 0; i--) {
-    const node = path[i]
-    if (node.groupTiebreakers && userGroup && node.groupTiebreakers[String(userGroup)]) return node.groupTiebreakers[String(userGroup)]
-    if (node.tiebreaker?.length) return node.tiebreaker
-  }
-  return []
-}
-function sortScore(u: any, tb: string[]): number[] {
-  // Meyar tək sütun və ya sütunların cəmi ola bilər
-  return [u.score || 0, ...tb.map(c => critValue(u, c))]
-}
-function compareStudents(a: any, b: any, tb: string[]): number {
-  const sa = sortScore(a, tb), sb = sortScore(b, tb)
-  for (let i = 0; i < Math.max(sa.length, sb.length); i++) {
-    const d = (sb[i] ?? -1) - (sa[i] ?? -1)
-    if (d !== 0) return d
-  }
-  return 0
-}
-
 // ── Balı qoruyan max-flow yenidən-tarazlama (qismən bölgü üçün) ──
 // Greedy nəticəsi (res) başlanğıc axın kimi saxlanılır; boş yer + yerləşməyən
 // qaldıqda cins-qapılı max-flow ilə kvotanı aşmadan maksimum yerləşmə tapılır.
@@ -122,6 +100,8 @@ export default function Redistribute() {
     })
   }, [])
   const { dialog, showConfirm, showInfo, closeDialog } = useDialog()
+  const [storedPrio, setStoredPrio] = useState<string[]>([])
+  useEffect(() => { systemSettingsDb.getPrioritySubjects().then(l => setStoredPrio(l || [])) }, [])
 
   const [instId, setInstId]   = useActiveInst(institutions)
   useEffect(() => { if (institutions.length && !instId) setInstId(institutions[0].id) }, [institutions])
@@ -180,13 +160,9 @@ export default function Redistribute() {
   function computePartial(): Record<string, { specId: string; choiceNum: number }> {
     const avail: Record<string, number> = {}
     leafStats.filter(s => selected.has(s.id)).forEach(s => { avail[s.id] = s.quota })
-    const sorted = [...pool].sort((a, b) => {
-      const aSid = subs.find(s => s.userId === a.id)?.ranking?.find((sid: string) => avail[sid] !== undefined) || ''
-      const bSid = subs.find(s => s.userId === b.id)?.ranking?.find((sid: string) => avail[sid] !== undefined) || ''
-      const aTb = getTiebreakerSubjects(aSid, a.group, pathMap)
-      const bTb = getTiebreakerSubjects(bSid, b.group, pathMap)
-      return compareStudents(a, b, aTb.length >= bTb.length ? aTb : bTb)
-    })
+    // Default prioritet (strukturda prioritet yoxdursa) — Yerləşdirmə ilə eyni
+    setDefaultTiebreaker(buildDefaultTiebreaker(storedPrio, allUsers.filter((u: any) => u.institution === instId)))
+    const sorted = [...pool].sort(makeMeritCompare(subs, pathMap, sid => avail[sid] !== undefined))
     const res: Record<string, { specId: string; choiceNum: number }> = {}
     const femP: Record<string, number> = {}
     const malP: Record<string, number> = {}

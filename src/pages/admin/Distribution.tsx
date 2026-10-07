@@ -1,14 +1,14 @@
 import { useState, useMemo, useEffect, useRef, Fragment } from 'react'
 import { useActiveInst } from '../../activeInst'
 import * as XLSX from 'xlsx'
-import { userDb, submissionDb, selectionDb, treeDb, institutionDb, useLocalState, addLog, selectionParticipants } from '../../db'
+import { userDb, submissionDb, selectionDb, treeDb, institutionDb, systemSettingsDb, useLocalState, addLog, selectionParticipants } from '../../db'
 import InstIcon from '../../components/InstIcon'
 import InstTabs from '../../components/InstTabs'
 import { can } from '../../permissions'
 import { poolCounts, autoSplit, globalSourceSplitCached } from '../../quota-pool'
 import { allocatePacketSpecs, splitPacketStudents } from '../../packet-alloc'
-import { UMUMI_KEY, critValue, isSumCrit } from '../../tiebreak'
-import { getTiebreakerSubjects, studentSortScore, compareStudents, getLeavesWithPath, genderAllowed, genderCapReached, rebalanceUnplaced, runPacketPlacement, runPlacement } from '../../placement'
+import { UMUMI_KEY, isSumCrit } from '../../tiebreak'
+import { compareStudents, makeMeritCompare, pairTiebreaker, decidingCriterion, buildDefaultTiebreaker, setDefaultTiebreaker, getLeavesWithPath, genderAllowed, genderCapReached, rebalanceUnplaced, runPacketPlacement, runPlacement } from '../../placement'
 
 // ── Gale-Shapley (Deferred Acceptance) alqoritmi ─────────────────────────────
 function runGaleShapley(users: any[], subs: any[], tree: any) {
@@ -22,9 +22,14 @@ function runGaleShapley(users: any[], subs: any[], tree: any) {
     leafById[leaf.id] = leaf
   }
 
-  const scoreOf: Record<string, number> = {}
+  const userOf: Record<string, any> = {}
   const genderOf: Record<string, any> = {}
-  for (const u of users) { scoreOf[u.id] = u.score || 0; genderOf[u.id] = u.gender }
+  for (const u of users) { userOf[u.id] = u; genderOf[u.id] = u.gender }
+  // İxtisasın gözündə x y-dən öndədirmi (bal, bərabərdirsə həmin ixtisasın prioriteti)
+  const ahead = (x: string, y: string, sid: string) =>
+    compareStudents(userOf[x], userOf[y], pairTiebreaker(userOf[x], userOf[y], sid, sid, pathMap)) < 0
+  const sortHolders = (h: string[], sid: string) =>
+    h.sort((a, b) => compareStudents(userOf[a], userOf[b], pairTiebreaker(userOf[a], userOf[b], sid, sid, pathMap)))
 
   const userRankings: Record<string, string[]> = {}
   for (const sub of subs) {
@@ -71,17 +76,17 @@ function runGaleShapley(users: any[], subs: any[], tree: any) {
     if (gCount < capG && h.length < quota) {
       // Yer var və cins limiti dolmayıb → birbaşa qəbul
       h.push(uid)
-      h.sort((a, b) => (scoreOf[b] || 0) - (scoreOf[a] || 0))
+      sortHolders(h, specId)
       free.delete(uid)
     } else {
       // Sıxışdırma namizədləri: cins limiti dolubsa yalnız eyni cinsdən olanlar
       const pool = gCount >= capG ? h.filter(x => genderOf[x] === g) : h
       if (pool.length) {
-        const worstUid = pool.reduce((w, x) => ((scoreOf[x] || 0) < (scoreOf[w] || 0) ? x : w), pool[0])
-        if ((scoreOf[uid] || 0) > (scoreOf[worstUid] || 0)) {
+        const worstUid = pool.reduce((w, x) => (ahead(w, x, specId) ? x : w), pool[0])
+        if (ahead(uid, worstUid, specId)) {
           h.splice(h.indexOf(worstUid), 1)
           h.push(uid)
-          h.sort((a, b) => (scoreOf[b] || 0) - (scoreOf[a] || 0))
+          sortHolders(h, specId)
           free.delete(uid)
           free.add(worstUid)
         }
@@ -125,6 +130,9 @@ const PACK_COLORS = [
   { bg: 'linear-gradient(135deg,#13c2c2,#006d75)', shadow: '#13c2c244', light: '#e6fffb', text: '#006d75' },
 ]
 
+/** Meyar dəyəri: -1 = məlumat yoxdur */
+const critFmt = (v: any) => (v == null || Number(v) < 0) ? '—' : Number(v).toFixed(1)
+
 // ── İzahlı (hekayə) simulyasiya — Sadə və Paket üsulu üçün ──────────────────────
 function StorySim({ students, packets, subs, tree, poolUsers, preAssignLevel, finalAssignments, onClose }: {
   students?: any[]; packets?: any[]; subs: any[]; tree: any
@@ -164,11 +172,9 @@ function StorySim({ students, packets, subs, tree, poolUsers, preAssignLevel, fi
     for (const pk of pkts) {
       const quota: Record<string, number> = {}; pk.specs.forEach((s: any) => { quota[s.id] = s.quota })
       const withSub = pk.students.filter((u: any) => (subs.find((s: any) => s.userId === u.id)?.ranking || []).length)
-      const sorted = [...withSub].sort((a: any, b: any) => {
-        const aTb = getTiebreakerSubjects(subs.find((s: any) => s.userId === a.id)?.ranking?.[0] || '', a.group, pathMap)
-        const bTb = getTiebreakerSubjects(subs.find((s: any) => s.userId === b.id)?.ranking?.[0] || '', b.group, pathMap)
-        return compareStudents(a, b, aTb.length >= bTb.length ? aTb : bTb)
-      })
+      // Yerləşdirmə mühərriki ilə EYNİ sıra (bal, bərabərdirsə prioritet meyarları)
+      const meritCmp = makeMeritCompare(subs, pathMap, sid => quota[sid] !== undefined)
+      const sorted = [...withSub].sort(meritCmp)
       const scores = withSub.map((u: any) => u.score || 0)
       pkMeta.push({ num: pk.num, specIds: pk.specs.map((s: any) => s.id), quota, minScore: scores.length ? Math.min(...scores) : 0, maxScore: scores.length ? Math.max(...scores) : 0, count: sorted.length })
       const avail = { ...quota }
@@ -211,11 +217,7 @@ function StorySim({ students, packets, subs, tree, poolUsers, preAssignLevel, fi
       // [mülki, lisey, mənbəsiz] ardıcıllığı, sonra eyni müqayisə ilə sıralama.
       // Bərabər ballılarda sıra məhz bundan asılıdır — fərqli olsa, kənarda
       // qalanlar simulyasiya ilə real yerləşdirmədə fərqlənirdi.
-      const byScore = (a: any, b: any) => {
-        const aTb = getTiebreakerSubjects(subs.find((s: any) => s.userId === a.id)?.ranking?.[0] || '', a.group, pathMap)
-        const bTb = getTiebreakerSubjects(subs.find((s: any) => s.userId === b.id)?.ranking?.[0] || '', b.group, pathMap)
-        return compareStudents(a, b, aTb.length >= bTb.length ? aTb : bTb)
-      }
+      const byScore = meritCmp
       const rest = [
         ...withSub.filter((u: any) => u.source === 'mülki'),
         ...withSub.filter((u: any) => u.source === 'lisey'),
@@ -255,16 +257,15 @@ function StorySim({ students, packets, subs, tree, poolUsers, preAssignLevel, fi
             const tie = !!last && Math.abs((last.score || 0) - sc) < 1e-9
             attempts.push({ id: sid, full: true, tie, rival: tie ? last!.name : undefined })
             if (tie) {
-              // Bərabərliyi hansı prioritet fənn həll etdi — rəqib (öndə olan) ilə müqayisə
-              const tbs = getTiebreakerSubjects(sid, u.group, pathMap)
+              // Bərabərliyi hansı prioritet meyarı həll etdi — sıralamanın İŞLƏTDİYİ
+              // meyarlarla (yoxsa izah faktiki qərardan fərqli fənni göstərirdi)
+              const firstIn = (x: any) => (subs.find((s: any) => s.userId === x.id)?.ranking || []).find((id: string) => quota[id] !== undefined) || ''
+              const tbs = pairTiebreaker(last!.user, u, firstIn(last!.user), firstIn(u), pathMap)
               let dec: { subject?: string; rivalSubjScore?: number; mySubjScore?: number } = {}
-              for (const subj of tbs) {
-                const w = critValue(last!.user, subj)
-                const l = critValue(u, subj)
-                if (w !== l) {
-                  const lbl = subj === UMUMI_KEY ? 'Ümumi bal' : isSumCrit(subj) ? 'Σ ' + subj : subj
-                  dec = { subject: lbl, rivalSubjScore: w, mySubjScore: l }; break
-                }
+              const d = decidingCriterion(last!.user, u, tbs)
+              if (d) {
+                const lbl = d.crit === UMUMI_KEY ? 'Ümumi bal' : isSumCrit(d.crit) ? 'Σ ' + d.crit : d.crit
+                dec = { subject: lbl, rivalSubjScore: d.w, mySubjScore: d.l }
               }
               tieRivals.push({ id: sid, rival: last!.name, score: sc, ...dec })
             }
@@ -372,8 +373,8 @@ function StorySim({ students, packets, subs, tree, poolUsers, preAssignLevel, fi
     const fulls = cur.attempts.filter(a => a.full)
     const tr0 = cur.tieRivals[0]
     const tieDecide = tr0 && tr0.subject
-      ? ` Üstünlük meyarı “${tr0.subject}” fənni oldu: ${tr0.rival}-ın balı ${Number(tr0.rivalSubjScore).toFixed(1)}, bu təhsilalanınkı ${Number(tr0.mySubjScore).toFixed(1)} — ${tr0.rival} öndə olduğu üçün oraya yerləşdirildi.`
-      : tr0 ? ` Üstünlük meyarına (fənn balları) görə ${tr0.rival} öndə tutuldu.` : ''
+      ? ` Üstünlük meyarı “${tr0.subject}” oldu: ${tr0.rival}-ın balı ${critFmt(tr0.rivalSubjScore)}, bu təhsilalanınkı ${critFmt(tr0.mySubjScore)} — ${tr0.rival} öndə olduğu üçün oraya yerləşdirildi.`
+      : tr0 ? ` Bütün prioritet meyarları da eyni idi — sıra siyahıdakı ardıcıllıqla müəyyənləşdi.` : ''
     const tieNote = cur.tieRivals.length
       ? ` ⚖️ Bərabər bal: “${data.leafName[tr0.id]}” üçün ${tr0.rival} ilə ${sc} bal eyni idi.${tieDecide} Ona görə bu təhsilalan oraya yerləşdirilmədi.`
       : ''
@@ -509,8 +510,8 @@ function StorySim({ students, packets, subs, tree, poolUsers, preAssignLevel, fi
               <span style={{ fontSize: 18 }}>⚖️</span>
               <div style={{ fontSize: 13, color: '#8a6d1b', lineHeight: 1.55 }}>
                 <b style={{ color: '#5a4a12' }}>Bərabər bal toqquşması:</b> “{data.leafName[cur.tieRivals[0].id]}” üçün <b style={{ color: '#5a4a12' }}>{cur.tieRivals[0].rival}</b> ilə hər ikisinin ümumi balı <b style={{ color: '#5a4a12' }}>{cur.tieRivals[0].score.toFixed(2)}</b> idi. Son yer bir nəfərə qalır — {cur.tieRivals[0].subject ? (<>
-                  üstünlük meyarı <b style={{ color: '#5a4a12' }}>“{cur.tieRivals[0].subject}”</b> fənni oldu: <b style={{ color: '#5a4a12' }}>{cur.tieRivals[0].rival}</b> = <b style={{ color: '#237804' }}>{Number(cur.tieRivals[0].rivalSubjScore).toFixed(1)}</b>, bu təhsilalan = <b style={{ color: '#cf1322' }}>{Number(cur.tieRivals[0].mySubjScore).toFixed(1)}</b> — {cur.tieRivals[0].rival} öndə olduğu üçün bu təhsilalan həmin ixtisasa yerləşdirilmədi.
-                </>) : (<><b style={{ color: '#5a4a12' }}>üstünlük meyarı (fənn balları)</b> {cur.tieRivals[0].rival}-ı öndə tutdu, bu təhsilalan həmin ixtisasa yerləşdirilmədi.</>)}
+                  üstünlük meyarı <b style={{ color: '#5a4a12' }}>“{cur.tieRivals[0].subject}”</b> oldu: <b style={{ color: '#5a4a12' }}>{cur.tieRivals[0].rival}</b> = <b style={{ color: '#237804' }}>{critFmt(cur.tieRivals[0].rivalSubjScore)}</b>, bu təhsilalan = <b style={{ color: '#cf1322' }}>{critFmt(cur.tieRivals[0].mySubjScore)}</b> — {cur.tieRivals[0].rival} öndə olduğu üçün bu təhsilalan həmin ixtisasa yerləşdirilmədi.
+                </>) : (<>bütün prioritet meyarları da eyni idi — sıra siyahıdakı ardıcıllıqla müəyyənləşdi, bu təhsilalan həmin ixtisasa yerləşdirilmədi.</>)}
               </div>
             </div>
           )}
@@ -818,6 +819,18 @@ export default function Distribution() {
     : (users ?? []).filter((u: any) => u.institution === instId)
   const submittedUsers = allInstUsers.filter(u => sels.find((s: any) => s.userId === u.id))
 
+  // ── Default prioritet: strukturda prioritet təyin edilməyən ixtisaslar üçün ──
+  // Bərabər ballılar idxal şablonundakı fənn sırası ilə ayrılır. Siyahı bütün
+  // hesablamalardan (yerləşdirmə, paket, simulyasiya) ƏVVƏL qurulmalıdır.
+  const [storedPrio, setStoredPrio] = useState<string[]>([])
+  useEffect(() => { systemSettingsDb.getPrioritySubjects().then(l => setStoredPrio(l || [])) }, [])
+  const subjKey = allInstUsers.map((u: any) => Object.keys(u.subjects || {}).join(',')).join('|')
+  const defaultTbKey = useMemo(() => {
+    const list = buildDefaultTiebreaker(storedPrio, allInstUsers)
+    setDefaultTiebreaker(list)
+    return list.join('|')
+  }, [storedPrio.join('|'), subjKey])
+
   // ── Ağacın ən az kvotalı yarpağı → maks paket sayı ───────────────────────
   const { minQuota, minLeafName } = useMemo(() => {
     const leaves = getLeavesWithPath(tree?.nodes || [])
@@ -883,7 +896,9 @@ export default function Distribution() {
 
     // ── Addım 1: təhsilalanları paketlərə böl ────────────────────────────
     // Proporsional rejimdə mülki və lisey AYRICA bölünür (bax: splitPacketStudents)
-    const pkUsers = splitPacketStudents(allInstUsers, P, !!(tree?.sourceProportional))
+    const pm: Record<string, any[]> = {}
+    for (const { leaf, path } of leaves) pm[leaf.id] = path
+    const pkUsers = splitPacketStudents(allInstUsers, P, !!(tree?.sourceProportional), makeMeritCompare(sels, pm))
 
     // ── Addım 2: kvotanın paketlərə bölgüsü ─────────────────────────────
     // Yerlər HƏR MƏNBƏ ÜZRƏ AYRICA paylanır: paketə düşən mülki yer = paketdəki
@@ -906,7 +921,7 @@ export default function Distribution() {
       })
     }
     return result
-  }, [packetsReady, packetCount, usersKey, treeKey, tree?.sourceProportional, sel?.preAssignLevel])
+  }, [packetsReady, packetCount, usersKey, treeKey, tree?.sourceProportional, sel?.preAssignLevel, sels, defaultTbKey])
 
   // ── Hər paketin müstəqil yerləşdirməsi (simulyasiya üçün) ────────────────────
   const packetPlacements = useMemo(() => {
@@ -915,7 +930,7 @@ export default function Distribution() {
     return (packets as any[]).map((p: any) =>
       runPacketPlacement(p.students, sels, p.specs || [], spActive)
     )
-  }, [packets, sels, tree?.sourceProportional])
+  }, [packets, sels, tree?.sourceProportional, defaultTbKey])
 
   // ── Paket sim üçün addım-addım animasiya sırası ───────────────────────────
   const animSteps = useMemo(() => {
@@ -981,12 +996,15 @@ export default function Distribution() {
     if (algorithm === 'gale-shapley') return runGaleShapley(submittedUsers, sels, tree)
     return runPlacement(submittedUsers, sels, tree, !!(tree?.sourceProportional),
       allInstUsers, sel?.preAssignLevel ?? null)
-  }, [mode, method, selId, treeKey, (users ?? []).length, packets, packetPlacements, tree?.sourceProportional, algorithm])
+  }, [mode, method, selId, treeKey, (users ?? []).length, packets, packetPlacements, tree?.sourceProportional, algorithm, sels, defaultTbKey])
 
   const placedCount   = placement ? Object.keys(placement.assignments).length : 0
   const unplacedCount = submittedUsers.length - placedCount
 
   // Filtersiz sıra — animasiya üçün
+  // Yerləşdirmə ilə eyni sıra: bal, bərabərdirsə prioritet meyarları
+  const meritCmp = useMemo(() => makeMeritCompare(sels, placement?.pathMap || {}, sid => !!placement?.pathMap?.[sid]),
+    [sels, placement, defaultTbKey])
   const allStudentRows = useMemo(() => {
     if (!placement) return []
     return submittedUsers
@@ -995,7 +1013,7 @@ export default function Distribution() {
         const path = a ? (placement.pathMap[a.specId] || []) : []
         return { user: u, assignment: a, path }
       })
-      .sort((a, b) => (b.user.score || 0) - (a.user.score || 0))
+      .sort((a, b) => meritCmp(a.user, b.user))
   }, [placement])
 
   // ── Placement hazır olanda simTotal-ı yenilə ─────────────────────────────
@@ -1032,10 +1050,16 @@ export default function Distribution() {
     const map = new Map<number, any>()
     if (!placement || method !== 'simple') return map
     const scoreOf = (u: any) => u.score || 0
-    const riyOf   = (u: any) => u.subjects?.['Riyaziyyat'] ?? null
-    const nameOf  = (sid: string) => { const p = placement.pathMap[sid] || []; return p.length ? p[p.length - 1].name : sid }
+    const firstIn = (u: any) => (rankingOf[u.id] || []).find(id => !!placement.pathMap[id]) || ''
+    // Bərabərliyi hansı prioritet meyarı həll etdi (sıralamanın işlətdiyi meyarlarla)
+    const decide = (w: any, l: any) => {
+      const d = decidingCriterion(w, l, pairTiebreaker(w, l, firstIn(w), firstIn(l), placement.pathMap))
+      if (!d) return null
+      return { label: d.crit === UMUMI_KEY ? 'Ümumi bal' : isSumCrit(d.crit) ? 'Σ ' + d.crit : d.crit, w: d.w, l: d.l }
+    }
     const rankingOf: Record<string, string[]> = {}
     for (const s of sels) rankingOf[s.userId] = s.ranking || []
+    const nameOf  = (sid: string) => { const p = placement.pathMap[sid] || []; return p.length ? p[p.length - 1].name : sid }
     const assignOf  = placement.assignments
     const remaining: Record<string, number> = { ...placement.quotas }
     allStudentRows.forEach((row: any, idx: number) => {
@@ -1053,9 +1077,9 @@ export default function Distribution() {
         if (losers.length > 0) {
           map.set(idx + 1, {
             step: idx + 1, score: sc, specName: nameOf(sid),
-            winner: { name: row.user.name, fin: row.user.fin, riy: riyOf(row.user), choiceNum: a.choiceNum },
+            winner: { name: row.user.name, fin: row.user.fin, choiceNum: a.choiceNum },
             losers: losers.map((u: any) => ({
-              name: u.name, fin: u.fin, riy: riyOf(u),
+              name: u.name, fin: u.fin, dec: decide(row.user, u),
               got: assignOf[u.id] ? nameOf(assignOf[u.id].specId) : 'Yerləşmədi',
               gotChoice: assignOf[u.id]?.choiceNum ?? null,
             })),
@@ -1286,7 +1310,7 @@ export default function Distribution() {
               <div style={{ fontSize: 19, fontWeight: 900, marginTop: 4 }}>⚠️ Bərabər ballı toqquşma</div>
               <div style={{ fontSize: 12.5, opacity: .95, marginTop: 6, lineHeight: 1.5 }}>
                 Addım {collisionPause.step} — eyni <b>{collisionPause.score}</b> ballı təhsilalanlar
-                «<b>{collisionPause.specName}</b>» ixtisası üçün rəqabət apardı. Yer məhdud olduğu üçün biri yerləşdi, digər(lər)i ala bilmədi. Aşağıda hər kəsin Riyaziyyat balı göstərilir.
+                «<b>{collisionPause.specName}</b>» ixtisası üçün rəqabət apardı. Yer məhdud olduğu üçün biri yerləşdi, digər(lər)i ala bilmədi. Aşağıda bərabərliyi həll edən prioritet meyarı göstərilir.
               </div>
             </div>
             <div style={{ padding: '20px 26px' }}>
@@ -1296,7 +1320,7 @@ export default function Distribution() {
                 <div style={{ flex: 1 }}>
                   <div style={{ fontWeight: 800, fontSize: 14, color: '#065f46' }}>{collisionPause.winner.name}</div>
                   <div style={{ fontSize: 11.5, color: '#047857' }}>
-                    Riyaziyyat: <b>{collisionPause.winner.riy ?? '—'}</b> · bu ixtisası aldı ({collisionPause.winner.choiceNum}-ci seçimi)
+                    Bu ixtisası aldı ({collisionPause.winner.choiceNum}-ci seçimi)
                   </div>
                 </div>
                 <span style={{ fontSize: 11, fontWeight: 800, color: '#065f46', background: '#fff', borderRadius: 8, padding: '4px 10px', border: '1px solid #6ee7b7' }}>QAZANDI</span>
@@ -1311,7 +1335,10 @@ export default function Distribution() {
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 700, fontSize: 13.5, color: '#9a3412' }}>{l.name}</div>
                     <div style={{ fontSize: 11.5, color: '#b45309' }}>
-                      Riyaziyyat: <b>{l.riy ?? '—'}</b> · əvəzində: {l.got}{l.gotChoice ? ` (${l.gotChoice}-ci seçimi)` : ''}
+                      {l.dec
+                        ? <>Meyar «{l.dec.label}»: qazanan <b>{critFmt(l.dec.w)}</b>, bu təhsilalan <b>{critFmt(l.dec.l)}</b></>
+                        : <>Bütün prioritet meyarları eyni idi</>}
+                      {' · '}əvəzində: {l.got}{l.gotChoice ? ` (${l.gotChoice}-ci seçimi)` : ''}
                     </div>
                   </div>
                 </div>

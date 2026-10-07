@@ -14,8 +14,9 @@ const evenSizes = (n: number, P: number) => Array.from({ length: P }, (_, i) => 
  * (məs. mülkilər 250+, liseylər 220-dən aşağı) paketlər yalnız bir mənbədən
  * ibarət olmur. Proporsional rejim söndürülübsə — ümumi bal sırası ilə.
  */
-export function splitPacketStudents(users: any[], P: number, bySource: boolean): any[][] {
-  const bySc = (a: any, b: any) => (b.score || 0) - (a.score || 0)
+export function splitPacketStudents(users: any[], P: number, bySource: boolean, cmp?: (a: any, b: any) => number): any[][] {
+  // Bərabər ballılar paket sərhədində prioritet meyarları ilə ayrılır (cmp verilibsə)
+  const bySc = cmp ?? ((a: any, b: any) => (b.score || 0) - (a.score || 0))
   const groups = bySource
     ? [users.filter(u => u.source === 'mülki'), users.filter(u => u.source === 'lisey'), users.filter(u => u.source !== 'mülki' && u.source !== 'lisey')]
     : [users]

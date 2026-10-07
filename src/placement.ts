@@ -3,18 +3,70 @@
 import { poolCounts, autoSplit, globalSourceSplitCached } from './quota-pool'
 import { UMUMI_KEY, critValue, isSumCrit } from './tiebreak'
 
+// ── Default prioritet ────────────────────────────────────────────────────────
+// Strukturda heç bir node-a prioritet təyin edilməyibsə, bərabər ballılar
+// əvvəllər yalnız siyahıdakı təsadüfi sıra ilə ayrılırdı. İndi default meyar
+// siyahısı işləyir: idxal şablonundakı fənn sütunlarının sırası (sistem
+// ayarlarında saxlanılır), sonra məlumatda olan digər fənlər.
+let defaultCriteria: string[] = []
+export function setDefaultTiebreaker(list: string[]) { defaultCriteria = [...list] }
+export function getDefaultTiebreaker(): string[] { return defaultCriteria }
+export function buildDefaultTiebreaker(stored: string[], users: any[]): string[] {
+  const inData: string[] = []
+  const seenData = new Set<string>()
+  for (const u of users || []) {
+    for (const [k, v] of Object.entries(u?.subjects || {})) {
+      if (v == null || isNaN(Number(v)) || seenData.has(k)) continue
+      seenData.add(k); inData.push(k)
+    }
+  }
+  const out: string[] = [], seen = new Set<string>()
+  const add = (k: string) => { if (k && k !== UMUMI_KEY && !seen.has(k)) { seen.add(k); out.push(k) } }
+  for (const k of stored || []) if (seenData.has(k)) add(k)
+  for (const k of inData) add(k)
+  return out
+}
+
 // ── Tiebreaker: təhsilalanı sıralamaq üçün bal massivi ──────────────────────────
 export function getTiebreakerSubjects(specId: string, userGroup: string | null, pathMap: Record<string, any[]>): string[] {
   const path = pathMap[specId] || []
   // Yarpaqdan kökə qədər tiebreaker axtarırıq
   for (let i = path.length - 1; i >= 0; i--) {
     const node = path[i]
-    if (node.groupTiebreakers && userGroup && node.groupTiebreakers[String(userGroup)]) {
+    if (node.groupTiebreakers && userGroup && node.groupTiebreakers[String(userGroup)]?.length) {
       return node.groupTiebreakers[String(userGroup)]
     }
     if (node.tiebreaker?.length) return node.tiebreaker
   }
-  return []
+  return defaultCriteria
+}
+
+/** İki təhsilalanın müqayisəsində işlənən meyar siyahısı (hər birinin öz siyahısından uzunu) */
+export function pairTiebreaker(a: any, b: any, aSid: string, bSid: string, pathMap: Record<string, any[]>): string[] {
+  const aTb = getTiebreakerSubjects(aSid, a.group, pathMap)
+  const bTb = getTiebreakerSubjects(bSid, b.group, pathMap)
+  return aTb.length >= bTb.length ? aTb : bTb
+}
+
+/**
+ * Bal + prioritet sırası ilə müqayisə funksiyası. Hər təhsilalanın meyarları onun
+ * birinci (əhatədəki) seçiminin prioritetindən götürülür — yerləşdirmə, tarazlama,
+ * paket bölgüsü və simulyasiya hamısı EYNİ sıranı işlətsin deyə tək yerdədir.
+ */
+export function makeMeritCompare(subs: any[], pathMap: Record<string, any[]>, inScope?: (sid: string) => boolean) {
+  const rk = new Map<string, string[]>()
+  for (const s of subs || []) if (s?.userId && !rk.has(s.userId)) rk.set(s.userId, s.ranking || [])
+  const first = (u: any) => (rk.get(u.id) || []).find(sid => !inScope || inScope(sid)) || ''
+  return (a: any, b: any) => compareStudents(a, b, pairTiebreaker(a, b, first(a), first(b), pathMap))
+}
+
+/** Bərabər ballı iki nəfərdən öndəkini hansı meyar ayırdı (yoxdursa null) */
+export function decidingCriterion(winner: any, loser: any, tb: string[]): { crit: string; w: number; l: number } | null {
+  for (const crit of tb) {
+    const w = critValue(winner, crit), l = critValue(loser, crit)
+    if (w !== l) return { crit, w, l }
+  }
+  return null
 }
 
 export function studentSortScore(user: any, tiebreakers: string[]): number[] {
@@ -128,7 +180,10 @@ export function rebalanceUnplaced(opts: {
   const rankingOf = (uid: string): string[] => subByUser[uid] || []
 
   // ── Bal sırası: 0 = ən yüksək ballı ──────────────────────────────────────
-  const ordered = [...users].sort((a: any, b: any) => (b.score || 0) - (a.score || 0))
+  // Bərabər ballılar prioritet meyarları ilə ayrılır (yerləşdirmə ilə eyni sıra).
+  // Əvvəl yalnız bal götürülürdü: bərabər ballılarda tarazlama prioritetə baxmadan
+  // siyahı sırasına görə seçir və greedy-nin düzgün qərarını tərsinə çevirə bilirdi.
+  const ordered = [...users].sort(makeMeritCompare(subs, opts.pathMap, sid => quotas[sid] !== undefined))
   const rankOf: Record<string, number> = {}
   ordered.forEach((u: any, i: number) => { rankOf[u.id] = i })
   const N = users.length || 1
@@ -251,16 +306,7 @@ export function runPacketPlacement(
   const assignments: Record<string, { specId: string; choiceNum: number }> = {}
 
   function tryPlace(students: any[], availQuota: Record<string, number>) {
-    const sorted = [...students].sort((a, b) => {
-      const aSub = subOf(a.id)
-      const bSub = subOf(b.id)
-      const aSid = aSub?.ranking?.find((sid: string) => availQuota[sid] !== undefined) || ''
-      const bSid = bSub?.ranking?.find((sid: string) => availQuota[sid] !== undefined) || ''
-      const aTb  = getTiebreakerSubjects(aSid, a.group, pathMap)
-      const bTb  = getTiebreakerSubjects(bSid, b.group, pathMap)
-      const tb   = aTb.length >= bTb.length ? aTb : bTb
-      return compareStudents(a, b, tb)
-    })
+    const sorted = [...students].sort(makeMeritCompare(allSubs, pathMap, sid => availQuota[sid] !== undefined))
     for (const user of sorted) {
       if (assignments[user.id]) continue
       const sub = subOf(user.id)
@@ -383,17 +429,7 @@ export function runPlacement(
 
   function tryPlace(students: any[], availQuota: Record<string, number>) {
     // Hər təhsilalan üçün birinci əlçatan ixtisasın tiebreaker-ına görə sırala
-    const sorted = [...students].sort((a, b) => {
-      const aSub = subOf(a.id)
-      const bSub = subOf(b.id)
-      const aSid = aSub?.ranking?.find((sid: string) => availQuota[sid] !== undefined) || ''
-      const bSid = bSub?.ranking?.find((sid: string) => availQuota[sid] !== undefined) || ''
-      const aTb  = getTiebreakerSubjects(aSid, a.group, pathMap)
-      const bTb  = getTiebreakerSubjects(bSid, b.group, pathMap)
-      // Hər ikisinin tiebreaker-ını birləşdir (uzunluq üzrə max)
-      const tb   = aTb.length >= bTb.length ? aTb : bTb
-      return compareStudents(a, b, tb)
-    })
+    const sorted = [...students].sort(makeMeritCompare(subs, pathMap, sid => availQuota[sid] !== undefined))
     for (const user of sorted) {
       if (assignments[user.id]) continue
       const sub = subOf(user.id)
