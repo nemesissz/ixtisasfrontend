@@ -82,6 +82,24 @@ export default function LiveMonitor() {
     setBusy(false)
   }
 
+  // Seansı bütün qeydləri (aktiv, yarımçıq, təsdiqləyənlər, statistika) ilə silir
+  async function removeSession() {
+    if (!sess) return
+    const open = sess.status !== 'ended'
+    if (!confirm(`"${selName(sess)}" seansı silinsin? Seansın bütün qeydləri və statistikası silinəcək, geri qaytarıla bilməz.`
+      + (open ? '\n\nSeans hələ açıqdır: təhsilalanlar seçimdə qalarsa, növbəti siqnalda bu seçim üçün yeni seans başlayacaq.' : ''))) return
+    setBusy(true)
+    try {
+      await monitorDb.deleteSession(sess.id)
+      addLog('system', 'warning', `Canlı nəzarət seansı silindi: ${selName(sess)}`,
+        `Təsdiqləyən: ${st.submitted ?? 0} · Aktiv: ${active.length} · Yarımçıq: ${abandoned.length}`)
+      pickedRef.current = null
+      setData(null)
+      await load()
+    } catch { setErr('Seans silinmədi') }
+    setBusy(false)
+  }
+
   const statusBadge = !sess ? { t: 'Seans yoxdur', bg: '#f0f1f5', c: '#6b7080' }
     : sess.status === 'running' ? { t: '● Davam edir', bg: '#e8f8ee', c: '#1f6f43' }
     : sess.status === 'paused' ? { t: '❚❚ Dayandırılıb', bg: '#fff5e0', c: '#a86b00' }
@@ -137,6 +155,9 @@ export default function LiveMonitor() {
           {sess?.status === 'running' && <button className="btn" disabled={busy} onClick={() => act('pause')}>❚❚ Dayandır</button>}
           {sess?.status === 'paused' && <button className="btn btn-primary" disabled={busy} onClick={() => act('resume')}>▶ Davam et</button>}
           {sess && sess.status !== 'ended' && <button className="btn" disabled={busy} onClick={() => act('end')} style={{ color: '#c0392b' }}>■ Bitir</button>}
+          {sess && <button className="btn" disabled={busy} onClick={removeSession}
+            title="Seansı bütün qeydləri ilə sil"
+            style={{ color: '#cf1322', borderColor: '#ffccc7', background: '#fff5f5' }}>🗑 Sil</button>}
         </div>
         <div style={{ fontSize: 11.5, color: 'var(--muted)', flexBasis: '100%' }}>
           Hər seçimin öz seansı var: seçimə ilk təhsilalan girəndə başlayır, yalnız «Bitir» basılanda bitir.
