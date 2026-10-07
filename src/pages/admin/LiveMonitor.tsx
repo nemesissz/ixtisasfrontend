@@ -40,7 +40,9 @@ function Participants({ sessionId, refreshKey }: { sessionId: number; refreshKey
     let off = false
     monitorDb.participants(sessionId, { page, size, sort, state, q: qDeb })
       .then(r => { if (!off) { setRes(r); setErr('') } })
-      .catch(() => { if (!off) setErr('İştirakçılar yüklənmədi') })
+      .catch((e: any) => { if (!off) setErr(e?.status === 404 || e?.status === 405
+        ? `İştirakçılar yüklənmədi (server ${e.status}): backend köhnə versiyadadır — yenidən build edin`
+        : 'İştirakçılar yüklənmədi') })
     return () => { off = true }
   }, [sessionId, page, size, sort, state, qDeb, refreshKey])
 
@@ -219,7 +221,12 @@ export default function LiveMonitor() {
       pickedRef.current = null
       setData(null)
       await load()
-    } catch { setErr('Seans silinmədi') }
+    } catch (e: any) {
+      // 405/404 → backend köhnədir (silmə endpoint-i yoxdur), yenidən build lazımdır
+      setErr(e?.status === 405 || e?.status === 404
+        ? `Seans silinmədi (server ${e.status}): backend köhnə versiyadadır — yenidən build edin`
+        : `Seans silinmədi${e?.status ? ` (server ${e.status})` : ''}: ${String(e?.message ?? '')}`)
+    }
     setBusy(false)
   }
 
