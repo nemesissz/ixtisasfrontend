@@ -15,6 +15,129 @@ function fmt(sec: number | null | undefined): string {
   return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`
 }
 
+// ── Seansın iştirakçıları: tez/gec sıralaması, filtr, axtarış, səhifələmə ──
+// Siyahı serverdə səhifələnir — yüzlərlə təhsilalan bir anda yüklənmir.
+const STATE_LBL: Record<string, { t: string; bg: string; c: string }> = {
+  submitted: { t: '✓ Təsdiqləyib', bg: '#e8f8ee', c: '#1f6f43' },
+  active:    { t: '● Seçimdə',     bg: '#e8f0ff', c: '#1d4ed8' },
+  abandoned: { t: '⚠ Yarımçıq',    bg: '#fff1ee', c: '#a8321f' },
+}
+function Participants({ sessionId, refreshKey }: { sessionId: number; refreshKey: number }) {
+  const [sort, setSort]   = useState<'fast' | 'slow'>('fast')
+  const [state, setState] = useState('all')
+  const [q, setQ]         = useState('')
+  const [qDeb, setQDeb]   = useState('')
+  const [page, setPage]   = useState(1)
+  const [size, setSize]   = useState(20)
+  const [res, setRes]     = useState<any>(null)
+  const [err, setErr]     = useState('')
+
+  useEffect(() => { const t = setTimeout(() => setQDeb(q.trim()), 350); return () => clearTimeout(t) }, [q])
+  // Filtr/sıralama dəyişəndə 1-ci səhifəyə qayıt
+  useEffect(() => { setPage(1) }, [sessionId, sort, state, qDeb, size])
+
+  useEffect(() => {
+    let off = false
+    monitorDb.participants(sessionId, { page, size, sort, state, q: qDeb })
+      .then(r => { if (!off) { setRes(r); setErr('') } })
+      .catch(() => { if (!off) setErr('İştirakçılar yüklənmədi') })
+    return () => { off = true }
+  }, [sessionId, page, size, sort, state, qDeb, refreshKey])
+
+  const th: React.CSSProperties = { textAlign: 'left', padding: '10px 14px', fontSize: 11, fontWeight: 800, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.4, borderBottom: '1.5px solid var(--border)', whiteSpace: 'nowrap' }
+  const td: React.CSSProperties = { padding: '9px 14px', fontSize: 13, borderBottom: '1px solid #f0f1f5' }
+  const c = res?.counts || {}
+  const pages = res?.pages || 1
+  const tab = (key: string, label: string, n?: number) => (
+    <button key={key} className={state === key ? 'btn btn-primary' : 'btn'} onClick={() => setState(key)}
+      style={{ fontWeight: 700, fontSize: 12, padding: '6px 12px' }}>{label}{n != null ? ` · ${n}` : ''}</button>
+  )
+  const time = (v?: string) => v ? new Date(v.endsWith('Z') ? v : v + 'Z').toLocaleTimeString('az-AZ') : '—'
+
+  // Səhifə nömrələri: 1 … p-1 p p+1 … N
+  const nums: (number | '…')[] = []
+  for (let i = 1; i <= pages; i++) {
+    if (i === 1 || i === pages || Math.abs(i - page) <= 1) nums.push(i)
+    else if (nums[nums.length - 1] !== '…') nums.push('…')
+  }
+
+  return (
+    <div className="card" style={{ overflow: 'hidden' }}>
+      <div style={{ padding: '14px 18px', borderBottom: '1.5px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <div style={{ fontWeight: 800, fontSize: 14, flex: '1 1 auto' }}>
+          📋 Seansın iştirakçıları <span style={{ color: 'var(--muted)', fontWeight: 600 }}>· {c.all ?? 0}</span>
+        </div>
+        <input className="search-input" placeholder="🔍 Ad və ya FİN" value={q} onChange={e => setQ(e.target.value)}
+          style={{ maxWidth: 220, padding: '7px 12px', fontSize: 12.5 }} />
+        <div style={{ display: 'flex', borderRadius: 9, overflow: 'hidden', border: '1.5px solid var(--border)' }}>
+          {(['fast', 'slow'] as const).map(k => (
+            <button key={k} onClick={() => setSort(k)}
+              style={{ padding: '6px 12px', fontSize: 12, fontWeight: 800, border: 'none', cursor: 'pointer',
+                background: sort === k ? '#2b2f3a' : '#fff', color: sort === k ? '#fff' : 'var(--muted)' }}>
+              {k === 'fast' ? '⚡ Ən tez' : '🐢 Ən gec'}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div style={{ padding: '10px 18px', display: 'flex', gap: 6, flexWrap: 'wrap', borderBottom: '1px solid #f0f1f5' }}>
+        {tab('all', 'Hamısı', c.all)}
+        {tab('submitted', 'Təsdiqləyib', c.submitted)}
+        {tab('active', 'Seçimdə', c.active)}
+        {tab('abandoned', 'Yarımçıq', c.abandoned)}
+      </div>
+      {err && <div style={{ padding: '10px 18px', color: '#c0392b', fontSize: 12.5, fontWeight: 700 }}>{err}</div>}
+      {!res ? (
+        <div style={{ padding: 28, textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>Yüklənir…</div>
+      ) : res.items.length === 0 ? (
+        <div style={{ padding: 28, textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>Nəticə yoxdur</div>
+      ) : (
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead><tr>
+              <th style={th}>Sıra</th><th style={th}>Ad soyad</th><th style={th}>FİN</th><th style={th}>Qrup</th><th style={th}>Müəssisə</th>
+              <th style={th}>Status</th><th style={th}>Başladı</th><th style={th}>Təsdiq / son siqnal</th><th style={th}>Müddət</th>
+            </tr></thead>
+            <tbody>
+              {res.items.map((r: any) => {
+                const s = STATE_LBL[r.state] || STATE_LBL.active
+                return (
+                  <tr key={r.studentId}>
+                    <td style={{ ...td, fontWeight: 800, color: 'var(--muted)' }}>{r.rank}</td>
+                    <td style={{ ...td, fontWeight: 700 }}>{r.name}</td>
+                    <td style={{ ...td, fontFamily: 'monospace' }}>{r.fin || '—'}</td>
+                    <td style={td}>{r.group || '—'}</td>
+                    <td style={td}>{r.institution || '—'}</td>
+                    <td style={td}><span style={{ padding: '2px 9px', borderRadius: 12, fontSize: 11.5, fontWeight: 800, background: s.bg, color: s.c, whiteSpace: 'nowrap' }}>{s.t}</span></td>
+                    <td style={{ ...td, fontVariantNumeric: 'tabular-nums' }}>{time(r.startedAt)}</td>
+                    <td style={{ ...td, fontVariantNumeric: 'tabular-nums' }}>{time(r.state === 'submitted' ? r.submittedAt : r.lastSeenAt)}</td>
+                    <td style={{ ...td, fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>{fmt(r.sec)}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {res && res.total > 0 && (
+        <div style={{ padding: '10px 18px', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', borderTop: '1px solid #f0f1f5' }}>
+          <span style={{ fontSize: 12, color: 'var(--muted)', flex: '1 1 auto' }}>
+            {(page - 1) * size + 1}–{Math.min(page * size, res.total)} / {res.total}
+          </span>
+          <select className="filter-select" value={size} onChange={e => setSize(Number(e.target.value))} style={{ fontSize: 12 }}>
+            {[10, 20, 50, 100].map(n => <option key={n} value={n}>{n} / səhifə</option>)}
+          </select>
+          <button className="btn" disabled={page <= 1} onClick={() => setPage(p => p - 1)} style={{ padding: '5px 10px' }}>‹</button>
+          {nums.map((n, i) => n === '…'
+            ? <span key={'e' + i} style={{ color: 'var(--muted)', padding: '0 2px' }}>…</span>
+            : <button key={n} className={n === page ? 'btn btn-primary' : 'btn'} onClick={() => setPage(n)}
+                style={{ padding: '5px 10px', minWidth: 34, fontWeight: 700 }}>{n}</button>)}
+          <button className="btn" disabled={page >= pages} onClick={() => setPage(p => p + 1)} style={{ padding: '5px 10px' }}>›</button>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function LiveMonitor() {
   const session = getAdminSession()
   const [data, setData] = useState<any>(null)
@@ -236,6 +359,11 @@ export default function LiveMonitor() {
           </div>
         </div>
       )}
+
+      {/* Seansın bütün iştirakçıları — ən aşağıda, səhifələnmiş */}
+      {/* refreshKey ~15 saniyədən bir dəyişir: açıq seansda siyahı da yenilənir */}
+      {sess && <Participants sessionId={sess.id}
+        refreshKey={sess.status === 'ended' ? 0 : Math.floor(fetchedAt.current / 15000)} />}
     </div>
   )
 }

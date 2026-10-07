@@ -626,4 +626,6 @@ export const monitorDb = {
   setConfig: (c: MonitorConfig) => http.put('/api/monitor/config', c),
   session:   (id: number, op: 'pause' | 'resume' | 'end') => http.post(`/api/monitor/session/${id}/${op}`),
   deleteSession: (id: number) => http.delete(`/api/monitor/session/${id}`),
+  participants: (id: number, p: { page: number; size: number; sort: 'fast' | 'slow'; state: string; q?: string }) =>
+    http.get<any>(`/api/monitor/session/${id}/participants?page=${p.page}&size=${p.size}&sort=${p.sort}&state=${p.state}${p.q ? `&q=${encodeURIComponent(p.q)}` : ''}`),
 }
