@@ -589,13 +589,22 @@ export default function Dashboard() {
 
     // İxtisaslar vərəqi
     const perf: any[][] = [
-      ['İxtisas', 'Yol', 'Kvota', 'Yerləşən', 'Doluluq %', 'Lisey', '', '', 'Mülki', '', ''],
-      ['', '', '', '', '', 'ən aşağı bal', 'orta bal', 'ən yuxarı bal', 'ən aşağı bal', 'orta bal', 'ən yuxarı bal'],
-      ...[...A.byLeaf].sort((a: any, b: any) => b.quota - a.quota).map((l: any) =>
-        [l.name, l.path, l.quota, l.placed, pc(l.placed, l.quota),
-          l.liseyMin ? +l.liseyMin.toFixed(1) : '', l.liseyAvg ? +l.liseyAvg.toFixed(1) : '', l.liseyMax ? +l.liseyMax.toFixed(1) : '',
-          l.mülkiMin ? +l.mülkiMin.toFixed(1) : '', l.mülkiAvg ? +l.mülkiAvg.toFixed(1) : '', l.mülkiMax ? +l.mülkiMax.toFixed(1) : ''])]
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(perf), 'İxtisaslar')
+      // Hər ixtisas üzrə ümumi bal statistikası həmişə; mənbə bölgüsü varsa lisey/mülki ayrıca
+      ['İxtisas', 'Yol', 'Kvota', 'Yerləşən', 'Doluluq %', 'Ümumi bal', '', '',
+        ...(A.hasSource ? ['Lisey', '', '', 'Mülki', '', ''] : [])],
+      ['', '', '', '', '', 'ən aşağı bal', 'orta bal', 'ən yuxarı bal',
+        ...(A.hasSource ? ['ən aşağı bal', 'orta bal', 'ən yuxarı bal', 'ən aşağı bal', 'orta bal', 'ən yuxarı bal'] : [])],
+      ...[...A.byLeaf].sort((a: any, b: any) => b.quota - a.quota).map((l: any) => {
+        const n = (v: number) => (v ? +v.toFixed(1) : '')
+        return [l.name, l.path, l.quota, l.placed, pc(l.placed, l.quota),
+          n(l.min), n(l.avg), n(l.max),
+          ...(A.hasSource ? [n(l.liseyMin), n(l.liseyAvg), n(l.liseyMax), n(l.mülkiMin), n(l.mülkiAvg), n(l.mülkiMax)] : [])]
+      })]
+    const perfWs = XLSX.utils.aoa_to_sheet(perf)
+    // Qrup başlıqlarını birləşdir (Ümumi bal / Lisey / Mülki — hər biri 3 sütun)
+    perfWs['!merges'] = [0, ...(A.hasSource ? [1, 2] : [])].map(g => ({ s: { r: 0, c: 5 + g * 3 }, e: { r: 0, c: 7 + g * 3 } }))
+    perfWs['!cols'] = [{ wch: 34 }, { wch: 40 }, { wch: 7 }, { wch: 9 }, { wch: 10 }, ...Array(A.hasSource ? 9 : 3).fill({ wch: 12 })]
+    XLSX.utils.book_append_sheet(wb, perfWs, 'İxtisaslar')
 
     // Rəqabət vərəqi (1-ci seçim üzrə)
     const comp: any[][] = [['ƏN RƏQABƏTLİ (1-ci seçim üzrə)'], ['#', 'İxtisas', 'Tələb', 'Yer', 'Rəqabət'],

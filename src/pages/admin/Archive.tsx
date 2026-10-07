@@ -70,24 +70,29 @@ export default function Archive() {
       onConfirm: async () => { const a = uarcs.find((x: any) => x.id === id); await userArchiveDb.delete(id); addLog('user', 'error', `Təhsilalan arxivi silindi: "${a?.label || id}"`, `${a?.snapshot?.length ?? 0} təhsilalan qeydi`); await refreshUArcs() },
     })
   }
-  function handleRestoreUserArc(arc: any) {
-    showConfirm({
-      icon: '👥', iconBg: '#fbf1d6', iconColor: '#c9962a',
-      title: 'Təhsilalanları bərpa et',
-      message: `"${arc.label}" arxivindəki ${arc.snapshot?.length ?? 0} təhsilalan aktiv siyahıya əlavə ediləcək.`
-        + (arc.submissions?.length ? ` Yerləşdirmə nəticələri və ${arc.submissions.length} göndərilmiş seçim də geri qaytarılır.` : ' Yerləşdirmə nəticələri də geri qaytarılır.'),
-      confirmLabel: 'Bərpa et', confirmColor: '#c9962a',
-      onConfirm: async () => {
+  // Bərpa pəncərəsi: hansı qrupa salınacağı seçilir (bax: RestoreUsersModal)
+  const [restoreArc, setRestoreArc] = useState<any>(null)
+  function handleRestoreUserArc(arc: any) { setRestoreArc(arc) }
+
+  /**
+   * target: 'keep' — arxivdəki qrup saxlanılır (silinibsə qrupsuz);
+   *         'none' — qrupsuz; başqa dəyər — həmin qrupun ID-si.
+   */
+  async function doRestoreUserArc(arc: any, target: string) {
         const [existing, cohortList] = await Promise.all([userDb.getAll(), cohortDb.getAll()])
         // FİN yalnız qrup daxilində unikaldır: eyni FİN başqa qrupda/müəssisədə ola bilər.
         // Arxivdəki qrup sonradan silinibsə təhsilalan qrupsuz bərpa olunur.
         const liveCohorts = new Set(cohortList.map((c: any) => c.id))
+        const cohortFor = (raw: any) =>
+          target === 'keep' ? (raw.cohort && liveCohorts.has(raw.cohort) ? raw.cohort : null)
+          : target === 'none' ? null
+          : target
         const scopeKey  = (u: any) => `${u.cohort ? 'c:' + u.cohort : 'i:' + u.institution}|${normFin(u.fin)}`
         const existKeys = new Set(existing.filter((u: any) => normFin(u.fin)).map(scopeKey))
         const existIds  = new Set(existing.map((u: any) => u.id))
         const toAdd: any[] = []
         for (const raw of arc.snapshot || []) {
-          const u = { ...raw, cohort: raw.cohort && liveCohorts.has(raw.cohort) ? raw.cohort : null }
+          const u = { ...raw, cohort: cohortFor(raw) }
           if (existIds.has(u.id)) continue
           if (normFin(u.fin) && existKeys.has(scopeKey(u))) continue
           if (normFin(u.fin)) existKeys.add(scopeKey(u))
@@ -106,7 +111,9 @@ export default function Archive() {
         }
         const skipped = (arc.snapshot?.length ?? 0) - toAdd.length
         await userArchiveDb.delete(arc.id)
-        addLog('user', 'success', `Təhsilalanlar arxivdən bərpa edildi: "${arc.label}"`, `${toAdd.length} bərpa${subOk ? ` · ${subOk} seçim` : ''}${skipped ? ` · ${skipped} mövcud idi` : ''}`)
+        const grpName = target === 'keep' ? 'arxivdəki qrup' : target === 'none' ? 'qrupsuz'
+          : `qrup: ${cohortList.find((c: any) => c.id === target)?.label ?? target}`
+        addLog('user', 'success', `Təhsilalanlar arxivdən bərpa edildi: "${arc.label}"`, `${toAdd.length} bərpa · ${grpName}${subOk ? ` · ${subOk} seçim` : ''}${skipped ? ` · ${skipped} mövcud idi` : ''}`)
         await refreshUArcs()
         showInfo({
           icon: '✅', iconBg: '#f0fff4', iconColor: '#52c41a',
@@ -114,8 +121,6 @@ export default function Archive() {
           message: `${toAdd.length} təhsilalan bərpa edildi.${subOk ? ` ${subOk} göndərilmiş seçim və yerləşdirmə nəticələri ilə birlikdə.` : ''}${skipped ? ` ${skipped} təhsilalan artıq mövcud idi.` : ''} Arxivdən silindi.`,
           confirmLabel: 'Bağla',
         })
-      },
-    })
   }
   function handleRestoreTreeArc(arc: any) {
     showConfirm({
@@ -207,6 +212,13 @@ export default function Archive() {
 
       {/* ── Xüsusi dialog ── */}
       {dialog && <AppDialog cfg={dialog} onClose={closeDialog} />}
+      {restoreArc && (
+        <RestoreUsersModal
+          arc={restoreArc}
+          onClose={() => setRestoreArc(null)}
+          onRestore={async target => { await doRestoreUserArc(restoreArc, target); setRestoreArc(null) }}
+        />
+      )}
 
       {/* ── Bölmə tabları (content-də) ── */}
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -364,6 +376,128 @@ function InstTabs({ insts, active, counts, onSelect }: {
 }
 
 // ── Boş vəziyyət ──────────────────────────────────────────────────────────────
+// ── Təhsilalan arxivinin bərpası: hansı qrupa salınsın ─────────────────────
+// Arxivdəki qrup saxlanıla, mövcud qrup seçilə, yerindəcə yeni qrup yaradıla
+// və ya təhsilalanlar qrupsuz bərpa oluna bilər.
+function RestoreUsersModal({ arc, onClose, onRestore }: {
+  arc: any; onClose: () => void; onRestore: (target: string) => Promise<void>
+}) {
+  const [cohorts, setCohorts] = useState<any[] | null>(null)
+  const [mode, setMode]       = useState<'keep' | 'existing' | 'new' | 'none'>('keep')
+  const [pick, setPick]       = useState('')
+  const [newLabel, setNewLabel] = useState('')
+  const [busy, setBusy]       = useState(false)
+  const [err, setErr]         = useState('')
+
+  useEffect(() => {
+    cohortDb.getAll(arc.institution).then(list => {
+      const live = list.filter((c: any) => !c.isArchived)
+      setCohorts(live)
+      if (live.length) setPick(live[0].id)
+    }).catch(() => setCohorts([]))
+  }, [arc.institution])
+
+  // Arxivdəki təhsilalanların əvvəlki qrupları (adı ilə)
+  const origIds = Array.from(new Set((arc.snapshot || []).map((u: any) => u.cohort).filter(Boolean))) as string[]
+  const origNames = origIds.map(id => cohorts?.find(c => c.id === id)?.label).filter(Boolean) as string[]
+  const origMissing = origIds.length > origNames.length
+
+  const subCount = arc.submissions?.length ?? 0
+  const canSubmit = !busy && (mode !== 'existing' || !!pick) && (mode !== 'new' || !!newLabel.trim())
+
+  async function submit() {
+    setErr(''); setBusy(true)
+    try {
+      let target: string = mode === 'existing' ? pick : mode
+      if (mode === 'new') {
+        const label = newLabel.trim()
+        const dup = cohorts?.find(c => c.label.trim().toLowerCase() === label.toLowerCase())
+        if (dup) target = dup.id
+        else {
+          const c = await cohortDb.create({ institution: arc.institution, label })
+          addLog('user', 'info', `Qrup yaradıldı: "${label}"`, `Arxivdən bərpa zamanı · "${arc.label}"`)
+          target = c.id
+        }
+      }
+      await onRestore(target)
+    } catch (e: any) {
+      setErr(e?.message || 'Bərpa alınmadı')
+      setBusy(false)
+    }
+  }
+
+  const opt = (key: typeof mode, title: string, sub?: React.ReactNode) => (
+    <label key={key} style={{
+      display: 'flex', gap: 10, alignItems: 'flex-start', padding: '10px 12px', borderRadius: 10, cursor: 'pointer',
+      border: `1.5px solid ${mode === key ? '#c9962a' : '#e6e9f5'}`, background: mode === key ? '#fffbf0' : '#fff',
+    }}>
+      <input type="radio" checked={mode === key} onChange={() => setMode(key)} style={{ marginTop: 3 }} />
+      <span style={{ flex: 1, minWidth: 0 }}>
+        <span style={{ display: 'block', fontWeight: 700, fontSize: 13.5, color: 'var(--text)' }}>{title}</span>
+        {sub && <span style={{ display: 'block', fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>{sub}</span>}
+      </span>
+    </label>
+  )
+
+  return (
+    <div className="modal-overlay open" onClick={() => !busy && onClose()}>
+      <div className="modal" style={{ maxWidth: 480 }} onClick={e => e.stopPropagation()}>
+        <div className="modal-head">
+          <span className="modal-title">↩ Təhsilalanları bərpa et</span>
+          <button className="modal-close" onClick={onClose} disabled={busy}>✕</button>
+        </div>
+        <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.5 }}>
+            «{arc.label}» arxivindəki <b style={{ color: 'var(--text)' }}>{arc.snapshot?.length ?? 0}</b> təhsilalan aktiv siyahıya əlavə ediləcək
+            {subCount ? <>, {subCount} göndərilmiş seçim və yerləşdirmə nəticələri də geri qaytarılır</> : null}. Hansı qrupa salınsın?
+          </div>
+
+          {cohorts === null ? (
+            <div style={{ fontSize: 13, color: 'var(--muted)', padding: '8px 0' }}>Qruplar yüklənir...</div>
+          ) : (
+            <>
+              {opt('keep', 'Arxivdəki qrupda saxla',
+                origIds.length === 0 ? 'Arxivdə qrup qeyd olunmayıb — qrupsuz bərpa olunacaq'
+                : <>{origNames.length ? origNames.join(', ') : ''}{origMissing ? `${origNames.length ? ' · ' : ''}silinmiş qrupa aid olanlar qrupsuz bərpa olunacaq` : ''}</>)}
+
+              {opt('existing', 'Mövcud qrupa sal',
+                cohorts.length === 0 ? 'Bu müəssisədə aktiv qrup yoxdur — yeni qrup yaradın' : undefined)}
+              {mode === 'existing' && cohorts.length > 0 && (
+                <select className="form-select" value={pick} onChange={e => setPick(e.target.value)} style={{ marginLeft: 30, width: 'calc(100% - 30px)' }}>
+                  {cohorts.map(c => <option key={c.id} value={c.id}>{c.label}{c.year ? ` (${c.year})` : ''}</option>)}
+                </select>
+              )}
+
+              {opt('new', 'Yeni qrup yarat və ora sal')}
+              {mode === 'new' && (
+                <input className="form-input" autoFocus placeholder="Qrupun adı (məs. 2026 buraxılışı)" value={newLabel}
+                  onChange={e => setNewLabel(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter' && canSubmit) submit() }}
+                  style={{ marginLeft: 30, width: 'calc(100% - 30px)' }} />
+              )}
+
+              {opt('none', 'Qrupsuz bərpa et')}
+            </>
+          )}
+
+          {mode !== 'keep' && subCount > 0 && (
+            <div style={{ fontSize: 12, color: '#8a6d1b', background: '#fff7e6', border: '1px solid #ffd591', borderRadius: 8, padding: '8px 10px' }}>
+              Qeyd: seçimlər qrupa bağlı struktura aiddir. Təhsilalanları başqa qrupa salsanız, köhnə seçim nəticələri həmin qrupun strukturunda görünməyə bilər.
+            </div>
+          )}
+          {err && <div style={{ fontSize: 12.5, color: '#cf1322' }}>{err}</div>}
+        </div>
+        <div className="modal-foot">
+          <button className="btn btn-outline" onClick={onClose} disabled={busy}>Ləğv et</button>
+          <button className="btn btn-primary" onClick={submit} disabled={!canSubmit || cohorts === null}>
+            {busy ? 'Bərpa edilir...' : '↩ Bərpa et'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function EmptyState({ icon, text, sub }: { icon: string; text: string; sub: string }) {
   return (
     <div style={{
