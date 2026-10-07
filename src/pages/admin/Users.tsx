@@ -2210,14 +2210,17 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
   const totalPend = instUsers.length - totalSub
 
   // ── Toplu əməliyyatlar ──────────────────────────────────────────────────
-  const selUsers = instUsers.filter((u: any) => selected.has(u.id))
+  // Yerləşdirməsi olan təhsilalan seçilə bilməz — onun nəticəsi toplu əməliyyatla pozulmasın
+  const selectable = (u: any) => !u.placedSpecialty
+  const selUsers = instUsers.filter((u: any) => selected.has(u.id) && selectable(u))
   const selIds   = selUsers.map((u: any) => u.id)
-  const allShownSelected = sorted.length > 0 && sorted.every((u: any) => selected.has(u.id))
+  const shownSelectable  = sorted.filter(selectable)
+  const allShownSelected = shownSelectable.length > 0 && shownSelectable.every((u: any) => selected.has(u.id))
   const toggleOne = (id: string) => setSelected(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
   const toggleAllShown = () => setSelected(prev => {
     const n = new Set(prev)
-    if (allShownSelected) sorted.forEach((u: any) => n.delete(u.id))
-    else sorted.forEach((u: any) => n.add(u.id))
+    if (allShownSelected) shownSelectable.forEach((u: any) => n.delete(u.id))
+    else shownSelectable.forEach((u: any) => n.add(u.id))
     return n
   })
   function exitSelectMode() { setSelectMode(false); setSelected(new Set()); setBulkCohOpen(false) }
@@ -2656,9 +2659,9 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
               <span style={{ fontWeight: 800, fontSize: 13, color: '#1f3a5f', marginRight: 4 }}>
                 {selIds.length} seçilib
               </span>
-              <button type="button" onClick={toggleAllShown} disabled={!sorted.length || bulkBusy}
-                style={{ ...btn('#fff', '#d0d8f8', '#1f3a5f'), opacity: sorted.length ? 1 : 0.45, cursor: 'pointer' }}>
-                {allShownSelected ? 'Görünənləri çıxar' : `Görünənlərin hamısı (${sorted.length})`}
+              <button type="button" onClick={toggleAllShown} disabled={!shownSelectable.length || bulkBusy}
+                style={{ ...btn('#fff', '#d0d8f8', '#1f3a5f'), opacity: shownSelectable.length ? 1 : 0.45, cursor: 'pointer' }}>
+                {allShownSelected ? 'Görünənləri çıxar' : `Görünənlərin hamısı (${shownSelectable.length})`}
               </button>
               {selIds.length > 0 && (
                 <button type="button" onClick={() => setSelected(new Set())} disabled={bulkBusy}
@@ -2702,7 +2705,7 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
               <tr>
                 <th className="sticky-col sticky-col-1" style={{ textAlign: 'center' }}>
                   {selectMode
-                    ? <input type="checkbox" checked={allShownSelected} onChange={toggleAllShown} disabled={!sorted.length}
+                    ? <input type="checkbox" checked={allShownSelected} onChange={toggleAllShown} disabled={!shownSelectable.length}
                         title="Görünənlərin hamısını seç" style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#1f3a5f' }} />
                     : '№'}
                 </th>
@@ -2737,15 +2740,18 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
                 const isPrinted = u.printStatus === 'printed'
                 const grp       = String(u.group || '')
                 const grpStyle  = GRP_COLORS[grp] || { bg: '#f4f4f4', color: '#999' }
-                const isSel     = selectMode && selected.has(u.id)
+                const canSel    = selectMode && selectable(u)
+                const isSel     = canSel && selected.has(u.id)
                 return (
                   <tr key={u.id} className={isSel ? 'row-selected' : undefined}
-                    onClick={selectMode ? (e) => { if (!(e.target as HTMLElement).closest('button,a,input')) toggleOne(u.id) } : undefined}
-                    style={selectMode ? { cursor: 'pointer' } : undefined}>
+                    onClick={canSel ? (e) => { if (!(e.target as HTMLElement).closest('button,a,input')) toggleOne(u.id) } : undefined}
+                    style={canSel ? { cursor: 'pointer' } : undefined}>
                     <td className="sticky-col sticky-col-1" style={{ color: 'var(--muted)', fontWeight: 700, textAlign: 'center' }}>
                       {selectMode
-                        ? <input type="checkbox" checked={isSel} onChange={() => toggleOne(u.id)}
-                            style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#1f3a5f' }} />
+                        ? (canSel
+                            ? <input type="checkbox" checked={isSel} onChange={() => toggleOne(u.id)}
+                                style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#1f3a5f' }} />
+                            : <span title="Yerləşdirməsi olan təhsilalan seçilə bilməz" style={{ cursor: 'not-allowed', fontSize: 12 }}>🔒</span>)
                         : i + 1}
                     </td>
                     <td className="sticky-col sticky-col-2" style={{ textAlign: 'center' }}>

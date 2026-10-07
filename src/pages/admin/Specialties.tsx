@@ -1160,7 +1160,14 @@ function BalanceModal({ tree, instUsers, onClose, onQuotaMode, onGenderConfig }:
             color: fea.ok ? '#237804' : '#874d00',
           }}>
             {fea.ok
-              ? <>✅ <b>Kvotalar uyğundur.</b> {fea.students} təhsilalanın hamısı üçün seçə bildiyi ixtisaslarda yer var.</>
+              ? <>✅ <b>Kvotalar uyğundur.</b> {fea.students} təhsilalanın hamısı üçün seçə bildiyi ixtisaslarda yer var.
+                  {(() => {
+                    const q = totalQuota(tree.nodes || [])
+                    const extra = q - instUsers.length
+                    return extra > 0
+                      ? <div style={{ marginTop: 6, color: '#cf1322' }}>⚠️ Amma ümumi kvota ({q}) təhsilalan sayından ({instUsers.length}) <b>{extra} çoxdur</b> — {extra} yer boş qalacaq.</div>
+                      : null
+                  })()}</>
               : <>⚠️ <b>{fea.deficit} təhsilalan heç bir halda yerləşə bilməyəcək</b> və <b>{fea.unfillable} yer</b> boş qalacaq —
                   bu, alqoritmin yox, kvota rəqəmlərinin nəticəsidir: bir qrup namizədə yer çatmır,
                   artıq qalan yerlər isə onların girə bilmədiyi ixtisaslardadır.</>}
@@ -2676,6 +2683,29 @@ export default function Specialties() {
                       {t.institution && (t.nodes || []).length > 0 && (
                         <SimChip users={usersForTree(t)} tree={t} onOpen={() => setBalanceTree(t)} />
                       )}
+
+                      {/* Ümumi kvota təhsilalan sayına bərabərdirmi — fərq olsa ya boş yer
+                          qalacaq, ya da kimsə yersiz qalacaq (mənbə rejimindən asılı deyil) */}
+                      {(() => {
+                        if (!t.institution || !(t.nodes || []).length) return null
+                        const cnt = usersForTree(t).length
+                        if (cnt === 0 || cnt === quota) return null
+                        const diff = quota - cnt
+                        const over = diff > 0
+                        return (
+                          <span onClick={e => { e.stopPropagation(); setBalanceTree(t) }}
+                            title={over
+                              ? `Ümumi kvota (${quota}) təhsilalan sayından (${cnt}) ${diff} çoxdur — ${diff} yer boş qalacaq`
+                              : `Təhsilalan sayı (${cnt}) ümumi kvotadan (${quota}) ${-diff} çoxdur — ən azı ${-diff} nəfər yersiz qalacaq`}
+                            style={{
+                              display: 'inline-flex', alignItems: 'center', gap: 4,
+                              fontSize: 10, fontWeight: 700, borderRadius: 6, padding: '1px 7px', whiteSpace: 'nowrap', cursor: 'pointer',
+                              color: '#cf1322', background: '#fff2f0', border: '1px solid #ffccc7',
+                            }}>
+                            ⚠️ Kvota {quota} ≠ təhsilalan {cnt} ({over ? `${diff} boş yer` : `${-diff} nəfər yersiz`})
+                          </span>
+                        )
+                      })()}
 
                       {/* Kvota rəqəmləri strukturla uyğundurmu (mənbə bölgüsündən asılı deyil) */}
                       {(() => {
