@@ -630,11 +630,12 @@ export default function Dashboard() {
 
   if (!loaded) return <div style={{ padding: '40px 0', textAlign: 'center', color: 'var(--muted)' }}>Yüklənir...</div>
 
-  const LEVEL_ICONS = ['⚔️', '🎖️', '🎓', '📘', '📗']
+  // Hərbi ciddiyyətə uyğun neytral ikonlar: qoşun növü · ixtisas · uçot qeydiyyatı
+  const LEVEL_ICONS = ['🛡️', '💼', '🗂️', '📁', '📄']
   const INST_KPIS: { label: string; value: any; icon: string; accent: string; sub?: string }[] = [
     { label: 'Təhsilalan', value: A.instUsers.length, icon: '👥', accent: '#722ed1' },
-    ...A.levelStats.map((l: any, i: number) => ({ label: l.name, value: l.count, icon: LEVEL_ICONS[i] || '🎓', accent: '#13c2c2' })),
-    { label: 'Ümumi kvota', value: A.totalQuota, icon: '🎯', accent: '#fa8c16' },
+    ...A.levelStats.map((l: any, i: number) => ({ label: l.name, value: l.count, icon: LEVEL_ICONS[i] || '📁', accent: '#13c2c2' })),
+    { label: 'Ümumi kvota', value: A.totalQuota, icon: '🔢', accent: '#fa8c16' },
     { label: 'Yerləşmə', value: `${pctText(A.placed, A.instUsers.length)}%`, icon: '✅', accent: '#52c41a', sub: `${A.placed}/${A.instUsers.length}` },
     { label: 'Seçim etdi', value: `${pctText(A.submittedCount, A.instUsers.length)}%`, icon: '🗳️', accent: '#eb2f96', sub: `${A.submittedCount}/${A.instUsers.length}` },
   ]
@@ -746,7 +747,7 @@ export default function Dashboard() {
             {/* Kart iki rejimlidir: yerləşdirmə bir kliklə aparıldığı üçün ondan ƏVVƏL
                 diaqram boş dayanmasın — seçim gedişatını (seçim etdi / etmədi) göstərir.
                 Yerləşdirmə aparılan kimi (placed > 0) avtomatik yerləşmə mənzərəsinə keçir. */}
-            <Card title={`${A.placed ? 'Yerləşmə' : 'Seçim'} statusu — ${activeInst.label}`} icon="🎯">
+            <Card title={`${A.placed ? 'Yerləşmə' : 'Seçim'} statusu — ${activeInst.label}`} icon="📋">
               <div style={{ display: 'flex', alignItems: 'center', gap: 22, flexWrap: 'wrap' }}>
                 <Donut size={150} segments={A.placed ? [
                   { value: A.placed, color: '#52c41a', label: 'Yerləşdi' },
@@ -864,7 +865,7 @@ export default function Dashboard() {
 
           {/* Sıra 2.5: qoşun növü + fənn ortalamaları */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 14 }}>
-            <Card title={`${A.tree?.levelNames?.[0] || 'Qoşun növü'} üzrə bölgü`} icon="⚔️">
+            <Card title={`${A.tree?.levelNames?.[0] || 'Qoşun növü'} üzrə bölgü`} icon="🛡️">
               {A.branchStats.length === 0 ? (
                 <div style={{ color: 'var(--muted)', fontSize: 13, padding: '14px 0' }}>Struktur tapılmadı.</div>
               ) : (
@@ -990,7 +991,7 @@ export default function Dashboard() {
           })()}
 
           {/* Sıra 3: ixtisas performans cədvəli */}
-          <Card title="İxtisas üzrə performans" icon="🎓">
+          <Card title="İxtisas üzrə performans" icon="💼">
             {A.byLeaf.length === 0 ? (
               <div style={{ color: 'var(--muted)', fontSize: 13, padding: '14px 0' }}>Bu müəssisə üçün ixtisas strukturu tapılmadı.</div>
             ) : (
