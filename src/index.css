@@ -150,6 +150,9 @@ tbody tr:hover td { background: #fafbff; }
 }
 .adaptive-table thead th.sticky-col { background: #f8f9fd; z-index: 6; }
 .adaptive-table tbody tr:hover td.sticky-col { background: #f8f9ff; }
+/* Toplu seçim rejimində seçilmiş sətir */
+.adaptive-table tbody tr.row-selected td,
+.adaptive-table tbody tr.row-selected td.sticky-col { background: #e9effb; }
 /* Sticky sütunların eni SABİT olmalıdır — icazə (redaktə/silmə düyməsi) olmasa da
    col-2 76px qalsın ki, col-3-ün 120px məsafəsi düz gəlsin (yoxsa sütunlar
    sürüşüb İş Nömrəsi/FİN kəsilir). 76px = iki 26px düymə + aralarındakı 5px + kənarlar */

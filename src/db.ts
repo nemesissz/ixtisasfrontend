@@ -224,6 +224,9 @@ export const userDb = {
     await http.post(`/api/students/bulk-update${method ? `?method=${method}` : ''}`, patches)
   },
   deleteMany: async (ids: string[]) => { await http.post('/api/students/delete-many', ids) },
+  // Seçilmiş təhsilalanlar üzrə toplu çap statusu / seçimin sıfırlanması ("Seçim etmədi")
+  bulkStatus: async (ids: string[], data: { printStatus?: 'printed' | 'not_printed'; resetSelection?: boolean }) =>
+    http.post<{ count: number }>('/api/students/bulk-status', { ids, ...data }),
   delete: async (id: string) => { await http.delete(`/api/students/${id}`) },
 }
 

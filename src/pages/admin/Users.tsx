@@ -1941,6 +1941,61 @@ const GRP_COLORS: Record<string, { bg: string; color: string }> = {
   '5': { bg: '#f9f0ff', color: '#531dab' },
 }
 
+// ── Seçilmiş təhsilalanları başqa qrupa köçürmə pəncərəsi ─────────────────────
+// Mövcud qrup, qrupsuz və ya yerindəcə yaradılan yeni qrup.
+function BulkCohortModal({ count, cohorts, currentId, busy, warnDone, onClose, onApply }: {
+  count: number; cohorts: any[]; currentId: string; busy: boolean; warnDone: number
+  onClose: () => void; onApply: (target: string, newLabel?: string) => Promise<void>
+}) {
+  const others = cohorts.filter((c: any) => c.id !== currentId)
+  const [mode, setMode]   = useState<'existing' | 'new' | 'none'>(others.length ? 'existing' : 'new')
+  const [pick, setPick]   = useState(others[0]?.id || '')
+  const [label, setLabel] = useState('')
+  const ok = !busy && (mode === 'none' ? currentId !== 'none' : mode === 'existing' ? !!pick : !!label.trim())
+  const apply = () => { if (ok) onApply(mode === 'existing' ? pick : mode, label) }
+  const opt = (key: typeof mode, title: string, disabled = false) => (
+    <label style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '10px 12px', borderRadius: 10, cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.5 : 1,
+      border: `1.5px solid ${mode === key ? '#c9962a' : '#e6e9f5'}`, background: mode === key ? '#fffbf0' : '#fff' }}>
+      <input type="radio" checked={mode === key} disabled={disabled} onChange={() => setMode(key)} />
+      <span style={{ fontWeight: 700, fontSize: 13.5 }}>{title}</span>
+    </label>
+  )
+  return (
+    <div className="modal-overlay open" onClick={() => !busy && onClose()}>
+      <div className="modal" style={{ maxWidth: 440 }} onClick={e => e.stopPropagation()}>
+        <div className="modal-head">
+          <span className="modal-title">👥 Qrupu dəyiş — {count} təhsilalan</span>
+          <button className="modal-close" onClick={onClose} disabled={busy}>✕</button>
+        </div>
+        <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {opt('existing', 'Mövcud qrupa köçür', others.length === 0)}
+          {mode === 'existing' && others.length > 0 && (
+            <select className="form-select" value={pick} onChange={e => setPick(e.target.value)} style={{ marginLeft: 30, width: 'calc(100% - 30px)' }}>
+              {others.map((c: any) => <option key={c.id} value={c.id}>{c.label}{c.year ? ` (${c.year})` : ''}</option>)}
+            </select>
+          )}
+          {opt('new', 'Yeni qrup yarat və köçür')}
+          {mode === 'new' && (
+            <input className="form-input" autoFocus placeholder="Qrupun adı" value={label}
+              onChange={e => setLabel(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') apply() }}
+              style={{ marginLeft: 30, width: 'calc(100% - 30px)' }} />
+          )}
+          {opt('none', 'Qrupdan çıxar (qrupsuz)', currentId === 'none')}
+          {warnDone > 0 && (
+            <div style={{ fontSize: 12, color: '#8a6d1b', background: '#fff7e6', border: '1px solid #ffd591', borderRadius: 8, padding: '8px 10px' }}>
+              Seçilmişlərdən {warnDone} nəfər artıq seçim göndərib və ya yerləşdirilib — onların nəticələri köhnə qrupun seçiminə aid olaraq qalacaq.
+            </div>
+          )}
+        </div>
+        <div className="modal-foot">
+          <button className="btn btn-outline" onClick={onClose} disabled={busy}>Ləğv et</button>
+          <button className="btn btn-primary" onClick={apply} disabled={!ok}>{busy ? 'Köçürülür...' : 'Köçür'}</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Cədvəl ────────────────────────────────────────────────────────────────────
 function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId: string; instLabel: string; instIcon?: string; onDelete: () => void; onReset: () => void }) {
   const [archiveDone, setArchiveDone] = useState(false)
@@ -2028,6 +2083,13 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
   const [excludedCols, setExcludedCols] = useState<Set<string>>(new Set())   // export-da çıxarılan sütunlar
   const [editUser,   setEditUser]   = useState<any>(null)
   const [printUser,  setPrintUser]  = useState<any>(null)
+  // ── Toplu seçim rejimi (default söndürülüb; "☑ Seç" düyməsi ilə açılır) ──
+  const [selectMode,   setSelectMode]   = useState(false)
+  const [selected,     setSelected]     = useState<Set<string>>(new Set())
+  const [bulkBusy,     setBulkBusy]     = useState(false)
+  const [bulkCohOpen,  setBulkCohOpen]  = useState(false)
+  // Müəssisə və ya qrup sekməsi dəyişəndə seçim sıfırlanır — görünməyən sətirlər təsadüfən dəyişməsin
+  useEffect(() => { setSelected(new Set()) }, [instId, cohFilter])
   const [nameMap,    setNameMap]    = useState<Record<string, string>>({})
 
   const [allSubs, setAllSubs] = useState<any[]>([])
@@ -2146,6 +2208,118 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
 
   const totalSub  = instUsers.filter((u: any) => subCountMap[u.id] > 0).length
   const totalPend = instUsers.length - totalSub
+
+  // ── Toplu əməliyyatlar ──────────────────────────────────────────────────
+  const selUsers = instUsers.filter((u: any) => selected.has(u.id))
+  const selIds   = selUsers.map((u: any) => u.id)
+  const allShownSelected = sorted.length > 0 && sorted.every((u: any) => selected.has(u.id))
+  const toggleOne = (id: string) => setSelected(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
+  const toggleAllShown = () => setSelected(prev => {
+    const n = new Set(prev)
+    if (allShownSelected) sorted.forEach((u: any) => n.delete(u.id))
+    else sorted.forEach((u: any) => n.add(u.id))
+    return n
+  })
+  function exitSelectMode() { setSelectMode(false); setSelected(new Set()); setBulkCohOpen(false) }
+  const errText = (e: any) => {
+    let msg = String(e?.message ?? e ?? '')
+    try { const j = JSON.parse(msg); if (j?.message) msg = j.message } catch { /* JSON deyil */ }
+    return msg || 'Naməlum xəta baş verdi.'
+  }
+  async function runBulk(fn: () => Promise<void>) {
+    setBulkBusy(true)
+    try { await fn() }
+    catch (e: any) {
+      showConfirm({ icon: '⚠️', iconBg: '#fdecea', iconColor: '#c0392b', infoOnly: true,
+        title: 'Əməliyyat alınmadı', message: errText(e), confirmLabel: 'Bağla' })
+    }
+    finally { setBulkBusy(false) }
+  }
+
+  function bulkDelete() {
+    if (!selIds.length) return
+    const withSub = selUsers.filter((u: any) => subCountMap[u.id] > 0 || u.placedSpecialty).length
+    showConfirm({
+      icon: '🗑', iconBg: '#fff5f5', iconColor: '#cf1322',
+      title: `${selIds.length} təhsilalanı sil`,
+      message: `Seçilmiş ${selIds.length} təhsilalan siyahıdan tamamilə silinəcək.`
+        + (withSub ? ` Onlardan ${withSub} nəfərin göndərilmiş seçimi / yerləşdirmə nəticəsi də birlikdə silinir.` : '')
+        + ' Bu əməliyyat geri alına bilməz.',
+      confirmLabel: 'Sil', confirmColor: '#cf1322',
+      onConfirm: () => runBulk(async () => {
+        await userDb.deleteMany(selIds)
+        addLog('user', 'warning', `Toplu silmə: ${selIds.length} təhsilalan`,
+          `Müəssisə: ${instLabel}\n${selUsers.slice(0, 20).map((u: any) => `${u.name} (${u.fin || '—'})`).join('\n')}${selUsers.length > 20 ? `\n… və daha ${selUsers.length - 20}` : ''}`)
+        setSelected(new Set())
+        await refreshUsers(); loadSubs()
+      }),
+    })
+  }
+
+  function bulkPrint(status: 'printed' | 'not_printed') {
+    if (!selIds.length) return
+    const label = status === 'printed' ? 'Çap edilib' : 'Çap edilməyib'
+    showConfirm({
+      icon: '🖨️', iconBg: '#f4f7ff', iconColor: '#c9962a',
+      title: 'Çap statusunu dəyiş',
+      message: `Seçilmiş ${selIds.length} təhsilalanın çap statusu «${label}» olacaq.`,
+      confirmLabel: 'Dəyiş', confirmColor: '#c9962a',
+      onConfirm: () => runBulk(async () => {
+        await userDb.bulkStatus(selIds, { printStatus: status })
+        addLog('user', 'info', `Toplu çap statusu → ${label}: ${selIds.length} təhsilalan`, `Müəssisə: ${instLabel}`)
+        await refreshUsers()
+      }),
+    })
+  }
+
+  function bulkResetSelection() {
+    if (!selIds.length) return
+    const subbed = selUsers.filter((u: any) => subCountMap[u.id] > 0).length
+    const placed = selUsers.filter((u: any) => u.placedSpecialty).length
+    showConfirm({
+      icon: '↺', iconBg: '#fff7e6', iconColor: '#d46b08',
+      title: 'Seçim statusunu sıfırla',
+      message: `Seçilmiş ${selIds.length} təhsilalanın statusu «Seçim etmədi» olacaq.`
+        + (subbed ? ` ${subbed} nəfərin göndərdiyi seçim silinəcək.` : '')
+        + (placed ? ` ${placed} nəfərin yerləşdirmə nəticəsi də təmizlənəcək.` : '')
+        + ' Bu əməliyyat geri alına bilməz.',
+      confirmLabel: 'Sıfırla', confirmColor: '#d46b08',
+      onConfirm: () => runBulk(async () => {
+        await userDb.bulkStatus(selIds, { resetSelection: true })
+        addLog('user', 'warning', `Toplu seçim sıfırlama: ${selIds.length} təhsilalan → Seçim etmədi`,
+          `Müəssisə: ${instLabel}${subbed ? ` · ${subbed} seçim silindi` : ''}${placed ? ` · ${placed} yerləşdirmə təmizləndi` : ''}`)
+        await refreshUsers(); loadSubs()
+      }),
+    })
+  }
+
+  async function bulkMoveCohort(target: string, newLabel?: string) {
+    await runBulk(async () => {
+      let tid = target
+      if (target === 'new') {
+        const label = (newLabel || '').trim()
+        const dup = cohorts.find((c: any) => c.label.trim().toLowerCase() === label.toLowerCase())
+        if (dup) tid = dup.id
+        else {
+          const c = await cohortDb.create({ institution: instId, label })
+          addLog('user', 'info', `Qrup yaradıldı: "${label}"`, `Müəssisə: ${instLabel} · toplu köçürmə zamanı`)
+          tid = c.id
+        }
+      }
+      try { await cohortDb.assign(tid, selIds) }
+      catch (e) {
+        const fc = finConflictsOf(e)
+        if (fc) throw new Error(`FİN toqquşması: hədəf qrupda ${fc.conflicts.map((c: any) => `${c.fin} (${c.existingName})`).slice(0, 5).join(', ')} artıq var. Heç kim köçürülmədi.`)
+        throw e
+      }
+      const lbl = tid === 'none' ? 'qrupsuz' : (cohorts.find((c: any) => c.id === tid)?.label || newLabel || tid)
+      addLog('user', 'success', `${selIds.length} təhsilalan "${lbl}" qrupuna köçürüldü`, `Müəssisə: ${instLabel}`)
+      setBulkCohOpen(false)
+      setSelected(new Set())
+      loadCohorts()
+      await refreshUsers()
+    })
+  }
 
   async function handlePrint(u: any) {
     const tree = activeSel ? await treeDb.get(activeSel.treeId) : null
@@ -2341,6 +2515,16 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
       <div className="card" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', marginBottom: 0 }}>
         <div className="card-head" style={{ flexShrink: 0, padding: '10px 16px', gap: 10 }}>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end', flex: 1 }}>
+            {(can('users.edit') || can('users.delete')) && (
+            <button onClick={() => selectMode ? exitSelectMode() : setSelectMode(true)} disabled={!selectMode && instUsers.length === 0}
+              title={selectMode ? 'Seçim rejimini bağla' : 'Təhsilalanları seçib toplu əməliyyat et'}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 16px', borderRadius: 10,
+                cursor: (selectMode || instUsers.length) ? 'pointer' : 'not-allowed', opacity: (!selectMode && instUsers.length === 0) ? 0.4 : 1,
+                border: selectMode ? '1.5px solid #1f3a5f' : '1.5px solid #d0d8f8', background: selectMode ? '#1f3a5f' : '#f4f7ff',
+                color: selectMode ? '#fff' : '#1f3a5f', fontWeight: 800, fontSize: 13, boxShadow: '0 2px 8px #1a1f3c14' }}>
+              {selectMode ? '✕ Seçimi bağla' : '☑ Seç'}
+            </button>
+            )}
             {can('users.delete') && (
             <button onClick={() => handleArchiveUsers(instUsers, cohorts.find((c: any) => c.id === cohFilter)?.label)} disabled={instUsers.length === 0}
               title="Arxivlə"
@@ -2459,12 +2643,69 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
           )}
         </div>
 
+        {/* ── Toplu əməliyyat paneli (yalnız seçim rejimində) ── */}
+        {selectMode && (() => {
+          const none = selIds.length === 0 || bulkBusy
+          const btn = (bg: string, bd: string, fg: string): React.CSSProperties => ({
+            padding: '7px 12px', borderRadius: 9, border: `1.5px solid ${bd}`, background: bg, color: fg,
+            fontWeight: 800, fontSize: 12, cursor: none ? 'not-allowed' : 'pointer', opacity: none ? 0.45 : 1, whiteSpace: 'nowrap',
+          })
+          const sep = <span style={{ width: 1, alignSelf: 'stretch', background: '#d0d8f8', margin: '0 2px' }} />
+          return (
+            <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', padding: '9px 16px', background: '#f4f7ff', borderTop: '1px solid #e3e8f7', borderBottom: '1px solid #e3e8f7' }}>
+              <span style={{ fontWeight: 800, fontSize: 13, color: '#1f3a5f', marginRight: 4 }}>
+                {selIds.length} seçilib
+              </span>
+              <button type="button" onClick={toggleAllShown} disabled={!sorted.length || bulkBusy}
+                style={{ ...btn('#fff', '#d0d8f8', '#1f3a5f'), opacity: sorted.length ? 1 : 0.45, cursor: 'pointer' }}>
+                {allShownSelected ? 'Görünənləri çıxar' : `Görünənlərin hamısı (${sorted.length})`}
+              </button>
+              {selIds.length > 0 && (
+                <button type="button" onClick={() => setSelected(new Set())} disabled={bulkBusy}
+                  style={{ ...btn('#fff', '#e0e4f0', 'var(--muted)'), opacity: 1, cursor: 'pointer' }}>Təmizlə</button>
+              )}
+              <span style={{ flex: 1 }} />
+              {can('users.edit') && <>
+                <span style={{ fontSize: 11.5, color: 'var(--muted)', fontWeight: 700 }}>Çap:</span>
+                <button type="button" disabled={none} onClick={() => bulkPrint('printed')} style={btn('#f6ffed', '#b7eb8f', '#237804')}>✓ Edilib</button>
+                <button type="button" disabled={none} onClick={() => bulkPrint('not_printed')} style={btn('#fff7e6', '#ffd591', '#d46b08')}>✗ Edilməyib</button>
+                {sep}
+                <button type="button" disabled={none} onClick={bulkResetSelection} style={btn('#fff7e6', '#ffd591', '#d46b08')}
+                  title="Seçilmişlərin göndərdiyi seçimi silir və statusu «Seçim etmədi» edir">↺ Seçim etmədi</button>
+                {sep}
+                <button type="button" disabled={none} onClick={() => setBulkCohOpen(true)} style={btn('#fff', '#d0d8f8', '#1f3a5f')}>👥 Qrupu dəyiş</button>
+              </>}
+              {can('users.delete') && <>
+                {sep}
+                <button type="button" disabled={none} onClick={bulkDelete} style={btn('#fff5f5', '#ffccc7', '#cf1322')}>🗑 Sil</button>
+              </>}
+            </div>
+          )
+        })()}
+
+        {bulkCohOpen && (
+          <BulkCohortModal
+            count={selIds.length}
+            cohorts={cohorts.filter((c: any) => !c.isArchived)}
+            currentId={cohFilter}
+            busy={bulkBusy}
+            warnDone={selUsers.filter((u: any) => subCountMap[u.id] > 0 || u.placedSpecialty).length}
+            onClose={() => setBulkCohOpen(false)}
+            onApply={bulkMoveCohort}
+          />
+        )}
+
         <div className="card-body" style={{ padding: 0, flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
           <div ref={tableWrapRef} className="adaptive-table-wrap" style={{ flex: 1, minHeight: 0, maxHeight: 'none' }}>
           <table className="adaptive-table">
             <thead>
               <tr>
-                <th className="sticky-col sticky-col-1" style={{ textAlign: 'center' }}>№</th>
+                <th className="sticky-col sticky-col-1" style={{ textAlign: 'center' }}>
+                  {selectMode
+                    ? <input type="checkbox" checked={allShownSelected} onChange={toggleAllShown} disabled={!sorted.length}
+                        title="Görünənlərin hamısını seç" style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#1f3a5f' }} />
+                    : '№'}
+                </th>
                 <th className="sticky-col sticky-col-2"></th>
                 <th className="sticky-col sticky-col-3">Təhsilalan</th>
                 <th>İş Nömrəsi</th>
@@ -2496,9 +2737,17 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
                 const isPrinted = u.printStatus === 'printed'
                 const grp       = String(u.group || '')
                 const grpStyle  = GRP_COLORS[grp] || { bg: '#f4f4f4', color: '#999' }
+                const isSel     = selectMode && selected.has(u.id)
                 return (
-                  <tr key={u.id}>
-                    <td className="sticky-col sticky-col-1" style={{ color: 'var(--muted)', fontWeight: 700, textAlign: 'center' }}>{i + 1}</td>
+                  <tr key={u.id} className={isSel ? 'row-selected' : undefined}
+                    onClick={selectMode ? (e) => { if (!(e.target as HTMLElement).closest('button,a,input')) toggleOne(u.id) } : undefined}
+                    style={selectMode ? { cursor: 'pointer' } : undefined}>
+                    <td className="sticky-col sticky-col-1" style={{ color: 'var(--muted)', fontWeight: 700, textAlign: 'center' }}>
+                      {selectMode
+                        ? <input type="checkbox" checked={isSel} onChange={() => toggleOne(u.id)}
+                            style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#1f3a5f' }} />
+                        : i + 1}
+                    </td>
                     <td className="sticky-col sticky-col-2" style={{ textAlign: 'center' }}>
                       {can('users.edit') && (
                       hasPlacement ? (
