@@ -225,8 +225,26 @@ export const userDb = {
   },
   deleteMany: async (ids: string[]) => { await http.post('/api/students/delete-many', ids) },
   // Seçilmiş təhsilalanlar üzrə toplu çap statusu / seçimin sıfırlanması ("Seçim etmədi")
-  bulkStatus: async (ids: string[], data: { printStatus?: 'printed' | 'not_printed'; resetSelection?: boolean }) =>
-    http.post<{ count: number }>('/api/students/bulk-status', { ids, ...data }),
+  // Backend köhnədirsə (endpoint yoxdur → 404/405) eyni iş mövcud endpoint-lərlə,
+  // təhsilalan-təhsilalan görülür — nəticə eynidir, sadəcə daha yavaşdır.
+  bulkStatus: async (ids: string[], data: { printStatus?: 'printed' | 'not_printed'; resetSelection?: boolean }) => {
+    try {
+      return await http.post<{ count: number }>('/api/students/bulk-status', { ids, ...data })
+    } catch (e: any) {
+      if (e?.status !== 404 && e?.status !== 405) throw e
+    }
+    const subs = data.resetSelection ? await submissionDb.getAll() : []
+    for (const id of ids) {
+      if (data.resetSelection) {
+        for (const s of subs.filter((x: any) => x.userId === id)) await submissionDb.deleteByUser(id, s.selectionId)
+      }
+      await userDb.update(id, {
+        ...(data.printStatus ? { printStatus: data.printStatus } : {}),
+        ...(data.resetSelection ? { status: 'pending', placedSpecialty: null, placedSpecialtyId: null, placedSelectionId: null, choiceNum: null } : {}),
+      })
+    }
+    return { count: ids.length }
+  },
   delete: async (id: string) => { await http.delete(`/api/students/${id}`) },
 }
 
