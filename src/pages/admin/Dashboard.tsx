@@ -159,10 +159,10 @@ function buildStatsReportHtml(A: any, instLabel: string, selName: string): strin
   // İxtisas performansı
   const perf = A.byLeaf.length ? `
     <table class="t">
-      <thead><tr><th rowspan="2">İxtisas</th><th rowspan="2">Kvota</th><th rowspan="2">Yerləşən</th><th colspan="2">Lisey</th><th colspan="2">Mülki</th></tr>
-      <tr><th>ən aşağı</th><th>ən yuxarı</th><th>ən aşağı</th><th>ən yuxarı</th></tr></thead>
+      <thead><tr><th rowspan="2">İxtisas</th><th rowspan="2">Kvota</th><th rowspan="2">Yerləşən</th><th colspan="3">Lisey</th><th colspan="3">Mülki</th></tr>
+      <tr><th>ən aşağı</th><th>orta</th><th>ən yuxarı</th><th>ən aşağı</th><th>orta</th><th>ən yuxarı</th></tr></thead>
       <tbody>${[...A.byLeaf].sort((a: any, b: any) => b.quota - a.quota).map((l: any) =>
-        `<tr><td>${esc(l.name)}${l.path ? `<div class="sub">${esc(l.path)}</div>` : ''}</td><td class="c">${l.quota}</td><td class="c">${l.placed}</td><td class="c">${l.liseyMin ? l.liseyMin.toFixed(1) : '—'}</td><td class="c">${l.liseyMax ? l.liseyMax.toFixed(1) : '—'}</td><td class="c">${l.mülkiMin ? l.mülkiMin.toFixed(1) : '—'}</td><td class="c">${l.mülkiMax ? l.mülkiMax.toFixed(1) : '—'}</td></tr>`).join('')}</tbody>
+        `<tr><td>${esc(l.name)}${l.path ? `<div class="sub">${esc(l.path)}</div>` : ''}</td><td class="c">${l.quota}</td><td class="c">${l.placed}</td><td class="c">${l.liseyMin ? l.liseyMin.toFixed(1) : '—'}</td><td class="c">${l.liseyAvg ? l.liseyAvg.toFixed(1) : '—'}</td><td class="c">${l.liseyMax ? l.liseyMax.toFixed(1) : '—'}</td><td class="c">${l.mülkiMin ? l.mülkiMin.toFixed(1) : '—'}</td><td class="c">${l.mülkiAvg ? l.mülkiAvg.toFixed(1) : '—'}</td><td class="c">${l.mülkiMax ? l.mülkiMax.toFixed(1) : '—'}</td></tr>`).join('')}</tbody>
     </table>` : ''
 
   // Rəqabət
@@ -354,6 +354,7 @@ export default function Dashboard() {
       // mənbə üzrə bal aralığı (lisey / mülki ayrıca)
       const bySrc = (src: string) => us.filter(u => u.source === src).map(u => u.score || 0)
       const liseyS = bySrc('lisey'), mülkiS = bySrc('mülki')
+      const mean = (xs: number[]) => xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0
       return {
         id: leaf.id, name: leaf.name, path: path.slice(0, -1).map((n: any) => n.name).join(' › '),
         quota: leaf.quota || 0, placed: us.length,
@@ -365,6 +366,8 @@ export default function Dashboard() {
         top3: top3[leaf.id] || 0,
         liseyMin: liseyS.length ? Math.min(...liseyS) : 0,
         liseyMax: liseyS.length ? Math.max(...liseyS) : 0,
+        liseyAvg: mean(liseyS),
+        mülkiAvg: mean(mülkiS),
         mülkiMin: mülkiS.length ? Math.min(...mülkiS) : 0,
         mülkiMax: mülkiS.length ? Math.max(...mülkiS) : 0,
         demand: firstChoice[leaf.id] || 0,
@@ -586,12 +589,12 @@ export default function Dashboard() {
 
     // İxtisaslar vərəqi
     const perf: any[][] = [
-      ['İxtisas', 'Yol', 'Kvota', 'Yerləşən', 'Doluluq %', 'Lisey', '', 'Mülki', ''],
-      ['', '', '', '', '', 'ən aşağı bal', 'ən yuxarı bal', 'ən aşağı bal', 'ən yuxarı bal'],
+      ['İxtisas', 'Yol', 'Kvota', 'Yerləşən', 'Doluluq %', 'Lisey', '', '', 'Mülki', '', ''],
+      ['', '', '', '', '', 'ən aşağı bal', 'orta bal', 'ən yuxarı bal', 'ən aşağı bal', 'orta bal', 'ən yuxarı bal'],
       ...[...A.byLeaf].sort((a: any, b: any) => b.quota - a.quota).map((l: any) =>
         [l.name, l.path, l.quota, l.placed, pc(l.placed, l.quota),
-          l.liseyMin ? +l.liseyMin.toFixed(1) : '', l.liseyMax ? +l.liseyMax.toFixed(1) : '',
-          l.mülkiMin ? +l.mülkiMin.toFixed(1) : '', l.mülkiMax ? +l.mülkiMax.toFixed(1) : ''])]
+          l.liseyMin ? +l.liseyMin.toFixed(1) : '', l.liseyAvg ? +l.liseyAvg.toFixed(1) : '', l.liseyMax ? +l.liseyMax.toFixed(1) : '',
+          l.mülkiMin ? +l.mülkiMin.toFixed(1) : '', l.mülkiAvg ? +l.mülkiAvg.toFixed(1) : '', l.mülkiMax ? +l.mülkiMax.toFixed(1) : ''])]
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(perf), 'İxtisaslar')
 
     // Rəqabət vərəqi (1-ci seçim üzrə)
@@ -992,7 +995,7 @@ export default function Dashboard() {
               <div style={{ color: 'var(--muted)', fontSize: 13, padding: '14px 0' }}>Bu müəssisə üçün ixtisas strukturu tapılmadı.</div>
             ) : (
               <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5, minWidth: A.hasSource ? 900 : 720 }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5, minWidth: A.hasSource ? 1040 : 800 }}>
                   <thead>
                     <tr style={{ background: '#f8f9fd', color: 'var(--muted)', textAlign: 'left' }}>
                       <th rowSpan={2} style={{ padding: '9px 12px', fontWeight: 700, verticalAlign: 'bottom' }}>İxtisas</th>
@@ -1000,15 +1003,16 @@ export default function Dashboard() {
                       <th rowSpan={2} style={{ padding: '9px 12px', fontWeight: 700, whiteSpace: 'nowrap', textAlign: 'center', verticalAlign: 'bottom' }}>Yerləşən</th>
                       {A.hasSource
                         ? <>
-                            <th colSpan={2} style={{ padding: '7px 12px', fontWeight: 800, textAlign: 'center', borderLeft: '1px solid #e6e9f5', color: '#2f54eb' }}>Lisey</th>
-                            <th colSpan={2} style={{ padding: '7px 12px', fontWeight: 800, textAlign: 'center', borderLeft: '1px solid #e6e9f5', color: '#c9962a' }}>Mülki</th>
+                            <th colSpan={3} style={{ padding: '7px 12px', fontWeight: 800, textAlign: 'center', borderLeft: '1px solid #e6e9f5', color: '#2f54eb' }}>Lisey</th>
+                            <th colSpan={3} style={{ padding: '7px 12px', fontWeight: 800, textAlign: 'center', borderLeft: '1px solid #e6e9f5', color: '#c9962a' }}>Mülki</th>
                           </>
-                        : <th colSpan={2} style={{ padding: '7px 12px', fontWeight: 800, textAlign: 'center', borderLeft: '1px solid #e6e9f5' }}>Bal</th>}
+                        : <th colSpan={3} style={{ padding: '7px 12px', fontWeight: 800, textAlign: 'center', borderLeft: '1px solid #e6e9f5' }}>Bal</th>}
                     </tr>
                     <tr style={{ background: '#f8f9fd', color: 'var(--muted)' }}>
                       {(A.hasSource ? [0, 1] : [0]).map(g => (
                         <Fragment key={g}>
                           <th style={{ padding: '7px 12px', fontWeight: 700, fontSize: 11, textAlign: 'center', whiteSpace: 'nowrap', borderLeft: '1px solid #e6e9f5' }}>ən aşağı bal</th>
+                          <th style={{ padding: '7px 12px', fontWeight: 700, fontSize: 11, textAlign: 'center', whiteSpace: 'nowrap' }}>orta bal</th>
                           <th style={{ padding: '7px 12px', fontWeight: 700, fontSize: 11, textAlign: 'center', whiteSpace: 'nowrap' }}>ən yuxarı bal</th>
                         </Fragment>
                       ))}
@@ -1026,12 +1030,15 @@ export default function Dashboard() {
                           <td style={{ padding: '9px 12px', textAlign: 'center', fontWeight: 700 }}>{l.placed}</td>
                           {!A.hasSource && <>
                             <td style={{ padding: '9px 12px', textAlign: 'center', fontWeight: 700, color: l.min ? '#722ed1' : 'var(--muted)', borderLeft: '1px solid #f0f2fa' }}>{l.min ? l.min.toFixed(1) : '—'}</td>
+                            <td style={{ padding: '9px 12px', textAlign: 'center', fontWeight: 700, color: l.avg ? '#c9962a' : 'var(--muted)' }}>{l.avg ? l.avg.toFixed(1) : '—'}</td>
                             <td style={{ padding: '9px 12px', textAlign: 'center', fontWeight: 700, color: l.max ? '#52c41a' : 'var(--muted)' }}>{l.max ? l.max.toFixed(1) : '—'}</td>
                           </>}
                           {A.hasSource && <>
                             <td style={{ padding: '9px 12px', textAlign: 'center', fontWeight: 700, color: l.liseyMin ? '#722ed1' : 'var(--muted)', borderLeft: '1px solid #f0f2fa' }}>{l.liseyMin ? l.liseyMin.toFixed(1) : '—'}</td>
+                            <td style={{ padding: '9px 12px', textAlign: 'center', fontWeight: 700, color: l.liseyAvg ? '#c9962a' : 'var(--muted)' }}>{l.liseyAvg ? l.liseyAvg.toFixed(1) : '—'}</td>
                             <td style={{ padding: '9px 12px', textAlign: 'center', fontWeight: 700, color: l.liseyMax ? '#52c41a' : 'var(--muted)' }}>{l.liseyMax ? l.liseyMax.toFixed(1) : '—'}</td>
                             <td style={{ padding: '9px 12px', textAlign: 'center', fontWeight: 700, color: l.mülkiMin ? '#722ed1' : 'var(--muted)', borderLeft: '1px solid #f0f2fa' }}>{l.mülkiMin ? l.mülkiMin.toFixed(1) : '—'}</td>
+                            <td style={{ padding: '9px 12px', textAlign: 'center', fontWeight: 700, color: l.mülkiAvg ? '#c9962a' : 'var(--muted)' }}>{l.mülkiAvg ? l.mülkiAvg.toFixed(1) : '—'}</td>
                             <td style={{ padding: '9px 12px', textAlign: 'center', fontWeight: 700, color: l.mülkiMax ? '#52c41a' : 'var(--muted)' }}>{l.mülkiMax ? l.mülkiMax.toFixed(1) : '—'}</td>
                           </>}
                         </tr>
