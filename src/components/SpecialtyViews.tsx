@@ -146,8 +146,10 @@ export function FlatView({ flat, onChange, submitted = false, levelNames }: {
     if (!interactive || e.pointerType === 'touch' || e.button !== 0) return
     e.preventDefault()
     dragIdx.current = i; setDragging(i)
-    const prevCursor = document.body.style.cursor
-    document.body.style.cursor = 'grabbing'
+    // Sürükləmə bitənə qədər səhifənin hər yerində "sıxılmış əl" — sətirlərin öz "grab" kursoru da örtülür
+    const cursorStyle = document.createElement('style')
+    cursorStyle.textContent = '*, *::before, *::after { cursor: grabbing !important; }'
+    document.head.appendChild(cursorStyle)
     const move = (ev: PointerEvent) => {
       const el = (document.elementFromPoint(ev.clientX, ev.clientY) as HTMLElement | null)?.closest('[data-flat-idx]') as HTMLElement | null
       if (el) moveTo(Number(el.dataset.flatIdx))
@@ -156,7 +158,7 @@ export function FlatView({ flat, onChange, submitted = false, levelNames }: {
       window.removeEventListener('pointermove', move)
       window.removeEventListener('pointerup', up)
       window.removeEventListener('pointercancel', up)
-      document.body.style.cursor = prevCursor
+      cursorStyle.remove()
       onDragEnd()
     }
     window.addEventListener('pointermove', move)
@@ -228,7 +230,7 @@ export function FlatView({ flat, onChange, submitted = false, levelNames }: {
                 opacity: 1,
                 position: 'relative',
                 zIndex: isDrag ? 2 : undefined,
-                cursor: interactive ? (isDrag ? 'grabbing' : 'grab') : 'default',
+                cursor: interactive ? (dragging !== null ? 'grabbing' : 'grab') : 'default',
                 userSelect: 'none',
                 transition: isFlash ? 'background 1.8s ease, box-shadow 1.8s ease' : 'background .1s',
               }}
