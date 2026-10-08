@@ -643,8 +643,8 @@ export default function Dashboard() {
     { label: 'Təhsilalan', value: A.instUsers.length, accent: '#722ed1' },
     ...A.levelStats.map((l: any) => ({ label: l.name, value: l.count, accent: '#13c2c2' })),
     { label: 'Ümumi kvota', value: A.totalQuota, accent: '#fa8c16' },
-    { label: 'Yerləşmə', value: `${pctText(A.placed, A.instUsers.length)}%`, accent: '#52c41a', sub: `${A.placed}/${A.instUsers.length}` },
-    { label: 'Seçim etdi', value: `${pctText(A.submittedCount, A.instUsers.length)}%`, accent: '#eb2f96', sub: `${A.submittedCount}/${A.instUsers.length}` },
+    { label: 'Yerləşdirilən', value: A.placed, accent: '#52c41a' },
+    { label: 'Seçim etdi', value: A.submittedCount, accent: '#eb2f96' },
   ]
 
   // Strukturun təhsilalan qrupunun adı (nişanda göstərmək üçün)
@@ -738,7 +738,7 @@ export default function Dashboard() {
           {/* Müəssisənin fərdi KPI-ları */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12 }}>
             {INST_KPIS.map(k => (
-              <div key={k.label} style={{ background: '#fff', border: '1.5px solid var(--border)', borderTop: `3px solid ${k.accent}`, borderRadius: 14, padding: '15px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', gap: 5, minWidth: 0 }}>
+              <div key={k.label} style={{ background: '#fff', border: '1.5px solid var(--border)', borderRadius: 14, padding: '15px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', gap: 5, minWidth: 0 }}>
                 <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--text)', lineHeight: 1 }}>{k.value}</div>
                 <div style={{ fontSize: 11, color: 'var(--muted)', overflowWrap: 'anywhere' }}>{k.label}{k.sub ? ` · ${k.sub}` : ''}</div>
               </div>
@@ -750,7 +750,7 @@ export default function Dashboard() {
             {/* Kart iki rejimlidir: yerləşdirmə bir kliklə aparıldığı üçün ondan ƏVVƏL
                 diaqram boş dayanmasın — seçim gedişatını (seçim etdi / etmədi) göstərir.
                 Yerləşdirmə aparılan kimi (placed > 0) avtomatik yerləşmə mənzərəsinə keçir. */}
-            <Card title={`${A.placed ? 'Yerləşmə' : 'Seçim'} statusu — ${activeInst.label}`}>
+            <Card title="Yerləşdirmə statusu">
               <div style={{ display: 'flex', alignItems: 'center', gap: 22, flexWrap: 'wrap' }}>
                 <Donut size={150} segments={A.placed ? [
                   { value: A.placed, color: '#52c41a', label: 'Yerləşdi' },
@@ -780,28 +780,15 @@ export default function Dashboard() {
                       <b style={{ color: 'var(--text)' }}>{x.v}</b>
                     </div>
                   ))}
-                  <div style={{ borderTop: '1px solid var(--border)', paddingTop: 10, fontSize: 12, color: 'var(--muted)', display: 'flex', justifyContent: 'space-between' }}>
-                    {A.placed ? <>
-                      <span>Kvota doluluğu</span>
-                      <b style={{ color: '#fa8c16' }}>{pctText(A.placed, A.totalQuota)}% ({A.placed}/{A.totalQuota})</b>
-                    </> : <>
-                      <span>Ümumi kvota</span>
-                      <b style={{ color: '#fa8c16' }}>{A.totalQuota} yer · {A.instUsers.length} təhsilalan</b>
-                    </>}
-                  </div>
-                  {/* Yerləşdirmədən əvvəl bütün təhsilalanların qəbul balı göstərilir,
-                      sonra isə yalnız yerləşənlərin balı — kartın rejiminə uyğun olsun. */}
-                  <div style={{ fontSize: 10.5, color: 'var(--muted)', marginTop: 2 }}>
-                    {A.placed ? 'Yerləşənlərin balı' : 'Təhsilalanların balı'}
-                  </div>
-                  <div style={{ display: 'flex', gap: 6 }}>
+                  {/* Bal göstəriciləri: yerləşdirmədən əvvəl bütün təhsilalanların, sonra yalnız yerləşənlərin balı */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8, marginTop: 4, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
                     {(A.placed
                       ? [['Ən aşağı', A.placedMinScore, '#ff4d4f'], ['Orta', A.placedAvgScore, '#c9962a'], ['Ən yüksək', A.placedMaxScore, '#52c41a']]
                       : [['Ən aşağı', A.minScore, '#ff4d4f'], ['Orta', A.avgScore, '#c9962a'], ['Ən yüksək', A.maxScore, '#52c41a']]
                     ).map(([l, v, c]: any) => (
-                      <div key={l} style={{ flex: 1, textAlign: 'center', background: `${c}10`, borderRadius: 8, padding: '6px 2px' }}>
-                        <div style={{ fontSize: 14, fontWeight: 800, color: c }}>{Number(v).toFixed(1)}</div>
-                        <div style={{ fontSize: 9.5, color: 'var(--muted)' }}>{l}</div>
+                      <div key={l} style={{ textAlign: 'center', background: `${c}10`, borderRadius: 10, padding: '12px 4px', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 4 }}>
+                        <div style={{ fontSize: 18, fontWeight: 800, color: c, lineHeight: 1 }}>{Number(v).toFixed(1)}</div>
+                        <div style={{ fontSize: 11, color: 'var(--muted)' }}>{l}</div>
                       </div>
                     ))}
                   </div>
@@ -809,10 +796,11 @@ export default function Dashboard() {
               </div>
             </Card>
 
-            <Card title="Bal paylanması">
+            <Card title="Bal bölgüsü">
+              {/* Yüksək baldan aşağıya doğru */}
               <Bars data={A.scoreBuckets.map(([lo, hi], i) => ({
                 label: `${lo}–${hi}`, value: A.hist[i], color: '#c9962a',
-              }))} />
+              })).reverse()} />
             </Card>
           </div>
 
