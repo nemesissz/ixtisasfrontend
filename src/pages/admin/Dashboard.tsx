@@ -63,16 +63,22 @@ function Donut({ segments, size = 150, stroke = 20, center }: {
 // ── Üfüqi sütun ─────────────────────────────────────────────────────────────
 function Bars({ data, max }: { data: { label: string; value: number; color: string; sub?: string }[]; max?: number }) {
   const m = max ?? Math.max(1, ...data.map(d => d.value))
+  const hasSub = data.some(d => d.sub)
+  // Tək grid: ad, bar, say və faiz hər sətirdə eyni sütunlarda başlayır, bütün barlar eyni enlidir
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+    <div style={{
+      display: 'grid', alignItems: 'center', columnGap: 10, rowGap: 10,
+      gridTemplateColumns: `minmax(0, 120px) minmax(0, 1fr) minmax(4ch, max-content)${hasSub ? ' minmax(8ch, max-content)' : ''}`,
+    }}>
       {data.map((d, i) => (
-        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ width: 120, fontSize: 12, color: 'var(--text)', fontWeight: 600, textAlign: 'right', flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.label}</div>
-          <div style={{ flex: 1, background: '#f0f2f8', borderRadius: 6, height: 22, position: 'relative', overflow: 'hidden' }}>
+        <Fragment key={i}>
+          <div title={d.label} style={{ fontSize: 12, color: 'var(--text)', fontWeight: 600, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.label}</div>
+          <div style={{ background: '#f0f2f8', borderRadius: 6, height: 22, position: 'relative', overflow: 'hidden' }}>
             <div style={{ width: `${pct(d.value, m)}%`, background: d.color, height: '100%', borderRadius: 6, minWidth: d.value > 0 ? 3 : 0, transition: 'width .5s' }} />
           </div>
-          <div style={{ minWidth: 64, fontSize: 12, fontWeight: 700, color: 'var(--text)', flexShrink: 0, whiteSpace: 'nowrap' }}>{d.value}{d.sub ? <span style={{ color: 'var(--muted)', fontWeight: 500 }}> {d.sub}</span> : ''}</div>
-        </div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{d.value}</div>
+          {hasSub && <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--muted)', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{d.sub || ''}</div>}
+        </Fragment>
       ))}
     </div>
   )
