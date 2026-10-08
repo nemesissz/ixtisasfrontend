@@ -63,8 +63,26 @@ function Donut({ segments, size = 150, stroke = 20, center }: {
 // ── Üfüqi sütun ─────────────────────────────────────────────────────────────
 function Bars({ data, max }: { data: { label: string; value: number; color: string; sub?: string }[]; max?: number }) {
   const m = max ?? Math.max(1, ...data.map(d => d.value))
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      {data.map((d, i) => (
+        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ width: 120, fontSize: 12, color: 'var(--text)', fontWeight: 600, textAlign: 'right', flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.label}</div>
+          <div style={{ flex: 1, background: '#f0f2f8', borderRadius: 6, height: 22, position: 'relative', overflow: 'hidden' }}>
+            <div style={{ width: `${pct(d.value, m)}%`, background: d.color, height: '100%', borderRadius: 6, minWidth: d.value > 0 ? 3 : 0, transition: 'width .5s' }} />
+          </div>
+          <div style={{ minWidth: 64, fontSize: 12, fontWeight: 700, color: 'var(--text)', flexShrink: 0, whiteSpace: 'nowrap' }}>{d.value}{d.sub ? <span style={{ color: 'var(--muted)', fontWeight: 500 }}> {d.sub}</span> : ''}</div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// "Seçimlər üzrə yerləşmə statistikası" üçün: tək grid — ad, bar, say və faiz
+// hər sətirdə eyni sütunlarda başlayır, bütün barlar eyni enlidir
+function GridBars({ data, max }: { data: { label: string; value: number; color: string; sub?: string }[]; max?: number }) {
+  const m = max ?? Math.max(1, ...data.map(d => d.value))
   const hasSub = data.some(d => d.sub)
-  // Tək grid: ad, bar, say və faiz hər sətirdə eyni sütunlarda başlayır, bütün barlar eyni enlidir
   return (
     <div style={{
       display: 'grid', alignItems: 'center', columnGap: 10, rowGap: 10,
@@ -818,7 +836,7 @@ export default function Dashboard() {
                 <div style={{ color: 'var(--muted)', fontSize: 13, padding: '14px 0' }}>Hələ yerləşdirmə aparılmayıb.</div>
               ) : (
                 <>
-                  <Bars data={Array.from({ length: Math.max(A.byLeaf.length, 1) }, (_, i) => i + 1)
+                  <GridBars data={Array.from({ length: Math.max(A.byLeaf.length, 1) }, (_, i) => i + 1)
                     .slice(0, showAllChoices ? undefined : 3)
                     .map(c => ({
                       label: `${ord(Number(c))} seçim`, value: A.choiceDist[c] || 0,
@@ -863,7 +881,7 @@ export default function Dashboard() {
 
           {/* Sıra 2.5: qoşun növü + fənn ortalamaları */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 14 }}>
-            <Card title={`${A.tree?.levelNames?.[0] || 'Qoşun növü'} üzrə bölgü`}>
+            <Card title={`${A.tree?.levelNames?.[0] || 'Qoşun növü'} üzrə seçim statistikası`}>
               {A.branchStats.length === 0 ? (
                 <div style={{ color: 'var(--muted)', fontSize: 13, padding: '14px 0' }}>Struktur tapılmadı.</div>
               ) : (
@@ -875,7 +893,7 @@ export default function Dashboard() {
                       <div key={b.name}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, marginBottom: 4 }}>
                           <span style={{ fontWeight: 700, color: 'var(--text)' }}>{b.name}</span>
-                          <span style={{ color: 'var(--muted)' }}>{b.placed}/{b.quota} · {b.specs} ixtisas · tələb {b.demand} ({comp.toFixed(1)}×)</span>
+                          <span style={{ color: 'var(--muted)' }}>{b.quota} kvota · {b.specs} hərbi uçot ixtisası · tələb sayı {b.demand} ({comp.toFixed(1)}×)</span>
                         </div>
                         <div style={{ background: '#f0f2f8', borderRadius: 6, height: 10, overflow: 'hidden' }}>
                           <div style={{ width: `${fillP}%`, height: '100%', background: fillP >= 100 ? '#52c41a' : '#c9962a' }} />
