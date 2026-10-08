@@ -161,22 +161,48 @@ function generatePrintHTML(user: any, sel: any, nameMap: Record<string, string>,
 </html>`
 }
 
-// ── Excel export ──────────────────────────────────────────────────────────────
-async function exportToExcel(rows: any[], instLabel: string, instId: string, subCountMap: Record<string, number>, included?: Set<string>) {
-  const inc = (c: string) => c === '№' || !included || included.has(c)
-  // ── Təhsilalan seçimlərini hazırla (müəssisənin seçimi üzrə) ──
+// ── İxrac üçün seçim məlumatı ────────────────────────────────────────────────
+// Müəssisənin bir neçə seçimi ola bilər (məs. qruplara bölünmüş seçimlər) — hər təhsilalanın
+// göndərişi hansı seçimdədirsə, oradan götürülür; ixtisas adları həmin seçimin ağacından.
+async function loadExportChoices(instId: string) {
   const allSels = await selectionDb.getAll()
   const sel = allSels.find((s: any) => s.institution === instId && s.status === 'published')
           || allSels.find((s: any) => s.institution === instId && s.status !== 'draft')
           || allSels.find((s: any) => s.institution === instId)
   const tree = sel ? await treeDb.get(sel.treeId) : null
-  const pathMap = tree ? buildLeafPaths(tree.nodes || []) : {}
-  const subsByUser: Record<string, string[]> = {}
-  if (sel) {
-    for (const sub of await submissionDb.getBySelection(sel.id)) {
-      subsByUser[sub.userId] = sub.ranking || []
-    }
+  const selById = new Map(allSels.map((s: any) => [s.id, s]))
+  const rank = (selId: string) => {
+    const s: any = selById.get(selId)
+    if (!s) return 0
+    if (s.id === sel?.id) return 4
+    if (s.institution !== instId) return 1
+    return s.status === 'published' ? 3 : 2
   }
+  const best: Record<string, any> = {}
+  for (const sub of await submissionDb.getAll()) {
+    if (!sub.ranking?.length) continue
+    const cur = best[sub.userId]
+    if (!cur || rank(sub.selectionId) > rank(cur.selectionId)) best[sub.userId] = sub
+  }
+  // Lazım olan ağacların yarpaq yolları birləşdirilir (əsas seçimin ağacı üstündür)
+  const treeIds = new Set<string>()
+  for (const sub of Object.values(best)) { const s: any = selById.get(sub.selectionId); if (s?.treeId && s.treeId !== tree?.id) treeIds.add(s.treeId) }
+  const pathMap: Record<string, any[]> = {}
+  for (const tid of treeIds) {
+    const t = await treeDb.get(tid).catch(() => null)
+    if (t) Object.assign(pathMap, buildLeafPaths(t.nodes || []))
+  }
+  if (tree) Object.assign(pathMap, buildLeafPaths(tree.nodes || []))
+  const subsByUser: Record<string, string[]> = {}
+  for (const [uid, sub] of Object.entries(best)) subsByUser[uid] = sub.ranking
+  return { tree, pathMap, subsByUser }
+}
+
+// ── Excel export ──────────────────────────────────────────────────────────────
+async function exportToExcel(rows: any[], instLabel: string, instId: string, subCountMap: Record<string, number>, included?: Set<string>) {
+  const inc = (c: string) => c === '№' || !included || included.has(c)
+  // ── Təhsilalan seçimlərini hazırla (hər kəsin öz göndərişi üzrə) ──
+  const { tree, pathMap, subsByUser } = await loadExportChoices(instId)
   const formatChoices = (uid: string): string => {
     const rk = subsByUser[uid]
     if (!rk || rk.length === 0) return ''
@@ -270,18 +296,11 @@ async function buildLeveledSheet(
   included: Set<string> | undefined, selMode: 'levels' | 'flat',
 ) {
   const inc = (c: string) => c === '№' || !included || included.has(c)
-  const allSels = await selectionDb.getAll()
-  const sel = allSels.find((s: any) => s.institution === instId && s.status === 'published')
-          || allSels.find((s: any) => s.institution === instId && s.status !== 'draft')
-          || allSels.find((s: any) => s.institution === instId)
-  const tree = sel ? await treeDb.get(sel.treeId) : null
-  const pathMap = tree ? buildLeafPaths(tree.nodes || []) : {}
+  const { tree, pathMap, subsByUser } = await loadExportChoices(instId)
   const lvDyn = effectiveLevelNames(tree)
   const lv: string[] = lvDyn.length ? lvDyn : ['Qoşun növü', 'Orta ixtisas təhsili üzrə ixtisaslar', 'Hərbi Uçot İxtisası']
   const nLv = lv.length
   const lvName = (i: number) => lv[i] || `Səviyyə ${i + 1}`
-  const subsByUser: Record<string, string[]> = {}
-  if (sel) for (const s of await submissionDb.getBySelection(sel.id)) subsByUser[s.userId] = s.ranking || []
 
   const subjectKeys = (() => {
     const ks = new Set<string>()
