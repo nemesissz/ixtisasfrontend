@@ -784,8 +784,8 @@ export default function Dashboard() {
                   {/* Bal göstəriciləri: yerləşdirmədən əvvəl bütün təhsilalanların, sonra yalnız yerləşənlərin balı */}
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8, marginTop: 4, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
                     {(A.placed
-                      ? [['Ən aşağı', A.placedMinScore, '#ff4d4f'], ['Orta', A.placedAvgScore, '#c9962a'], ['Ən yüksək', A.placedMaxScore, '#52c41a']]
-                      : [['Ən aşağı', A.minScore, '#ff4d4f'], ['Orta', A.avgScore, '#c9962a'], ['Ən yüksək', A.maxScore, '#52c41a']]
+                      ? [['Ən aşağı bal', A.placedMinScore, '#ff4d4f'], ['Orta bal', A.placedAvgScore, '#c9962a'], ['Ən yüksək bal', A.placedMaxScore, '#52c41a']]
+                      : [['Ən aşağı bal', A.minScore, '#ff4d4f'], ['Orta bal', A.avgScore, '#c9962a'], ['Ən yüksək bal', A.maxScore, '#52c41a']]
                     ).map(([l, v, c]: any) => (
                       <div key={l} style={{ textAlign: 'center', background: `${c}10`, borderRadius: 10, padding: '12px 4px', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 4 }}>
                         <div style={{ fontSize: 18, fontWeight: 800, color: c, lineHeight: 1 }}>{Number(v).toFixed(1)}</div>
