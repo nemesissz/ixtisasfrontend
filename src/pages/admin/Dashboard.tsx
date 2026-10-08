@@ -230,11 +230,11 @@ function buildStatsReportHtml(A: any, instLabel: string, selName: string): strin
 </body></html>`
 }
 
-function Card({ title, icon, children, span }: { title: string; icon?: string; children: React.ReactNode; span?: number }) {
+function Card({ title, children, span }: { title: string; children: React.ReactNode; span?: number }) {
   return (
     <div style={{ background: '#fff', border: '1.5px solid var(--border)', borderRadius: 16, padding: '18px 20px', gridColumn: span ? `span ${span}` : undefined, minWidth: 0 }}>
       <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--text)', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-        {icon && <span>{icon}</span>}{title}
+        {title}
       </div>
       {children}
     </div>
@@ -639,14 +639,12 @@ export default function Dashboard() {
 
   if (!loaded) return <div style={{ padding: '40px 0', textAlign: 'center', color: 'var(--muted)' }}>Yüklənir...</div>
 
-  // Hərbi ciddiyyətə uyğun neytral ikonlar: qoşun növü · ixtisas · uçot qeydiyyatı
-  const LEVEL_ICONS = ['🛡️', '💼', '🗂️', '📁', '📄']
-  const INST_KPIS: { label: string; value: any; icon: string; accent: string; sub?: string }[] = [
-    { label: 'Təhsilalan', value: A.instUsers.length, icon: '👥', accent: '#722ed1' },
-    ...A.levelStats.map((l: any, i: number) => ({ label: l.name, value: l.count, icon: LEVEL_ICONS[i] || '📁', accent: '#13c2c2' })),
-    { label: 'Ümumi kvota', value: A.totalQuota, icon: '🔢', accent: '#fa8c16' },
-    { label: 'Yerləşmə', value: `${pctText(A.placed, A.instUsers.length)}%`, icon: '✅', accent: '#52c41a', sub: `${A.placed}/${A.instUsers.length}` },
-    { label: 'Seçim etdi', value: `${pctText(A.submittedCount, A.instUsers.length)}%`, icon: '🗳️', accent: '#eb2f96', sub: `${A.submittedCount}/${A.instUsers.length}` },
+  const INST_KPIS: { label: string; value: any; accent: string; sub?: string }[] = [
+    { label: 'Təhsilalan', value: A.instUsers.length, accent: '#722ed1' },
+    ...A.levelStats.map((l: any) => ({ label: l.name, value: l.count, accent: '#13c2c2' })),
+    { label: 'Ümumi kvota', value: A.totalQuota, accent: '#fa8c16' },
+    { label: 'Yerləşmə', value: `${pctText(A.placed, A.instUsers.length)}%`, accent: '#52c41a', sub: `${A.placed}/${A.instUsers.length}` },
+    { label: 'Seçim etdi', value: `${pctText(A.submittedCount, A.instUsers.length)}%`, accent: '#eb2f96', sub: `${A.submittedCount}/${A.instUsers.length}` },
   ]
 
   // Strukturun təhsilalan qrupunun adı (nişanda göstərmək üçün)
@@ -664,22 +662,21 @@ export default function Dashboard() {
           <div style={{ position: 'relative', flexShrink: 0 }}>
             <button onClick={() => setReportMenu(v => !v)} title="Statistik hesabatı yüklə"
               style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 18px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#b8860b,#e0a92e)', color: '#fff', fontWeight: 800, fontSize: 13, cursor: 'pointer', boxShadow: '0 3px 12px #c9962a55' }}>
-              📊 Hesabatı yüklə <span style={{ fontSize: 10 }}>{reportMenu ? '▲' : '▼'}</span>
+              Hesabatı yüklə <span style={{ fontSize: 10 }}>{reportMenu ? '▲' : '▼'}</span>
             </button>
             {reportMenu && (
               <>
                 <div onClick={() => setReportMenu(false)} style={{ position: 'fixed', inset: 0, zIndex: 40 }} />
                 <div style={{ position: 'absolute', right: 0, top: '112%', zIndex: 41, background: '#fff', border: '1.5px solid #e8eaf5', borderRadius: 12, boxShadow: '0 12px 32px #0002', overflow: 'hidden', minWidth: 210 }}>
                   {[
-                    { icon: '📄', label: 'PDF (çap üçün)', sub: 'Çap pəncərəsi açılır', color: '#b8860b', fn: printReport },
-                    { icon: '📝', label: 'Word (.doc)', sub: 'Redaktə oluna bilən sənəd', color: '#2b579a', fn: exportReportWord },
-                    { icon: '📊', label: 'Excel (.xlsx)', sub: 'Cədvəllər, 3-4 vərəq', color: '#1d6f42', fn: exportReportExcel },
+                    { label: 'PDF (çap üçün)', sub: 'Çap pəncərəsi açılır', color: '#b8860b', fn: printReport },
+                    { label: 'Word (.doc)', sub: 'Redaktə oluna bilən sənəd', color: '#2b579a', fn: exportReportWord },
+                    { label: 'Excel (.xlsx)', sub: 'Cədvəllər, 3-4 vərəq', color: '#1d6f42', fn: exportReportExcel },
                   ].map((o, i) => (
                     <button key={o.label} onClick={() => { o.fn(); setReportMenu(false) }}
                       style={{ display: 'flex', alignItems: 'center', gap: 11, width: '100%', padding: '11px 14px', border: 'none', borderTop: i ? '1px solid #f0f2f8' : 'none', background: '#fff', cursor: 'pointer', textAlign: 'left' }}
                       onMouseEnter={e => (e.currentTarget.style.background = '#f8f9fd')}
                       onMouseLeave={e => (e.currentTarget.style.background = '#fff')}>
-                      <span style={{ fontSize: 20, width: 26, textAlign: 'center', flexShrink: 0 }}>{o.icon}</span>
                       <span style={{ minWidth: 0 }}>
                         <span style={{ display: 'block', fontSize: 13, fontWeight: 800, color: o.color }}>{o.label}</span>
                         <span style={{ display: 'block', fontSize: 11, color: 'var(--muted)' }}>{o.sub}</span>
@@ -741,12 +738,9 @@ export default function Dashboard() {
           {/* Müəssisənin fərdi KPI-ları */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12 }}>
             {INST_KPIS.map(k => (
-              <div key={k.label} style={{ background: '#fff', border: '1.5px solid var(--border)', borderRadius: 14, padding: '15px 16px', display: 'flex', alignItems: 'center', gap: 13 }}>
-                <div style={{ width: 44, height: 44, borderRadius: 12, background: `${k.accent}14`, color: k.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>{k.icon}</div>
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: 21, fontWeight: 800, color: 'var(--text)', lineHeight: 1 }}>{k.value}</div>
-                  <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 3 }}>{k.label}{k.sub ? ` · ${k.sub}` : ''}</div>
-                </div>
+              <div key={k.label} style={{ background: '#fff', border: '1.5px solid var(--border)', borderTop: `3px solid ${k.accent}`, borderRadius: 14, padding: '15px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', gap: 5, minWidth: 0 }}>
+                <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--text)', lineHeight: 1 }}>{k.value}</div>
+                <div style={{ fontSize: 11, color: 'var(--muted)', overflowWrap: 'anywhere' }}>{k.label}{k.sub ? ` · ${k.sub}` : ''}</div>
               </div>
             ))}
           </div>
@@ -756,7 +750,7 @@ export default function Dashboard() {
             {/* Kart iki rejimlidir: yerləşdirmə bir kliklə aparıldığı üçün ondan ƏVVƏL
                 diaqram boş dayanmasın — seçim gedişatını (seçim etdi / etmədi) göstərir.
                 Yerləşdirmə aparılan kimi (placed > 0) avtomatik yerləşmə mənzərəsinə keçir. */}
-            <Card title={`${A.placed ? 'Yerləşmə' : 'Seçim'} statusu — ${activeInst.label}`} icon="📋">
+            <Card title={`${A.placed ? 'Yerləşmə' : 'Seçim'} statusu — ${activeInst.label}`}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 22, flexWrap: 'wrap' }}>
                 <Donut size={150} segments={A.placed ? [
                   { value: A.placed, color: '#52c41a', label: 'Yerləşdi' },
@@ -815,7 +809,7 @@ export default function Dashboard() {
               </div>
             </Card>
 
-            <Card title="Bal paylanması" icon="📈">
+            <Card title="Bal paylanması">
               <Bars data={A.scoreBuckets.map(([lo, hi], i) => ({
                 label: `${lo}–${hi}`, value: A.hist[i], color: '#c9962a',
               }))} />
@@ -824,7 +818,7 @@ export default function Dashboard() {
 
           {/* Sıra 2: seçimlər üzrə qəbul statistikası + demoqrafiya */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 14 }}>
-            <Card title="Seçimlər üzrə qəbul statistikası" icon="📊">
+            <Card title="Seçimlər üzrə qəbul statistikası">
               {Object.keys(A.choiceDist).length === 0 ? (
                 <div style={{ color: 'var(--muted)', fontSize: 13, padding: '14px 0' }}>Hələ yerləşdirmə aparılmayıb.</div>
               ) : (
@@ -847,7 +841,7 @@ export default function Dashboard() {
             </Card>
 
             {(A.hasGender || A.hasSource) && (
-              <Card title="Təhsil alanların tərkibi" icon="👥">
+              <Card title="Təhsil alanların tərkibi">
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                   {A.hasGender && (
                     <div>
@@ -874,7 +868,7 @@ export default function Dashboard() {
 
           {/* Sıra 2.5: qoşun növü + fənn ortalamaları */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 14 }}>
-            <Card title={`${A.tree?.levelNames?.[0] || 'Qoşun növü'} üzrə bölgü`} icon="🛡️">
+            <Card title={`${A.tree?.levelNames?.[0] || 'Qoşun növü'} üzrə bölgü`}>
               {A.branchStats.length === 0 ? (
                 <div style={{ color: 'var(--muted)', fontSize: 13, padding: '14px 0' }}>Struktur tapılmadı.</div>
               ) : (
@@ -898,7 +892,7 @@ export default function Dashboard() {
               )}
             </Card>
 
-            <Card title="Fənn üzrə orta ballar" icon="📚">
+            <Card title="Fənn üzrə orta ballar">
               {A.subjectAvg.length === 0 ? (
                 <div style={{ color: 'var(--muted)', fontSize: 13, padding: '14px 0' }}>Fənn balı datası yoxdur.</div>
               ) : (
@@ -909,7 +903,7 @@ export default function Dashboard() {
 
           {/* Sıra 2.7: qrup üzrə bölgü — yalnız qrup məlumatı varsa */}
           {A.hasGroups && (
-            <Card title="Qrup üzrə bölgü" icon="🧩">
+            <Card title="Qrup üzrə bölgü">
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5, minWidth: 640 }}>
                   <thead>
@@ -952,7 +946,7 @@ export default function Dashboard() {
             const PACK_TXT = ['#1f6fb2', '#b8860b', '#237804', '#c41d7f', '#531dab', '#d46b08']
             const PACK_BG  = ['#e8f4ff', '#fbf1d6', '#f0fff4', '#fff0f6', '#f9f0ff', '#fff7e6']
             return (
-              <Card title="İxtisas kvota bölgüsü (paketlər üzrə)" icon="📊">
+              <Card title="İxtisas kvota bölgüsü (paketlər üzrə)">
                 <div style={{ overflowX: 'auto' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5, minWidth: 560 }}>
                     <thead>
@@ -1000,7 +994,7 @@ export default function Dashboard() {
           })()}
 
           {/* Sıra 3: ixtisas performans cədvəli */}
-          <Card title="İxtisas üzrə performans" icon="💼">
+          <Card title="İxtisas üzrə performans">
             {A.byLeaf.length === 0 ? (
               <div style={{ color: 'var(--muted)', fontSize: 13, padding: '14px 0' }}>Bu müəssisə üçün ixtisas strukturu tapılmadı.</div>
             ) : (
@@ -1063,7 +1057,7 @@ export default function Dashboard() {
           {/* Sıra 4: rəqabət highlight */}
           {A.byLeaf.length > 0 && (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 14 }}>
-              <Card title="Ən çox rəqabətli ixtisaslar" icon="🔥">
+              <Card title="Ən çox rəqabətli ixtisaslar">
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 9, maxHeight: 340, overflowY: 'auto' }}>
                   {A.mostCompetitive.map((l: any, i: number) => (
                     <div key={l.id} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13 }}>
@@ -1075,7 +1069,7 @@ export default function Dashboard() {
                   ))}
                 </div>
               </Card>
-              <Card title="Ən az rəqabətli olan ixtisaslar" icon="❄️">
+              <Card title="Ən az rəqabətli olan ixtisaslar">
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 9, maxHeight: 340, overflowY: 'auto' }}>
                   {A.leastDemanded.map((l: any, i: number) => (
                     <div key={l.id} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13 }}>
@@ -1092,7 +1086,7 @@ export default function Dashboard() {
 
           {/* Sıra 5: maraq sıralaması — kvota nəzərə alınmadan, xam tələb */}
           {A.byInterest.length > 0 && (
-            <Card title="İxtisaslara maraq sıralaması" icon="📌">
+            <Card title="İxtisaslara maraq sıralaması">
               <div style={{ color: 'var(--muted)', fontSize: 12, marginBottom: 12 }}>
                 Sıralama 1-ci seçim sayına görədir. Faiz — həmin ixtisası seçə bilənlərin
                 neçə faizinin onu 1-ci yazdığını göstərir.
