@@ -686,7 +686,7 @@ export default function Dashboard() {
         {activeInst && (
           <div style={{ position: 'relative', flexShrink: 0 }}>
             <button onClick={() => setReportMenu(v => !v)} title="Statistik hesabatı yüklə"
-              style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 18px', borderRadius: 10, border: 'none', background: '#234b7d', color: '#fff', fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>
+              style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 18px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#1d3f6b,#3a6aa5)', color: '#fff', fontWeight: 800, fontSize: 13, cursor: 'pointer', boxShadow: '0 3px 12px #234b7d55' }}>
               Hesabatı yüklə <span style={{ fontSize: 10 }}>{reportMenu ? '▲' : '▼'}</span>
             </button>
             {reportMenu && (
