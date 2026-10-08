@@ -9,6 +9,7 @@ import { poolCounts, autoSplit, globalSourceSplitCached } from '../../quota-pool
 import { allocatePacketSpecs, splitPacketStudents } from '../../packet-alloc'
 import { UMUMI_KEY, isSumCrit } from '../../tiebreak'
 import { compareStudents, makeMeritCompare, pairTiebreaker, decidingCriterion, tieTrace, buildDefaultTiebreaker, setDefaultTiebreaker, getLeavesWithPath, genderAllowed, genderCapReached, rebalanceUnplaced, runPacketPlacement, runPlacement } from '../../placement'
+import { ord } from '../../ordinal'
 
 // ── Gale-Shapley (Deferred Acceptance) alqoritmi ─────────────────────────────
 function runGaleShapley(users: any[], subs: any[], tree: any) {
@@ -469,7 +470,7 @@ function StorySim({ students, packets, subs, tree, poolUsers, preAssignLevel, fi
       ? ` ⚖️ Bərabər bal: “${data.leafName[tr0.id]}” üçün ${tr0.rival} ilə ${sc} bal eyni idi.${tieDecide} Ona görə bu təhsilalan oraya yerləşdirilmədi.`
       : ''
     if (fulls.length === 0) return `${nm} (${sc} bal): 1-ci seçimi “${data.leafName[cur.placed]}”-də boş yer olduğu üçün birbaşa oraya yerləşdirildi.`
-    return `${nm} (${sc} bal): ${fulls.map((a, i) => `${i + 1}-ci seçim “${data.leafName[a.id]}” dolu`).join(', ')} → ${cur.choiceNum}-ci seçim “${data.leafName[cur.placed]}”-ə yerləşdirildi.${tieNote}`
+    return `${nm} (${sc} bal): ${fulls.map((a, i) => `${ord(i + 1)} seçim “${data.leafName[a.id]}” dolu`).join(', ')} → ${ord(cur.choiceNum)} seçim “${data.leafName[cur.placed]}”-ə yerləşdirildi.${tieNote}`
   })()
 
   const Seat = ({ on, color }: { on: boolean; color: string }) => <span style={{ width: 8, height: 8, borderRadius: '50%', background: on ? color : 'transparent', border: on ? 'none' : '1px solid #d6dae3', flexShrink: 0 }} />
@@ -839,7 +840,7 @@ function StorySim({ students, packets, subs, tree, poolUsers, preAssignLevel, fi
                     </div>
                     {flashId === it.u.id && <span style={{ fontSize: 11.5, fontWeight: 800, color: '#ad6800', background: '#fff1b8', border: '1px solid #ffd666', padding: '3px 10px', borderRadius: 14, whiteSpace: 'nowrap', flexShrink: 0 }}>📍 Axtarılan</span>}
                     {showAll && <span title="Paket" style={{ fontSize: 11.5, fontWeight: 800, color: '#4a5fc1', background: '#eef1ff', border: '1px solid #d0d8f8', padding: '3px 10px', borderRadius: 14, whiteSpace: 'nowrap', flexShrink: 0 }}>📦 Paket {it.packetNum}</span>}
-                    <span style={{ fontSize: 11.5, fontWeight: 700, color: it.choiceNum === 1 ? '#237804' : '#b8860b', background: it.choiceNum === 1 ? '#f6ffed' : '#fbf1d6', border: `1px solid ${it.choiceNum === 1 ? '#b7eb8f' : '#ecd9a0'}`, padding: '3px 10px', borderRadius: 14, whiteSpace: 'nowrap', flexShrink: 0 }}>{it.choiceNum}-ci seçim</span>
+                    <span style={{ fontSize: 11.5, fontWeight: 700, color: it.choiceNum === 1 ? '#237804' : '#b8860b', background: it.choiceNum === 1 ? '#f6ffed' : '#fbf1d6', border: `1px solid ${it.choiceNum === 1 ? '#b7eb8f' : '#ecd9a0'}`, padding: '3px 10px', borderRadius: 14, whiteSpace: 'nowrap', flexShrink: 0 }}>{ord(it.choiceNum)} seçim</span>
                     <span style={{ fontSize: 15, fontWeight: 900, color: '#c9962a', minWidth: 52, textAlign: 'right', flexShrink: 0 }}>{Number(it.u.score).toFixed(2)}</span>
                   </div>
                   </Fragment>
@@ -1457,7 +1458,7 @@ export default function Distribution() {
                 <div style={{ flex: 1 }}>
                   <div style={{ fontWeight: 800, fontSize: 14, color: '#065f46' }}>{collisionPause.winner.name}</div>
                   <div style={{ fontSize: 11.5, color: '#047857' }}>
-                    Bu ixtisası aldı ({collisionPause.winner.choiceNum}-ci seçimi)
+                    Bu ixtisası aldı ({ord(collisionPause.winner.choiceNum)} seçimi)
                   </div>
                 </div>
                 <span style={{ fontSize: 11, fontWeight: 800, color: '#065f46', background: '#fff', borderRadius: 8, padding: '4px 10px', border: '1px solid #6ee7b7' }}>QAZANDI</span>
@@ -1480,7 +1481,7 @@ export default function Distribution() {
                           ? <>Meyar «{l.dec.label}»: qazanan <b>{critFmt(l.dec.w)}</b>, bu təhsilalan <b>{critFmt(l.dec.l)}</b></>
                           : <>Prioritet meyarı yoxdur</>}
                       {l.dec?.none && l.dec.trace?.length > 0 && <> · hamısı eyni</>}
-                      {' · '}əvəzində: {l.got}{l.gotChoice ? ` (${l.gotChoice}-ci seçimi)` : ''}
+                      {' · '}əvəzində: {l.got}{l.gotChoice ? ` (${ord(l.gotChoice)} seçimi)` : ''}
                     </div>
                   </div>
                 </div>

@@ -6,6 +6,7 @@ import InstIcon from '../../components/InstIcon'
 import InstTabs from '../../components/InstTabs'
 import { formatDate } from '../../utils-date'
 import { canChoose } from '../../quota-pool'
+import { ord } from '../../ordinal'
 
 // ── Köməkçilər ────────────────────────────────────────────────────────────────
 function getLeaves(nodes: any[], anc: any[] = []): Array<{ leaf: any; path: any[] }> {
@@ -70,7 +71,7 @@ function Bars({ data, max }: { data: { label: string; value: number; color: stri
           <div style={{ flex: 1, background: '#f0f2f8', borderRadius: 6, height: 22, position: 'relative', overflow: 'hidden' }}>
             <div style={{ width: `${pct(d.value, m)}%`, background: d.color, height: '100%', borderRadius: 6, minWidth: d.value > 0 ? 3 : 0, transition: 'width .5s' }} />
           </div>
-          <div style={{ width: 64, fontSize: 12, fontWeight: 700, color: 'var(--text)', flexShrink: 0 }}>{d.value}{d.sub ? <span style={{ color: 'var(--muted)', fontWeight: 500 }}> {d.sub}</span> : ''}</div>
+          <div style={{ minWidth: 64, fontSize: 12, fontWeight: 700, color: 'var(--text)', flexShrink: 0, whiteSpace: 'nowrap' }}>{d.value}{d.sub ? <span style={{ color: 'var(--muted)', fontWeight: 500 }}> {d.sub}</span> : ''}</div>
         </div>
       ))}
     </div>
@@ -117,7 +118,7 @@ function buildStatsReportHtml(A: any, instLabel: string, selName: string): strin
     <table class="t">
       <thead><tr><th>Seçim sırası</th><th>Yerləşən say</th><th>Faiz</th></tr></thead>
       <tbody>${choiceKeys.map(c =>
-        `<tr><td>${c}-ci seçim</td><td class="c">${A.choiceDist[c]}</td><td class="c">${A.placed > 0 ? ((A.choiceDist[c] / A.placed) * 100).toFixed(1) : '0'}%</td></tr>`).join('')}</tbody>
+        `<tr><td>${ord(Number(c))} seçim</td><td class="c">${A.choiceDist[c]}</td><td class="c">${A.placed > 0 ? ((A.choiceDist[c] / A.placed) * 100).toFixed(1) : '0'}%</td></tr>`).join('')}</tbody>
     </table>` : '<p class="muted">Hələ yerləşdirmə aparılmayıb.</p>'
 
   // Demoqrafiya
@@ -578,7 +579,7 @@ export default function Dashboard() {
     const choiceKeys = Object.keys(A.choiceDist).map(Number).sort((a, b) => a - b)
     if (choiceKeys.length) {
       icmal.push([], ['SEÇİM MƏMNUNİYYƏTİ'], ['Seçim sırası', 'Yerləşən', 'Faiz'])
-      choiceKeys.forEach(c => icmal.push([`${c}-ci seçim`, A.choiceDist[c], A.placed > 0 ? `${((A.choiceDist[c] / A.placed) * 100).toFixed(1)}%` : '0%']))
+      choiceKeys.forEach(c => icmal.push([`${ord(Number(c))} seçim`, A.choiceDist[c], A.placed > 0 ? `${((A.choiceDist[c] / A.placed) * 100).toFixed(1)}%` : '0%']))
     }
     if (A.hasGender || A.hasSource) {
       icmal.push([], ['DEMOQRAFİYA'], ['Kateqoriya', 'Say', 'Faiz'])
@@ -806,7 +807,7 @@ export default function Dashboard() {
 
           {/* Sıra 2: seçimlər üzrə qəbul statistikası + demoqrafiya */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 14 }}>
-            <Card title="Seçimlər üzrə qəbul statistikası">
+            <Card title="Seçimlər üzrə yerləşmə statistikası">
               {Object.keys(A.choiceDist).length === 0 ? (
                 <div style={{ color: 'var(--muted)', fontSize: 13, padding: '14px 0' }}>Hələ yerləşdirmə aparılmayıb.</div>
               ) : (
@@ -814,7 +815,7 @@ export default function Dashboard() {
                   <Bars data={Array.from({ length: Math.max(A.byLeaf.length, 1) }, (_, i) => i + 1)
                     .slice(0, showAllChoices ? undefined : 3)
                     .map(c => ({
-                      label: `${c}-ci seçim`, value: A.choiceDist[c] || 0,
+                      label: `${ord(Number(c))} seçim`, value: A.choiceDist[c] || 0,
                       color: c === 1 ? '#52c41a' : c <= 3 ? '#c9962a' : '#faad14',
                       sub: `(${A.placed > 0 ? ((A.choiceDist[c] || 0) / A.placed * 100).toFixed(2) : '0.00'}%)`,
                     }))} />

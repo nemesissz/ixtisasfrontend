@@ -6,6 +6,7 @@ import InstIcon from '../../components/InstIcon'
 import { AppDialog, useDialog } from '../../components/AppDialog'
 import { can } from '../../permissions'
 import { today } from '../../utils-date'
+import { ord } from '../../ordinal'
 
 const pct = (a: number, b: number) => (b > 0 ? Math.round((a / b) * 100) : 0)
 
@@ -23,7 +24,7 @@ const choiceBadge = (c: number) => {
   const col = c === 1 ? { bg: '#f6ffed', tx: '#237804', bd: '#b7eb8f' }
     : c <= 3 ? { bg: '#e6f4ff', tx: '#0958d9', bd: '#91caff' }
     : { bg: '#fff7e6', tx: '#d46b08', bd: '#ffd591' }
-  return <span style={{ padding: '2px 9px', borderRadius: 20, fontSize: 11, fontWeight: 700, background: col.bg, color: col.tx, border: `1px solid ${col.bd}`, whiteSpace: 'nowrap' }}>{c}-ci seçim</span>
+  return <span style={{ padding: '2px 9px', borderRadius: 20, fontSize: 11, fontWeight: 700, background: col.bg, color: col.tx, border: `1px solid ${col.bd}`, whiteSpace: 'nowrap' }}>{ord(c)} seçim</span>
 }
 
 export default function Results() {
@@ -175,7 +176,7 @@ export default function Results() {
       '№': i + 1, 'Təhsilalan': u.name, 'FİN': u.fin || '—', 'İş nömrəsi': u.workNumber || '—',
       'Müəssisə': (u.institution && instMap[u.institution]?.label) || '—', 'Bal': Number(u.score).toFixed(2),
       ...(showGroup ? { 'Qrup': u.group || '—' } : {}),
-      'Seçim sırası': u.choiceNum ? `${u.choiceNum}-ci` : '—',
+      'Seçim sırası': u.choiceNum ? ord(u.choiceNum) : '—',
       'Yerləşdiyi ixtisas': isPlaced(u) ? specName(u) : 'Yerləşdirilməyib',
       'Status': isPlaced(u) ? 'Yerləşdi' : 'Yerləşmədi',
     }))
@@ -268,7 +269,7 @@ export default function Results() {
               <td>${esc(u.fin || '—')}</td>
               <td>${esc(u.workNumber || '—')}</td>
               <td class="c b">${f2(u.score || 0)}</td>
-              <td class="c">${u.choiceNum ? u.choiceNum + '-ci' : '—'}</td>
+              <td class="c">${u.choiceNum ? ord(u.choiceNum) : '—'}</td>
             </tr>`).join('')}
           </tbody>
         </table>`}
@@ -405,7 +406,7 @@ export default function Results() {
       listRows.push({ '№': `${si + 1}. ${s.name}${s.path ? ' (' + s.path + ')' : ''}`, 'Soyad, ad, ata adı': `Kvota: ${s.quota} · Yerləşdi: ${s.students.length}`, 'FİN': '', 'İş №': '', 'Bal': '', 'Seçim': '' })
       s.students.forEach((u: any, i: number) => listRows.push({
         '№': i + 1, 'Soyad, ad, ata adı': `${u.name}${u.parentName ? ' ' + u.parentName : ''}`,
-        'FİN': u.fin || '—', 'İş №': u.workNumber || '—', 'Bal': f2(u.score || 0), 'Seçim': u.choiceNum ? `${u.choiceNum}-ci` : '—',
+        'FİN': u.fin || '—', 'İş №': u.workNumber || '—', 'Bal': f2(u.score || 0), 'Seçim': u.choiceNum ? ord(u.choiceNum) : '—',
       }))
     })
     const ws2 = XLSX.utils.json_to_sheet(listRows, { header: ['№', 'Soyad, ad, ata adı', 'FİN', 'İş №', 'Bal', 'Seçim'] })
