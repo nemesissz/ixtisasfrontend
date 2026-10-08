@@ -69,7 +69,7 @@ function Bars({ data, max }: { data: { label: string; value: number; color: stri
         <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{ width: 120, fontSize: 12, color: 'var(--text)', fontWeight: 600, textAlign: 'right', flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.label}</div>
           <div style={{ flex: 1, background: '#e8ecf2', borderRadius: 6, height: 22, position: 'relative', overflow: 'hidden' }}>
-            <div style={{ width: `${pct(d.value, m)}%`, background: d.color, height: '100%', borderRadius: 6, minWidth: d.value > 0 ? 3 : 0, transition: 'width .5s' }} />
+            <div style={{ width: `${pct(d.value, m)}%`, background: '#234b7d', height: '100%', borderRadius: 6, minWidth: d.value > 0 ? 3 : 0, transition: 'width .5s' }} />
           </div>
           <div style={{ minWidth: 64, fontSize: 12, fontWeight: 700, color: 'var(--text)', flexShrink: 0, whiteSpace: 'nowrap' }}>{d.value}{d.sub ? <span style={{ color: 'var(--muted)', fontWeight: 500 }}> {d.sub}</span> : ''}</div>
         </div>
@@ -92,7 +92,7 @@ function GridBars({ data, max }: { data: { label: string; value: number; color: 
         <Fragment key={i}>
           <div title={d.label} style={{ fontSize: 12, color: 'var(--text)', fontWeight: 600, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.label}</div>
           <div style={{ background: '#e8ecf2', borderRadius: 6, height: 22, position: 'relative', overflow: 'hidden' }}>
-            <div style={{ width: `${pct(d.value, m)}%`, background: d.color, height: '100%', borderRadius: 6, minWidth: d.value > 0 ? 3 : 0, transition: 'width .5s' }} />
+            <div style={{ width: `${pct(d.value, m)}%`, background: '#234b7d', height: '100%', borderRadius: 6, minWidth: d.value > 0 ? 3 : 0, transition: 'width .5s' }} />
           </div>
           <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{d.value}</div>
           {hasSub && <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--muted)', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{d.sub || ''}</div>}
@@ -840,7 +840,7 @@ export default function Dashboard() {
                     .slice(0, showAllChoices ? undefined : 3)
                     .map(c => ({
                       label: `${ord(Number(c))} seçim`, value: A.choiceDist[c] || 0,
-                      color: c === 1 ? '#3a6aa5' : c <= 3 ? '#234b7d' : '#6a8ab0',
+                      color: '#234b7d',
                       sub: `(${A.placed > 0 ? ((A.choiceDist[c] || 0) / A.placed * 100).toFixed(2) : '0.00'}%)`,
                     }))} />
                   {A.byLeaf.length > 3 && (
@@ -896,7 +896,7 @@ export default function Dashboard() {
                           <span style={{ color: 'var(--muted)' }}>{b.quota} kvota · {b.specs} hərbi uçot ixtisası · tələb sayı {b.demand} ({comp.toFixed(1)}×)</span>
                         </div>
                         <div style={{ background: '#e8ecf2', borderRadius: 6, height: 10, overflow: 'hidden' }}>
-                          <div style={{ width: `${fillP}%`, height: '100%', background: fillP >= 100 ? '#3a6aa5' : '#234b7d' }} />
+                          <div style={{ width: `${fillP}%`, height: '100%', background: '#234b7d' }} />
                         </div>
                       </div>
                     )
@@ -909,7 +909,7 @@ export default function Dashboard() {
               {A.subjectAvg.length === 0 ? (
                 <div style={{ color: 'var(--muted)', fontSize: 13, padding: '14px 0' }}>Fənn balı datası yoxdur.</div>
               ) : (
-                <Bars data={A.subjectAvg.map((s: any) => ({ label: s.name, value: Math.round(s.avg * 10) / 10, color: '#13c2c2' }))} />
+                <Bars data={A.subjectAvg.map((s: any) => ({ label: s.name, value: Math.round(s.avg * 10) / 10, color: '#234b7d' }))} />
               )}
             </Card>
           </div>
