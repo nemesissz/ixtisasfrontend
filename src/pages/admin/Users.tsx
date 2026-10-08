@@ -6,6 +6,7 @@ import { userDb, submissionDb, institutionDb, userArchiveDb, selectionDb, treeDb
 import InstIcon, { isImageIcon } from '../../components/InstIcon'
 import InstTabs from '../../components/InstTabs'
 import { AppDialog, useDialog } from '../../components/AppDialog'
+import { readImageResized } from '../../imageResize'
 import { can } from '../../permissions'
 
 // ── Tree-dən hər yarpaq üçün tam yol (node adları) ────────────────────────────
@@ -1612,13 +1613,7 @@ function NewInstModal({ onClose, onCreated }: { onClose: () => void; onCreated: 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
-    const reader = new FileReader()
-    reader.onload = ev => {
-      const result = ev.target?.result as string
-      setImgPreview(result)
-      setIcon(result)
-    }
-    reader.readAsDataURL(file)
+    readImageResized(file).then(result => { setImgPreview(result); setIcon(result) })
   }
 
   async function handleCreate() {
@@ -1783,9 +1778,7 @@ function EditInstModal({ inst, onClose, onSaved }: { inst: any; onClose: () => v
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]; if (!file) return
-    const reader = new FileReader()
-    reader.onload = ev => { const r = ev.target?.result as string; setImgPreview(r); setIcon(r) }
-    reader.readAsDataURL(file)
+    readImageResized(file).then(r => { setImgPreview(r); setIcon(r) })
   }
 
   async function handleSave() {

@@ -8,6 +8,7 @@ import { can } from '../../permissions'
 import { useBalanceSim } from '../../quota-sim'
 import { poolCounts, checkManual, leavesWithPath, balanceForLeaf, genderPool, balanceReport, feasibility, globalSourceSplitCached, autoSplit, BALANCE_TOLERANCE, sourceBalance, fragileRisks, groupBlocks } from '../../quota-pool'
 import type { SourceSlotCheck } from '../../quota-pool'
+import { readImageResized } from '../../imageResize'
 import { UMUMI_KEY, SUM_SEP, isSumCrit, critParts } from '../../tiebreak'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -592,9 +593,7 @@ function IconPicker({ value, onChange }: { value: string; onChange: (v: string) 
   const isImage = value?.startsWith('data:')
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]; if (!file) return
-    const reader = new FileReader()
-    reader.onload = ev => { if (ev.target?.result) onChange(ev.target.result as string) }
-    reader.readAsDataURL(file)
+    readImageResized(file).then(onChange)
   }
   return (
     <div>
