@@ -69,6 +69,21 @@ export function decidingCriterion(winner: any, loser: any, tb: string[]): { crit
   return null
 }
 
+/**
+ * Bərabər ballı iki nəfərin prioritet meyarları üzrə addım-addım müqayisəsi:
+ * bərabər olan meyarlar + (varsa) fərqi yaradan meyar. İzahlarda göstərmək üçün.
+ */
+export function tieTrace(winner: any, loser: any, tb: string[]): { label: string; w: number; l: number; decided: boolean }[] {
+  const out: { label: string; w: number; l: number; decided: boolean }[] = []
+  for (const crit of tb) {
+    const w = critValue(winner, crit), l = critValue(loser, crit)
+    const label = crit === UMUMI_KEY ? 'Ümumi bal' : isSumCrit(crit) ? 'Σ ' + crit : crit
+    out.push({ label, w, l, decided: w !== l })
+    if (w !== l) break
+  }
+  return out
+}
+
 export function studentSortScore(user: any, tiebreakers: string[]): number[] {
   // Meyar tək sütun da ola bilər, bir neçə sütunun cəmi də — critValue hər ikisini bilir
   const primary = user.score || 0

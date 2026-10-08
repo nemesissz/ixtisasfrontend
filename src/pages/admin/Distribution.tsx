@@ -8,7 +8,7 @@ import { can } from '../../permissions'
 import { poolCounts, autoSplit, globalSourceSplitCached } from '../../quota-pool'
 import { allocatePacketSpecs, splitPacketStudents } from '../../packet-alloc'
 import { UMUMI_KEY, isSumCrit } from '../../tiebreak'
-import { compareStudents, makeMeritCompare, pairTiebreaker, decidingCriterion, buildDefaultTiebreaker, setDefaultTiebreaker, getLeavesWithPath, genderAllowed, genderCapReached, rebalanceUnplaced, runPacketPlacement, runPlacement } from '../../placement'
+import { compareStudents, makeMeritCompare, pairTiebreaker, decidingCriterion, tieTrace, buildDefaultTiebreaker, setDefaultTiebreaker, getLeavesWithPath, genderAllowed, genderCapReached, rebalanceUnplaced, runPacketPlacement, runPlacement } from '../../placement'
 
 // ── Gale-Shapley (Deferred Acceptance) alqoritmi ─────────────────────────────
 function runGaleShapley(users: any[], subs: any[], tree: any) {
@@ -132,6 +132,44 @@ const PACK_COLORS = [
 
 /** Meyar dəyəri: -1 = məlumat yoxdur */
 const critFmt = (v: any) => (v == null || Number(v) < 0) ? '—' : Number(v).toFixed(1)
+const critNum = (v: any) => (v == null || Number(v) < 0) ? 'yoxdur' : String(+Number(v).toFixed(2))
+type TieStep = { label: string; w: number; l: number; decided: boolean }
+/** Prioritet müqayisəsinin oxunaqlı izahı: "1) Riyaziyyat: 52 = 52 · 2) ..." */
+function tieTraceText(trace: TieStep[] | undefined, winner: string, me = 'bu təhsilalan') {
+  if (!trace) return ''
+  if (!trace.length) return ' Bu ixtisas üçün prioritet meyarı təyin edilməyib — sıra siyahıdakı ardıcıllıqla müəyyənləşdi.'
+  const parts = trace.map((t, i) => t.decided
+    ? `${i + 1}) ${t.label}: ${winner} ${critNum(t.w)}, ${me} ${critNum(t.l)} — fərq buradadır`
+    : `${i + 1}) ${t.label}: ${critNum(t.w)} = ${critNum(t.l)} (bərabər)`)
+  const last = trace[trace.length - 1]
+  return ` Prioritet meyarları sıra ilə müqayisə olundu: ${parts.join('; ')}.` + (last.decided
+    ? ` ${winner} öndə olduğu üçün yer ona çatdı.`
+    : ` Bütün meyarlar eyni çıxdı — sıra siyahıdakı ardıcıllıqla müəyyənləşdi.`)
+}
+
+function TieTraceView({ trace, winner }: { trace: TieStep[]; winner: string }) {
+  const B = { color: '#5a4a12' }
+  if (!trace.length) return <> Bu ixtisas üçün prioritet meyarı təyin edilməyib — sıra siyahıdakı ardıcıllıqla müəyyənləşdi, bu təhsilalan həmin ixtisasa yerləşdirilmədi.</>
+  const last = trace[trace.length - 1]
+  return (
+    <>
+      {' '}Prioritet meyarları sıra ilə müqayisə olundu:
+      <ol style={{ margin: '6px 0 6px', paddingLeft: 22 }}>
+        {trace.map((t, i) => (
+          <li key={i}>
+            <b style={B}>{t.label}</b>:{' '}
+            {t.decided
+              ? <><b style={B}>{winner}</b> <b style={{ color: '#237804' }}>{critNum(t.w)}</b>, bu təhsilalan <b style={{ color: '#cf1322' }}>{critNum(t.l)}</b> — <b style={B}>fərq buradadır</b></>
+              : <>{critNum(t.w)} = {critNum(t.l)} <span style={{ color: '#a08a4a' }}>(bərabər, növbəti meyara keçildi)</span></>}
+          </li>
+        ))}
+      </ol>
+      {last.decided
+        ? <><b style={B}>{winner}</b> öndə olduğu üçün bu təhsilalan həmin ixtisasa yerləşdirilmədi.</>
+        : <>Bütün meyarlar eyni çıxdı — sıra siyahıdakı ardıcıllıqla müəyyənləşdi, bu təhsilalan həmin ixtisasa yerləşdirilmədi.</>}
+    </>
+  )
+}
 
 // ── İzahlı (hekayə) simulyasiya — Sadə və Paket üsulu üçün ──────────────────────
 function StorySim({ students, packets, subs, tree, poolUsers, preAssignLevel, finalAssignments, onClose }: {
@@ -245,7 +283,7 @@ function StorySim({ students, packets, subs, tree, poolUsers, preAssignLevel, fi
         const ranking = (subs.find((s: any) => s.userId === u.id)?.ranking || []).filter((id: string) => quota[id] !== undefined)
         const attempts: { id: string; full: boolean; tie?: boolean; rival?: string; blocked?: 'gender' | 'cap' }[] = []
         let placed: string | null = null
-        const tieRivals: { id: string; rival: string; score: number; subject?: string; rivalSubjScore?: number; mySubjScore?: number }[] = []
+        const tieRivals: { id: string; rival: string; score: number; trace?: TieStep[]; subject?: string; rivalSubjScore?: number; mySubjScore?: number }[] = []
         const sc = u.score || 0, g = u.gender
         for (const sid of ranking) {
           const leaf = leafById[sid]
@@ -266,12 +304,13 @@ function StorySim({ students, packets, subs, tree, poolUsers, preAssignLevel, fi
               const firstIn = (x: any) => (subs.find((s: any) => s.userId === x.id)?.ranking || []).find((id: string) => quota[id] !== undefined) || ''
               const tbs = pairTiebreaker(last!.user, u, firstIn(last!.user), firstIn(u), pathMap)
               let dec: { subject?: string; rivalSubjScore?: number; mySubjScore?: number } = {}
+              const trace = tieTrace(last!.user, u, tbs)
               const d = decidingCriterion(last!.user, u, tbs)
               if (d) {
                 const lbl = d.crit === UMUMI_KEY ? 'Ümumi bal' : isSumCrit(d.crit) ? 'Σ ' + d.crit : d.crit
                 dec = { subject: lbl, rivalSubjScore: d.w, mySubjScore: d.l }
               }
-              tieRivals.push({ id: sid, rival: last!.name, score: sc, ...dec })
+              tieRivals.push({ id: sid, rival: last!.name, score: sc, trace, ...dec })
             }
           }
         }
@@ -422,7 +461,8 @@ function StorySim({ students, packets, subs, tree, poolUsers, preAssignLevel, fi
     }
     const fulls = cur.attempts.filter(a => a.full)
     const tr0 = cur.tieRivals[0]
-    const tieDecide = tr0 && tr0.subject
+    const tieDecide = tr0?.trace ? tieTraceText(tr0.trace, tr0.rival)
+      : tr0 && tr0.subject
       ? ` Üstünlük meyarı “${tr0.subject}” oldu: ${tr0.rival}-ın balı ${critFmt(tr0.rivalSubjScore)}, bu təhsilalanınkı ${critFmt(tr0.mySubjScore)} — ${tr0.rival} öndə olduğu üçün oraya yerləşdirildi.`
       : tr0 ? ` Bütün prioritet meyarları da eyni idi — sıra siyahıdakı ardıcıllıqla müəyyənləşdi.` : ''
     const tieNote = cur.tieRivals.length
@@ -599,9 +639,9 @@ function StorySim({ students, packets, subs, tree, poolUsers, preAssignLevel, fi
             <div style={{ background: '#fff7e6', border: '1px solid #ffd591', borderRadius: 10, padding: '12px 16px', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
               <span style={{ fontSize: 18 }}>⚖️</span>
               <div style={{ fontSize: 13, color: '#8a6d1b', lineHeight: 1.55 }}>
-                <b style={{ color: '#5a4a12' }}>Bərabər bal toqquşması:</b> “{data.leafName[cur.tieRivals[0].id]}” üçün <b style={{ color: '#5a4a12' }}>{cur.tieRivals[0].rival}</b> ilə hər ikisinin ümumi balı <b style={{ color: '#5a4a12' }}>{cur.tieRivals[0].score.toFixed(2)}</b> idi. Son yer bir nəfərə qalır — {cur.tieRivals[0].subject ? (<>
+                <b style={{ color: '#5a4a12' }}>Bərabər bal toqquşması:</b> “{data.leafName[cur.tieRivals[0].id]}” üçün <b style={{ color: '#5a4a12' }}>{cur.tieRivals[0].rival}</b> ilə hər ikisinin ümumi balı <b style={{ color: '#5a4a12' }}>{cur.tieRivals[0].score.toFixed(2)}</b> idi. Son yer bir nəfərə qalır.{cur.tieRivals[0].trace ? (<TieTraceView trace={cur.tieRivals[0].trace} winner={cur.tieRivals[0].rival} />) : cur.tieRivals[0].subject ? (<> —
                   üstünlük meyarı <b style={{ color: '#5a4a12' }}>“{cur.tieRivals[0].subject}”</b> oldu: <b style={{ color: '#5a4a12' }}>{cur.tieRivals[0].rival}</b> = <b style={{ color: '#237804' }}>{critFmt(cur.tieRivals[0].rivalSubjScore)}</b>, bu təhsilalan = <b style={{ color: '#cf1322' }}>{critFmt(cur.tieRivals[0].mySubjScore)}</b> — {cur.tieRivals[0].rival} öndə olduğu üçün bu təhsilalan həmin ixtisasa yerləşdirilmədi.
-                </>) : (<>bütün prioritet meyarları da eyni idi — sıra siyahıdakı ardıcıllıqla müəyyənləşdi, bu təhsilalan həmin ixtisasa yerləşdirilmədi.</>)}
+                </>) : (<> Bütün prioritet meyarları da eyni idi — sıra siyahıdakı ardıcıllıqla müəyyənləşdi, bu təhsilalan həmin ixtisasa yerləşdirilmədi.</>)}
               </div>
             </div>
           )}
@@ -1148,9 +1188,11 @@ export default function Distribution() {
     const firstIn = (u: any) => (rankingOf[u.id] || []).find(id => !!placement.pathMap[id]) || ''
     // Bərabərliyi hansı prioritet meyarı həll etdi (sıralamanın işlətdiyi meyarlarla)
     const decide = (w: any, l: any) => {
-      const d = decidingCriterion(w, l, pairTiebreaker(w, l, firstIn(w), firstIn(l), placement.pathMap))
-      if (!d) return null
-      return { label: d.crit === UMUMI_KEY ? 'Ümumi bal' : isSumCrit(d.crit) ? 'Σ ' + d.crit : d.crit, w: d.w, l: d.l }
+      const tb = pairTiebreaker(w, l, firstIn(w), firstIn(l), placement.pathMap)
+      const trace = tieTrace(w, l, tb)
+      const d = decidingCriterion(w, l, tb)
+      if (!d) return { trace, none: true }
+      return { label: d.crit === UMUMI_KEY ? 'Ümumi bal' : isSumCrit(d.crit) ? 'Σ ' + d.crit : d.crit, w: d.w, l: d.l, trace }
     }
     const rankingOf: Record<string, string[]> = {}
     for (const s of sels) rankingOf[s.userId] = s.ranking || []
@@ -1430,9 +1472,14 @@ export default function Distribution() {
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 700, fontSize: 13.5, color: '#9a3412' }}>{l.name}</div>
                     <div style={{ fontSize: 11.5, color: '#b45309' }}>
-                      {l.dec
-                        ? <>Meyar «{l.dec.label}»: qazanan <b>{critFmt(l.dec.w)}</b>, bu təhsilalan <b>{critFmt(l.dec.l)}</b></>
-                        : <>Bütün prioritet meyarları eyni idi</>}
+                      {l.dec?.trace?.length
+                        ? l.dec.trace.map((t: TieStep, j: number) => (
+                            <span key={j}>{j > 0 && ' → '}{t.label}: <b>{critNum(t.w)}</b>{t.decided ? ' vs ' : ' = '}<b>{critNum(t.l)}</b>{t.decided ? ' (fərq)' : ''}</span>
+                          ))
+                        : l.dec?.label
+                          ? <>Meyar «{l.dec.label}»: qazanan <b>{critFmt(l.dec.w)}</b>, bu təhsilalan <b>{critFmt(l.dec.l)}</b></>
+                          : <>Prioritet meyarı yoxdur</>}
+                      {l.dec?.none && l.dec.trace?.length > 0 && <> · hamısı eyni</>}
                       {' · '}əvəzində: {l.got}{l.gotChoice ? ` (${l.gotChoice}-ci seçimi)` : ''}
                     </div>
                   </div>
