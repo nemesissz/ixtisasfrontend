@@ -153,6 +153,10 @@ function StorySim({ students, packets, subs, tree, poolUsers, preAssignLevel, fi
   const [speed, setSpeed] = useState(1200)
   const [selLeaf, setSelLeaf] = useState<string | null>(null)
   const [focusCol, setFocusCol] = useState<'left' | 'center' | 'right' | null>(null)
+  // Ada görə axtarış: seçilən təhsilalanın ixtisası açılır, sətri qısa müddət yanıb-sönür
+  const [findQ, setFindQ] = useState('')
+  const [findOpen, setFindOpen] = useState(false)
+  const [flashId, setFlashId] = useState<string | null>(null)
 
   const data = useMemo(() => {
     const leaves = getLeavesWithPath(tree?.nodes || [])
@@ -312,6 +316,42 @@ function StorySim({ students, packets, subs, tree, poolUsers, preAssignLevel, fi
   }, [students, packets, subs, tree, poolUsers, preAssignLevel, finalAssignments])
 
   const total = data.steps.length
+  // Simulyasiya sona çatıbsa ekran YEKUN (tarazlamadan sonrakı) nəticəni göstərir —
+  // axtarışın dediyi ixtisasla açılan siyahı eyni olsun.
+  const done = total > 0 && idx >= total - 1
+  // Hər təhsilalanın son addımı (mərhələli rejimdə bir nəfər iki addımda ola bilər)
+  const finalSteps = useMemo(() => {
+    const m = new Map<string, any>()
+    for (const s of data.steps) m.set(s.u.id, s)
+    return [...m.values()]
+  }, [data])
+  const findMatches = useMemo(() => {
+    const norm = (x: string) => (x || '').toLocaleLowerCase('az')
+    const t = norm(findQ.trim())
+    if (!t) return []
+    return finalSteps
+      .filter(s => norm(s.u.name).includes(t) || norm(s.u.fin || '').includes(t))
+      .sort((a, b) => (Number(!norm(a.u.name).startsWith(t)) - Number(!norm(b.u.name).startsWith(t))) || (a.u.name || '').localeCompare(b.u.name || '', 'az'))
+      .slice(0, 5)
+  }, [findQ, finalSteps])
+  function goToStudent(s: any) {
+    if (!s?.finalSpec) return
+    setPlaying(false)
+    setIdx(total - 1)
+    setSelLeaf(s.finalSpec)
+    setFlashId(s.u.id)
+    setFindQ('')
+    setFindOpen(false)
+  }
+  useEffect(() => {
+    if (!flashId) return
+    const t1 = setTimeout(() => {
+      document.querySelector(`[data-sim-uid="${CSS.escape(flashId)}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    }, 80)
+    const t2 = setTimeout(() => setFlashId(null), 3600)
+    return () => { clearTimeout(t1); clearTimeout(t2) }
+  }, [flashId])
+
   useEffect(() => {
     if (!playing) return
     if (idx >= total - 1) { setPlaying(false); return }
@@ -341,7 +381,17 @@ function StorySim({ students, packets, subs, tree, poolUsers, preAssignLevel, fi
   const filled: Record<string, number> = {}        // cari paket üzrə
   const cutoff: Record<string, number> = {}         // cari paket üzrə keçid balı
   let placedTotal = 0, firstChoice = 0              // ümumi (bütün paketlər)
-  for (let i = 0; i <= idx && i < total; i++) {
+  if (done) {
+    for (const s of finalSteps) {
+      if (!s.finalSpec) continue
+      placedTotal++; if (s.finalChoiceNum === 1) firstChoice++
+      if (inView(s.packetNum)) {
+        filled[s.finalSpec] = (filled[s.finalSpec] || 0) + 1
+        const sc = s.u.score || 0
+        if (cutoff[s.finalSpec] === undefined || sc < cutoff[s.finalSpec]) cutoff[s.finalSpec] = sc
+      }
+    }
+  } else for (let i = 0; i <= idx && i < total; i++) {
     const s = data.steps[i]
     if (s.placed) {
       placedTotal++; if (s.choiceNum === 1) firstChoice++
@@ -386,6 +436,8 @@ function StorySim({ students, packets, subs, tree, poolUsers, preAssignLevel, fi
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 600, background: "#eef1f5 url('/background.jpeg') center center / cover no-repeat fixed", display: 'flex', flexDirection: 'column' }}>
+      <style>{`@keyframes simFlash { 0%, 100% { background: #fff; box-shadow: 0 0 0 0 transparent } 50% { background: #fff1b8; box-shadow: 0 0 0 2px #e0a92e } }
+        .sim-flash { animation: simFlash .6s ease-in-out 6 }`}</style>
       {/* Üst: idarə paneli (tam eni tutur) */}
       <div style={{ padding: '12px 20px', background: '#fff', borderBottom: '1px solid #e7eaf0', boxShadow: '0 2px 10px #1a1f3c0a', display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
         {data.multiPacket && (
@@ -400,12 +452,50 @@ function StorySim({ students, packets, subs, tree, poolUsers, preAssignLevel, fi
           style={{ padding: '8px 16px', borderRadius: 9, border: 'none', background: '#e0a92e', color: '#fff', fontWeight: 800, fontSize: 13, boxShadow: '0 4px 14px #e0a92e55', cursor: idx >= total - 1 ? 'not-allowed' : 'pointer', opacity: idx >= total - 1 ? .4 : 1 }}>Növbəti addım ▶</button>
         <button onClick={() => setPlaying(p => !p)} disabled={idx >= total - 1}
           style={{ padding: '8px 16px', borderRadius: 9, border: '1.5px solid #e0e4f0', background: playing ? '#f5a623' : '#fff', color: playing ? '#fff' : '#5a6070', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>{playing ? '⏸ Dayandır' : '⏵ Avtomatik'}</button>
-        <button onClick={() => setSpeed(s => s === 1200 ? 500 : s === 500 ? 150 : 1200)}
-          style={{ padding: '8px 12px', borderRadius: 9, border: '1.5px solid #e0e4f0', background: '#fff', color: '#8a909c', fontSize: 12, cursor: 'pointer' }}>{speed === 1200 ? '1×' : speed === 500 ? '2×' : '5×'}</button>
+        <button onClick={() => setSpeed(s => s === 1200 ? 500 : s === 500 ? 150 : s === 150 ? 60 : 1200)} title="Sürət"
+          style={{ padding: '8px 12px', borderRadius: 9, border: '1.5px solid #e0e4f0', background: '#fff', color: '#8a909c', fontSize: 12, cursor: 'pointer' }}>{speed === 1200 ? '1×' : speed === 500 ? '2×' : speed === 150 ? '5×' : '10×'}</button>
         <button onClick={() => { setPlaying(false); setIdx(total - 1) }} disabled={idx >= total - 1}
           title="Sona keç — yekun nəticəni göstər"
           style={{ padding: '8px 12px', borderRadius: 9, border: '1.5px solid #e0e4f0', background: '#fff', color: '#5a6070', fontWeight: 700, fontSize: 13, cursor: idx >= total - 1 ? 'not-allowed' : 'pointer', opacity: idx >= total - 1 ? .4 : 1 }}>⏭ Sona</button>
         <button onClick={() => { setIdx(-1); setPlaying(false) }} title="Başa qayıt" style={{ padding: '8px 12px', borderRadius: 9, border: '1.5px solid #e0e4f0', background: '#fff', color: '#8a909c', fontSize: 13, cursor: 'pointer' }}>↺</button>
+        {/* Ada görə axtarış — yerləşən təhsilalanın ixtisasını açır */}
+        <div style={{ position: 'relative' }}>
+          <input value={findQ} placeholder="🔍 Təhsilalan axtar…"
+            onChange={e => { setFindQ(e.target.value); setFindOpen(true) }}
+            onFocus={() => setFindOpen(true)}
+            onBlur={() => setTimeout(() => setFindOpen(false), 150)}
+            onKeyDown={e => {
+              if (e.key === 'Escape') { setFindQ(''); setFindOpen(false) }
+              if (e.key === 'Enter') goToStudent(findMatches.find(s => s.finalSpec))
+            }}
+            style={{ width: 220, padding: '8px 12px', borderRadius: 9, border: '1.5px solid #e0e4f0', fontSize: 13, outline: 'none', background: '#fff', color: '#2b2f3a' }} />
+          {findOpen && findQ.trim() && (
+            <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, width: 320, background: '#fff', border: '1px solid #e7eaf0', borderRadius: 10, boxShadow: '0 12px 32px #1a1f3c26', zIndex: 30, overflow: 'hidden' }}>
+              {findMatches.length === 0
+                ? <div style={{ padding: '10px 12px', fontSize: 12.5, color: '#8a909c' }}>Tapılmadı</div>
+                : findMatches.map(s => {
+                    const ok = !!s.finalSpec
+                    return (
+                      <button key={s.u.id} disabled={!ok}
+                        onMouseDown={e => e.preventDefault()}
+                        onClick={() => goToStudent(s)}
+                        title={ok ? 'İxtisasını aç' : 'Bu təhsilalan yerləşməyib'}
+                        style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 12px', border: 'none', borderBottom: '1px solid #f4f5fb', background: '#fff', textAlign: 'left', cursor: ok ? 'pointer' : 'not-allowed', opacity: ok ? 1 : .5 }}
+                        onMouseEnter={e => { if (ok) e.currentTarget.style.background = '#fffdf5' }}
+                        onMouseLeave={e => { e.currentTarget.style.background = '#fff' }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: '#1a1a2e', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.u.name}</div>
+                          <div style={{ fontSize: 11, color: ok ? '#2faf5f' : '#cf1322', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {ok ? `→ ${data.leafName[s.finalSpec]}${data.multiPacket ? ` · Paket ${s.packetNum}` : ''}` : 'yerləşməyib'}
+                          </div>
+                        </div>
+                        <span style={{ fontSize: 12, fontWeight: 800, color: '#c9962a' }}>{Number(s.u.score).toFixed(1)}</span>
+                      </button>
+                    )
+                  })}
+            </div>
+          )}
+        </div>
         <div style={{ flex: 1 }} />
         <div style={{ display: 'flex', alignItems: 'center', gap: 4, paddingLeft: 6, borderLeft: '1px solid #e7eaf0' }}>
           <span style={{ fontSize: 11, color: '#9aa0ac', marginRight: 2 }}>Önə çıxar:</span>
@@ -613,7 +703,10 @@ function StorySim({ students, packets, subs, tree, poolUsers, preAssignLevel, fi
       {selLeaf && (() => {
         // Mənbə sırası: əvvəl mülki, sonra lisey (hər qrup öz içində bala görə)
         const srcRank = (s?: string) => s === 'mülki' ? 0 : s === 'lisey' ? 1 : 2
-        const list = data.steps.slice(0, idx + 1).filter(s => s.placed === selLeaf && inView(s.packetNum)).map(s => ({ u: s.u, choiceNum: s.choiceNum, packetNum: s.packetNum as number })).sort((a, b) => (srcRank(a.u.source) - srcRank(b.u.source)) || ((b.u.score || 0) - (a.u.score || 0)))
+        const list = (done
+          ? finalSteps.filter(s => s.finalSpec === selLeaf && inView(s.packetNum)).map(s => ({ u: s.u, choiceNum: s.finalChoiceNum, packetNum: s.packetNum as number }))
+          : data.steps.slice(0, idx + 1).filter(s => s.placed === selLeaf && inView(s.packetNum)).map(s => ({ u: s.u, choiceNum: s.choiceNum, packetNum: s.packetNum as number }))
+        ).sort((a, b) => (srcRank(a.u.source) - srcRank(b.u.source)) || ((b.u.score || 0) - (a.u.score || 0)))
         const q = (showAll ? viewMeta : curMeta)?.quota[selLeaf] ?? 0
         const fillP = q ? Math.round((list.length / q) * 100) : 0
         const isFull = list.length >= q && q > 0
@@ -696,13 +789,15 @@ function StorySim({ students, packets, subs, tree, poolUsers, preAssignLevel, fi
                       <div style={{ flex: 1, height: 2, background: 'linear-gradient(90deg,#531dab55,#1677ff33)' }} />
                     </div>
                   )}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 10px', borderRadius: 10, background: i % 2 ? '#fafbff' : '#fff', borderBottom: '1px solid #f4f5fb' }}>
+                  <div data-sim-uid={it.u.id} className={flashId === it.u.id ? 'sim-flash' : undefined}
+                    style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 10px', borderRadius: 10, background: i % 2 ? '#fafbff' : '#fff', borderBottom: '1px solid #f4f5fb' }}>
                     <span style={{ width: 26, color: '#aab', fontWeight: 800, fontSize: 13, textAlign: 'center', flexShrink: 0 }}>{i + 1}</span>
                     <div style={{ width: 38, height: 38, borderRadius: '50%', background: '#fbf1d6', color: '#b8860b', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 13, flexShrink: 0 }}>{(it.u.name || '?').split(' ').map((x: string) => x[0]).slice(0, 2).join('')}</div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 14, fontWeight: 700, color: '#1a1a2e', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.u.name}</div>
                       <div style={{ fontSize: 11, color: '#8892b0', fontFamily: 'monospace' }}>{it.u.fin || '—'}</div>
                     </div>
+                    {flashId === it.u.id && <span style={{ fontSize: 11.5, fontWeight: 800, color: '#ad6800', background: '#fff1b8', border: '1px solid #ffd666', padding: '3px 10px', borderRadius: 14, whiteSpace: 'nowrap', flexShrink: 0 }}>📍 Axtarılan</span>}
                     {showAll && <span title="Paket" style={{ fontSize: 11.5, fontWeight: 800, color: '#4a5fc1', background: '#eef1ff', border: '1px solid #d0d8f8', padding: '3px 10px', borderRadius: 14, whiteSpace: 'nowrap', flexShrink: 0 }}>📦 Paket {it.packetNum}</span>}
                     <span style={{ fontSize: 11.5, fontWeight: 700, color: it.choiceNum === 1 ? '#237804' : '#b8860b', background: it.choiceNum === 1 ? '#f6ffed' : '#fbf1d6', border: `1px solid ${it.choiceNum === 1 ? '#b7eb8f' : '#ecd9a0'}`, padding: '3px 10px', borderRadius: 14, whiteSpace: 'nowrap', flexShrink: 0 }}>{it.choiceNum}-ci seçim</span>
                     <span style={{ fontSize: 15, fontWeight: 900, color: '#c9962a', minWidth: 52, textAlign: 'right', flexShrink: 0 }}>{Number(it.u.score).toFixed(2)}</span>
