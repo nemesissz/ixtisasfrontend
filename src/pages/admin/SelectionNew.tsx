@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { selectionDb, treeDb, userDb, institutionDb, cohortDb, addLog } from '../../db'
+import { readActiveInst, writeActiveInst } from '../../activeInst'
 import { FlatView, NestedView, treeToNested, nestedToFlat } from '../../components/SpecialtyViews'
 import InstIcon from '../../components/InstIcon'
 import { filterTreeByBranch, collapseLevel } from '../student/SelectionPage'
@@ -103,8 +104,11 @@ export default function SelectionNew() {
   }, [])
 
   useEffect(() => {
+    // Defolt: digər səhifələrdə son açılmış müəssisə; yoxdursa (və ya silinibsə) birincisi
     if (loaded && !form.institution && institutions[0]?.id) {
-      setForm(f => ({ ...f, institution: institutions[0].id }))
+      const last = readActiveInst()
+      const id = institutions.some((i: any) => i.id === last) ? last : institutions[0].id
+      setForm(f => ({ ...f, institution: id }))
     }
   }, [loaded, institutions, form.institution])
 
@@ -139,7 +143,7 @@ export default function SelectionNew() {
   function set(key: string, val: any) {
     setForm(f => {
       const next = { ...f, [key]: val }
-      if (key === 'institution') { next.treeId = ''; next.sourceProportional = false; next.preAssignLevel = null }
+      if (key === 'institution') { next.treeId = ''; next.sourceProportional = false; next.preAssignLevel = null; writeActiveInst(val) }
       if (key === 'treeId') { next.preAssignLevel = null }
       return next
     })
