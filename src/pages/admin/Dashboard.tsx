@@ -68,7 +68,7 @@ function Bars({ data, max }: { data: { label: string; value: number; color: stri
       {data.map((d, i) => (
         <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{ width: 120, fontSize: 12, color: 'var(--text)', fontWeight: 600, textAlign: 'right', flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.label}</div>
-          <div style={{ flex: 1, background: '#f0f2f8', borderRadius: 6, height: 22, position: 'relative', overflow: 'hidden' }}>
+          <div style={{ flex: 1, background: '#e8ecf2', borderRadius: 6, height: 22, position: 'relative', overflow: 'hidden' }}>
             <div style={{ width: `${pct(d.value, m)}%`, background: d.color, height: '100%', borderRadius: 6, minWidth: d.value > 0 ? 3 : 0, transition: 'width .5s' }} />
           </div>
           <div style={{ minWidth: 64, fontSize: 12, fontWeight: 700, color: 'var(--text)', flexShrink: 0, whiteSpace: 'nowrap' }}>{d.value}{d.sub ? <span style={{ color: 'var(--muted)', fontWeight: 500 }}> {d.sub}</span> : ''}</div>
@@ -91,7 +91,7 @@ function GridBars({ data, max }: { data: { label: string; value: number; color: 
       {data.map((d, i) => (
         <Fragment key={i}>
           <div title={d.label} style={{ fontSize: 12, color: 'var(--text)', fontWeight: 600, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.label}</div>
-          <div style={{ background: '#f0f2f8', borderRadius: 6, height: 22, position: 'relative', overflow: 'hidden' }}>
+          <div style={{ background: '#e8ecf2', borderRadius: 6, height: 22, position: 'relative', overflow: 'hidden' }}>
             <div style={{ width: `${pct(d.value, m)}%`, background: d.color, height: '100%', borderRadius: 6, minWidth: d.value > 0 ? 3 : 0, transition: 'width .5s' }} />
           </div>
           <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{d.value}</div>
@@ -667,7 +667,7 @@ export default function Dashboard() {
   const INST_KPIS: { label: string; value: any; accent: string; sub?: string }[] = [
     { label: 'Təhsilalan', value: A.instUsers.length, accent: '#722ed1' },
     ...A.levelStats.map((l: any) => ({ label: l.name, value: l.count, accent: '#13c2c2' })),
-    { label: 'Ümumi kvota', value: A.totalQuota, accent: '#fa8c16' },
+    { label: 'Ümumi kvota', value: A.totalQuota, accent: '#234b7d' },
     { label: 'Yerləşdirilən', value: A.placed, accent: '#52c41a' },
     { label: 'Seçim etdi', value: A.submittedCount, accent: '#eb2f96' },
   ]
@@ -686,7 +686,7 @@ export default function Dashboard() {
         {activeInst && (
           <div style={{ position: 'relative', flexShrink: 0 }}>
             <button onClick={() => setReportMenu(v => !v)} title="Statistik hesabatı yüklə"
-              style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 18px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#b8860b,#e0a92e)', color: '#fff', fontWeight: 800, fontSize: 13, cursor: 'pointer', boxShadow: '0 3px 12px #c9962a55' }}>
+              style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 18px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#1d3f6b,#3a6aa5)', color: '#fff', fontWeight: 800, fontSize: 13, cursor: 'pointer', boxShadow: '0 3px 12px #234b7d55' }}>
               Hesabatı yüklə <span style={{ fontSize: 10 }}>{reportMenu ? '▲' : '▼'}</span>
             </button>
             {reportMenu && (
@@ -694,12 +694,12 @@ export default function Dashboard() {
                 <div onClick={() => setReportMenu(false)} style={{ position: 'fixed', inset: 0, zIndex: 40 }} />
                 <div style={{ position: 'absolute', right: 0, top: '112%', zIndex: 41, background: '#fff', border: '1.5px solid #e8eaf5', borderRadius: 12, boxShadow: '0 12px 32px #0002', overflow: 'hidden', minWidth: 210 }}>
                   {[
-                    { label: 'PDF (çap üçün)', sub: 'Çap pəncərəsi açılır', color: '#b8860b', fn: printReport },
+                    { label: 'PDF (çap üçün)', sub: 'Çap pəncərəsi açılır', color: '#1d3f6b', fn: printReport },
                     { label: 'Word (.doc)', sub: 'Redaktə oluna bilən sənəd', color: '#2b579a', fn: exportReportWord },
                     { label: 'Excel (.xlsx)', sub: 'Cədvəllər, 3-4 vərəq', color: '#1d6f42', fn: exportReportExcel },
                   ].map((o, i) => (
                     <button key={o.label} onClick={() => { o.fn(); setReportMenu(false) }}
-                      style={{ display: 'flex', alignItems: 'center', gap: 11, width: '100%', padding: '11px 14px', border: 'none', borderTop: i ? '1px solid #f0f2f8' : 'none', background: '#fff', cursor: 'pointer', textAlign: 'left' }}
+                      style={{ display: 'flex', alignItems: 'center', gap: 11, width: '100%', padding: '11px 14px', border: 'none', borderTop: i ? '1px solid #e8ecf2' : 'none', background: '#fff', cursor: 'pointer', textAlign: 'left' }}
                       onMouseEnter={e => (e.currentTarget.style.background = '#f8f9fd')}
                       onMouseLeave={e => (e.currentTarget.style.background = '#fff')}>
                       <span style={{ minWidth: 0 }}>
@@ -779,7 +779,7 @@ export default function Dashboard() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 22, flexWrap: 'wrap' }}>
                 <Donut size={150} segments={A.placed ? [
                   { value: A.placed, color: '#52c41a', label: 'Yerləşdi' },
-                  { value: A.unplacedSubmitted, color: '#faad14', label: 'Yerləşmədi' },
+                  { value: A.unplacedSubmitted, color: '#6a8ab0', label: 'Yerləşmədi' },
                   { value: A.pendingCount, color: '#d9d9d9', label: 'Seçim etmədi' },
                 ] : [
                   { value: A.submittedCount, color: '#52c41a', label: 'Seçim etdi' },
@@ -793,7 +793,7 @@ export default function Dashboard() {
                 <div style={{ flex: 1, minWidth: 160, display: 'flex', flexDirection: 'column', gap: 10 }}>
                   {(A.placed ? [
                     { c: '#52c41a', l: 'Yerləşdi', v: A.placed },
-                    { c: '#faad14', l: 'Seçim etdi, yerləşdirilmədi', v: A.unplacedSubmitted },
+                    { c: '#6a8ab0', l: 'Seçim etdi, yerləşdirilmədi', v: A.unplacedSubmitted },
                     { c: '#d9d9d9', l: 'Seçim etmədi', v: A.pendingCount },
                   ] : [
                     { c: '#52c41a', l: 'Seçim etdi', v: A.submittedCount },
@@ -808,8 +808,8 @@ export default function Dashboard() {
                   {/* Bal göstəriciləri: yerləşdirmədən əvvəl bütün təhsilalanların, sonra yalnız yerləşənlərin balı */}
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8, marginTop: 4, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
                     {(A.placed
-                      ? [['Ən aşağı bal', A.placedMinScore, '#ff4d4f'], ['Orta bal', A.placedAvgScore, '#c9962a'], ['Ən yüksək bal', A.placedMaxScore, '#52c41a']]
-                      : [['Ən aşağı bal', A.minScore, '#ff4d4f'], ['Orta bal', A.avgScore, '#c9962a'], ['Ən yüksək bal', A.maxScore, '#52c41a']]
+                      ? [['Ən aşağı bal', A.placedMinScore, '#ff4d4f'], ['Orta bal', A.placedAvgScore, '#234b7d'], ['Ən yüksək bal', A.placedMaxScore, '#52c41a']]
+                      : [['Ən aşağı bal', A.minScore, '#ff4d4f'], ['Orta bal', A.avgScore, '#234b7d'], ['Ən yüksək bal', A.maxScore, '#52c41a']]
                     ).map(([l, v, c]: any) => (
                       <div key={l} style={{ textAlign: 'center', background: `${c}10`, borderRadius: 10, padding: '12px 4px', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 4 }}>
                         <div style={{ fontSize: 18, fontWeight: 800, color: c, lineHeight: 1 }}>{Number(v).toFixed(1)}</div>
@@ -824,7 +824,7 @@ export default function Dashboard() {
             <Card title="Bal bölgüsü">
               {/* Yüksək baldan aşağıya doğru */}
               <Bars data={A.scoreBuckets.map(([lo, hi], i) => ({
-                label: `${lo}–${hi}`, value: A.hist[i], color: '#c9962a',
+                label: `${lo}–${hi}`, value: A.hist[i], color: '#234b7d',
               })).reverse()} />
             </Card>
           </div>
@@ -840,7 +840,7 @@ export default function Dashboard() {
                     .slice(0, showAllChoices ? undefined : 3)
                     .map(c => ({
                       label: `${ord(Number(c))} seçim`, value: A.choiceDist[c] || 0,
-                      color: c === 1 ? '#52c41a' : c <= 3 ? '#c9962a' : '#faad14',
+                      color: c === 1 ? '#52c41a' : c <= 3 ? '#234b7d' : '#6a8ab0',
                       sub: `(${A.placed > 0 ? ((A.choiceDist[c] || 0) / A.placed * 100).toFixed(2) : '0.00'}%)`,
                     }))} />
                   {A.byLeaf.length > 3 && (
@@ -860,8 +860,8 @@ export default function Dashboard() {
                     <div>
                       <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', marginBottom: 8 }}>Cins</div>
                       <Bars data={[
-                        { label: 'Qadın', value: A.fem, color: '#eb2f96', sub: `(${pctText(A.fem, A.instUsers.length)}%)` },
-                        { label: 'Kişi', value: A.mal, color: '#1677ff', sub: `(${pctText(A.mal, A.instUsers.length)}%)` },
+                        { label: 'Qadın', value: A.fem, color: '#7a9a62', sub: `(${pctText(A.fem, A.instUsers.length)}%)` },
+                        { label: 'Kişi', value: A.mal, color: '#2f619c', sub: `(${pctText(A.mal, A.instUsers.length)}%)` },
                       ]} />
                     </div>
                   )}
@@ -869,8 +869,8 @@ export default function Dashboard() {
                     <div>
                       <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', marginBottom: 8 }}>Mənbə</div>
                       <Bars data={[
-                        { label: 'Mülki', value: A.mulki, color: '#c9962a', sub: `(${pctText(A.mulki, A.instUsers.length)}%)` },
-                        { label: 'Lisey', value: A.lisey, color: '#722ed1', sub: `(${pctText(A.lisey, A.instUsers.length)}%)` },
+                        { label: 'Mülki', value: A.mulki, color: '#a39478', sub: `(${pctText(A.mulki, A.instUsers.length)}%)` },
+                        { label: 'Lisey', value: A.lisey, color: '#6a8ab0', sub: `(${pctText(A.lisey, A.instUsers.length)}%)` },
                       ]} />
                     </div>
                   )}
@@ -895,8 +895,8 @@ export default function Dashboard() {
                           <span style={{ fontWeight: 700, color: 'var(--text)' }}>{b.name}</span>
                           <span style={{ color: 'var(--muted)' }}>{b.quota} kvota · {b.specs} hərbi uçot ixtisası · tələb sayı {b.demand} ({comp.toFixed(1)}×)</span>
                         </div>
-                        <div style={{ background: '#f0f2f8', borderRadius: 6, height: 10, overflow: 'hidden' }}>
-                          <div style={{ width: `${fillP}%`, height: '100%', background: fillP >= 100 ? '#52c41a' : '#c9962a' }} />
+                        <div style={{ background: '#e8ecf2', borderRadius: 6, height: 10, overflow: 'hidden' }}>
+                          <div style={{ width: `${fillP}%`, height: '100%', background: fillP >= 100 ? '#52c41a' : '#234b7d' }} />
                         </div>
                       </div>
                     )
@@ -956,8 +956,8 @@ export default function Dashboard() {
             try { alloc = sel ? (JSON.parse(localStorage.getItem('dist_packet_alloc') || '{}')[sel.id] || null) : null } catch { alloc = null }
             const placementSaved = A.instUsers.some((u: any) => u.placedSelectionId === sel?.id && u.placedSpecialtyId)
             if (!alloc || !placementSaved) return null
-            const PACK_TXT = ['#1f6fb2', '#b8860b', '#237804', '#c41d7f', '#531dab', '#d46b08']
-            const PACK_BG  = ['#e8f4ff', '#fbf1d6', '#f0fff4', '#fff0f6', '#f9f0ff', '#fff7e6']
+            const PACK_TXT = ['#1f6fb2', '#1d3f6b', '#237804', '#c41d7f', '#531dab', '#1d3f6b']
+            const PACK_BG  = ['#e8f4ff', '#e8eef6', '#f0fff4', '#fff0f6', '#f9f0ff', '#eef3f9']
             return (
               <Card title="İxtisas kvota bölgüsü (paketlər üzrə)">
                 <div style={{ overflowX: 'auto' }}>
@@ -1021,7 +1021,7 @@ export default function Dashboard() {
                       {A.hasSource
                         ? <>
                             <th colSpan={3} style={{ padding: '7px 12px', fontWeight: 800, textAlign: 'center', borderLeft: '1px solid #e6e9f5', color: '#2f54eb' }}>Lisey</th>
-                            <th colSpan={3} style={{ padding: '7px 12px', fontWeight: 800, textAlign: 'center', borderLeft: '1px solid #e6e9f5', color: '#c9962a' }}>Mülki</th>
+                            <th colSpan={3} style={{ padding: '7px 12px', fontWeight: 800, textAlign: 'center', borderLeft: '1px solid #e6e9f5', color: '#234b7d' }}>Mülki</th>
                           </>
                         : <th colSpan={3} style={{ padding: '7px 12px', fontWeight: 800, textAlign: 'center', borderLeft: '1px solid #e6e9f5' }}>Bal</th>}
                     </tr>
@@ -1047,15 +1047,15 @@ export default function Dashboard() {
                           <td style={{ padding: '9px 12px', textAlign: 'center', fontWeight: 700 }}>{l.placed}</td>
                           {!A.hasSource && <>
                             <td style={{ padding: '9px 12px', textAlign: 'center', fontWeight: 700, color: l.min ? '#722ed1' : 'var(--muted)', borderLeft: '1px solid #f0f2fa' }}>{l.min ? l.min.toFixed(1) : '—'}</td>
-                            <td style={{ padding: '9px 12px', textAlign: 'center', fontWeight: 700, color: l.avg ? '#c9962a' : 'var(--muted)' }}>{l.avg ? l.avg.toFixed(1) : '—'}</td>
+                            <td style={{ padding: '9px 12px', textAlign: 'center', fontWeight: 700, color: l.avg ? '#234b7d' : 'var(--muted)' }}>{l.avg ? l.avg.toFixed(1) : '—'}</td>
                             <td style={{ padding: '9px 12px', textAlign: 'center', fontWeight: 700, color: l.max ? '#52c41a' : 'var(--muted)' }}>{l.max ? l.max.toFixed(1) : '—'}</td>
                           </>}
                           {A.hasSource && <>
                             <td style={{ padding: '9px 12px', textAlign: 'center', fontWeight: 700, color: l.liseyMin ? '#722ed1' : 'var(--muted)', borderLeft: '1px solid #f0f2fa' }}>{l.liseyMin ? l.liseyMin.toFixed(1) : '—'}</td>
-                            <td style={{ padding: '9px 12px', textAlign: 'center', fontWeight: 700, color: l.liseyAvg ? '#c9962a' : 'var(--muted)' }}>{l.liseyAvg ? l.liseyAvg.toFixed(1) : '—'}</td>
+                            <td style={{ padding: '9px 12px', textAlign: 'center', fontWeight: 700, color: l.liseyAvg ? '#234b7d' : 'var(--muted)' }}>{l.liseyAvg ? l.liseyAvg.toFixed(1) : '—'}</td>
                             <td style={{ padding: '9px 12px', textAlign: 'center', fontWeight: 700, color: l.liseyMax ? '#52c41a' : 'var(--muted)' }}>{l.liseyMax ? l.liseyMax.toFixed(1) : '—'}</td>
                             <td style={{ padding: '9px 12px', textAlign: 'center', fontWeight: 700, color: l.mülkiMin ? '#722ed1' : 'var(--muted)', borderLeft: '1px solid #f0f2fa' }}>{l.mülkiMin ? l.mülkiMin.toFixed(1) : '—'}</td>
-                            <td style={{ padding: '9px 12px', textAlign: 'center', fontWeight: 700, color: l.mülkiAvg ? '#c9962a' : 'var(--muted)' }}>{l.mülkiAvg ? l.mülkiAvg.toFixed(1) : '—'}</td>
+                            <td style={{ padding: '9px 12px', textAlign: 'center', fontWeight: 700, color: l.mülkiAvg ? '#234b7d' : 'var(--muted)' }}>{l.mülkiAvg ? l.mülkiAvg.toFixed(1) : '—'}</td>
                             <td style={{ padding: '9px 12px', textAlign: 'center', fontWeight: 700, color: l.mülkiMax ? '#52c41a' : 'var(--muted)' }}>{l.mülkiMax ? l.mülkiMax.toFixed(1) : '—'}</td>
                           </>}
                         </tr>
@@ -1077,7 +1077,7 @@ export default function Dashboard() {
                       <span style={{ width: 22, height: 22, borderRadius: 7, background: '#fff1f0', color: '#cf1322', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, flexShrink: 0 }}>{i + 1}</span>
                       <span style={{ flex: 1, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.name}</span>
                       <span style={{ color: 'var(--muted)', fontSize: 11 }}>{l.demand} tələb / {l.quota} yer</span>
-                      <b style={{ color: l.comp >= 1.5 ? '#cf1322' : '#d46b08', minWidth: 38, textAlign: 'right' }}>{l.comp.toFixed(1)}×</b>
+                      <b style={{ color: l.comp >= 1.5 ? '#cf1322' : '#1d3f6b', minWidth: 38, textAlign: 'right' }}>{l.comp.toFixed(1)}×</b>
                     </div>
                   ))}
                 </div>
@@ -1089,7 +1089,7 @@ export default function Dashboard() {
                       <span style={{ width: 22, height: 22, borderRadius: 7, background: '#f0f5ff', color: '#2f54eb', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, flexShrink: 0 }}>{i + 1}</span>
                       <span style={{ flex: 1, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.name}</span>
                       <span style={{ color: 'var(--muted)', fontSize: 11 }}>{l.demand} tələb / {l.quota} yer</span>
-                      <b style={{ color: l.comp < 1 ? '#237804' : '#d46b08', minWidth: 38, textAlign: 'right' }}>{l.comp.toFixed(1)}×</b>
+                      <b style={{ color: l.comp < 1 ? '#237804' : '#1d3f6b', minWidth: 38, textAlign: 'right' }}>{l.comp.toFixed(1)}×</b>
                     </div>
                   ))}
                 </div>
@@ -1113,7 +1113,7 @@ export default function Dashboard() {
                         <th key={k}
                           onClick={() => setIntSort(v => v.k === k ? { k, asc: !v.asc } : { k: k as any, asc: true })}
                           title="Sıralamaq üçün klikləyin"
-                          style={{ padding: '9px 12px', fontWeight: 700, cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap', textAlign: al as any, color: intSort.k === k ? '#c9962a' : undefined }}>
+                          style={{ padding: '9px 12px', fontWeight: 700, cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap', textAlign: al as any, color: intSort.k === k ? '#234b7d' : undefined }}>
                           {lbl}<span style={{ opacity: intSort.k === k ? 1 : 0.25, marginLeft: 4 }}>{intSort.k === k ? (intSort.asc ? '▴' : '▾') : '▾'}</span>
                         </th>
                       ))}
@@ -1123,7 +1123,7 @@ export default function Dashboard() {
                         <th key={k}
                           onClick={() => setIntSort(v => v.k === k ? { k, asc: !v.asc } : { k: k as any, asc: false })}
                           title="Sıralamaq üçün klikləyin"
-                          style={{ padding: '9px 12px', fontWeight: 700, cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap', textAlign: al as any, color: intSort.k === k ? '#c9962a' : undefined }}>
+                          style={{ padding: '9px 12px', fontWeight: 700, cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap', textAlign: al as any, color: intSort.k === k ? '#234b7d' : undefined }}>
                           {lbl}<span style={{ opacity: intSort.k === k ? 1 : 0.25, marginLeft: 4 }}>{intSort.k === k ? (intSort.asc ? '▴' : '▾') : '▾'}</span>
                         </th>
                       ))}
@@ -1143,7 +1143,7 @@ export default function Dashboard() {
                           {l.eligible > 0 ? `${((l.demand / l.eligible) * 100).toFixed(1)}%` : '—'}
                         </td>
                         <td style={{ padding: '9px 12px', textAlign: 'center', fontWeight: 800, color: '#cf1322' }}>{l.demand}</td>
-                        <td style={{ padding: '9px 12px', textAlign: 'center', fontWeight: 700, color: '#c9962a' }}>{l.top3}</td>
+                        <td style={{ padding: '9px 12px', textAlign: 'center', fontWeight: 700, color: '#234b7d' }}>{l.top3}</td>
                       </tr>
                     ))}
                   </tbody>
