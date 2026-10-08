@@ -186,6 +186,8 @@ export default function LiveMonitor() {
 
   const drift = Math.floor((Date.now() - fetchedAt.current) / 1000)
   const cfg = data.config
+  const warnMin = cfg?.warnMin ?? 10
+  const dangerMin = cfg?.dangerMin ?? 20
   const sess = data.session
   const running = sess?.status === 'running'
   const sessSec = sess ? sess.elapsedSec + (running ? drift : 0) : null
@@ -329,7 +331,14 @@ export default function LiveMonitor() {
                     <td style={{ ...td, fontFamily: 'monospace' }}>{a.fin || '—'}</td>
                     <td style={td}>{a.group || '—'}</td>
                     <td style={td}>{a.institution || '—'}</td>
-                    <td style={{ ...td, fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>{fmt(a.elapsedSec + drift)}</td>
+                    <td style={{ ...td, fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>{(() => {
+                      const sec = a.elapsedSec + drift
+                      const tone = sec >= dangerMin * 60 ? { bg: '#fff1f0', c: '#cf1322', b: '#ffa39e' }
+                        : sec >= warnMin * 60 ? { bg: '#fffbe6', c: '#ad6800', b: '#ffd666' } : null
+                      return tone
+                        ? <span style={{ padding: '2px 9px', borderRadius: 12, background: tone.bg, color: tone.c, border: `1px solid ${tone.b}` }}>{fmt(sec)}</span>
+                        : fmt(sec)
+                    })()}</td>
                   </tr>
                 ))}
               </tbody>

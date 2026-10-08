@@ -619,7 +619,7 @@ export function studentColValue(u: any, key: string): string {
 }
 
 // ── Canlı nəzarət (docs/PLAN-canli-nezaret.md) ──────────────────────────────
-export interface MonitorConfig { enabled: boolean; heartbeatSec: number; offlineSec: number; abandonMin: number }
+export interface MonitorConfig { enabled: boolean; heartbeatSec: number; offlineSec: number; abandonMin: number; warnMin: number; dangerMin: number }
 export const monitorDb = {
   live:      (sessionId?: number | null) => http.get<any>(`/api/monitor/live${sessionId ? `?sessionId=${sessionId}` : ''}`),
   getConfig: () => http.get<MonitorConfig>('/api/monitor/config'),

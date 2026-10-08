@@ -11,7 +11,7 @@ export default function MonitorSettingsCard() {
   const [err, setErr] = useState('')
 
   useEffect(() => {
-    monitorDb.getConfig().then(c => { setCfg(c); setDraft(c) }).catch(() => setErr('Parametrlər yüklənmədi'))
+    monitorDb.getConfig().then(c => { const x = { ...c, warnMin: c.warnMin ?? 10, dangerMin: c.dangerMin ?? 20 }; setCfg(x); setDraft(x) }).catch(() => setErr('Parametrlər yüklənmədi'))
   }, [])
 
   if (!draft || !cfg) {
@@ -30,7 +30,7 @@ export default function MonitorSettingsCard() {
       addLog('system', 'info', toggled
         ? `Canlı nəzarət ${next.enabled ? 'yandırıldı' : 'söndürüldü'}`
         : 'Canlı nəzarət parametrləri dəyişdirildi',
-        `Heartbeat ${next.heartbeatSec} san · əlaqə kəsildi ${next.offlineSec} san · yarımçıq ${next.abandonMin} dəq`)
+        `Heartbeat ${next.heartbeatSec} san · əlaqə kəsildi ${next.offlineSec} san · yarımçıq ${next.abandonMin} dəq · sarı ${next.warnMin} / qırmızı ${next.dangerMin} dəq`)
       setSaved(true); setTimeout(() => setSaved(false), 2500)
     } catch { setErr('Yadda saxlanmadı') }
     setBusy(false)
@@ -50,6 +50,7 @@ export default function MonitorSettingsCard() {
   )
 
   const dirty = draft.heartbeatSec !== cfg.heartbeatSec || draft.offlineSec !== cfg.offlineSec || draft.abandonMin !== cfg.abandonMin
+    || draft.warnMin !== cfg.warnMin || draft.dangerMin !== cfg.dangerMin
   const perSec = (n: number) => (n / Math.max(5, draft.heartbeatSec)).toFixed(1)
 
   return (
@@ -73,8 +74,16 @@ export default function MonitorSettingsCard() {
           {num('offlineSec', '«Əlaqə kəsildi» həddi', 'saniyə', 15, 3600, 'Bu qədər siqnal gəlməsə boz göstərilir')}
           {num('abandonMin', '«Yarımçıq» həddi', 'dəqiqə', 1, 240, 'Bu qədər siqnal gəlməsə yarımçıq sayılır')}
         </div>
+        <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', marginTop: 16 }}>
+          {num('warnMin', '🟡 Sarı həddi (seçim müddəti)', 'dəqiqə', 1, 600, 'Seçimdə bu qədər qalanın müddəti sarı göstərilir')}
+          {num('dangerMin', '🔴 Qırmızı həddi (seçim müddəti)', 'dəqiqə', 2, 601, 'Bu qədəri keçəndə qırmızı göstərilir')}
+          <div style={{ flex: 1, minWidth: 180 }} />
+        </div>
+        {draft.dangerMin <= draft.warnMin && (
+          <div style={{ marginTop: 8, fontSize: 12, fontWeight: 700, color: '#c0392b' }}>Qırmızı həddi sarı həddindən böyük olmalıdır</div>
+        )}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 18, flexWrap: 'wrap' }}>
-          <button className="btn btn-primary" disabled={!dirty || busy} onClick={() => save({ ...draft, enabled: cfg.enabled })}>
+          <button className="btn btn-primary" disabled={!dirty || busy || draft.dangerMin <= draft.warnMin} onClick={() => save({ ...draft, enabled: cfg.enabled })}>
             💾 Yadda saxla
           </button>
           {saved && <span style={{ fontSize: 12.5, fontWeight: 800, color: '#237804' }}>✅ Yadda saxlanıldı</span>}
