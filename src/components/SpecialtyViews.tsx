@@ -129,19 +129,51 @@ export function FlatView({ flat, onChange, submitted = false, levelNames }: {
     ? [['№','center','#f3e3b8','#5a4a12'], [lv[0] || 'Səviyyə 1','left','#f3e3b8','#5a4a12'], [lv[1] || 'Səviyyə 2','left','#fff4ef','#8c3a1f'], ['','center','#f3e3b8','#5a4a12']]
     : [['№','center','#f3e3b8','#5a4a12'], [lv[0] || 'Səviyyə 1','left','#f3e3b8','#5a4a12'], [lv[1] || 'Səviyyə 2','left','#f7eccf','#6a4a12'], [lv[2] || 'Səviyyə 3','left','#fff4ef','#8c3a1f'], ['','center','#f3e3b8','#5a4a12']]
 
+  // Siçanla sürükləmə pointer hadisələri ilə aparılır: brauzerin öz (HTML5) sürükləməsində
+  // kursoru dəyişmək mümkün deyil, burada isə bütün müddət "sıxılmış əl" (grabbing) görünür.
+  // Toxunma ekranlarında köhnə (HTML5) sürükləmə qalır.
+  const pointerKind = useRef<string>('')
+  const flatRef = useRef(flat); flatRef.current = flat
+  function moveTo(i: number) {
+    if (dragIdx.current === null || dragIdx.current === i) return
+    setOverIdx(i)
+    const next = [...flatRef.current]; const [m] = next.splice(dragIdx.current, 1); next.splice(i, 0, m)
+    movedId.current = m.specId
+    dragIdx.current = i; flatRef.current = next; onChange!(next)
+  }
+  function onPointerDown(e: React.PointerEvent, i: number) {
+    pointerKind.current = e.pointerType
+    if (!interactive || e.pointerType === 'touch' || e.button !== 0) return
+    e.preventDefault()
+    dragIdx.current = i; setDragging(i)
+    const prevCursor = document.body.style.cursor
+    document.body.style.cursor = 'grabbing'
+    const move = (ev: PointerEvent) => {
+      const el = (document.elementFromPoint(ev.clientX, ev.clientY) as HTMLElement | null)?.closest('[data-flat-idx]') as HTMLElement | null
+      if (el) moveTo(Number(el.dataset.flatIdx))
+    }
+    const up = () => {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', up)
+      window.removeEventListener('pointercancel', up)
+      document.body.style.cursor = prevCursor
+      onDragEnd()
+    }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up)
+    window.addEventListener('pointercancel', up)
+  }
+
   function onDragStart(e: React.DragEvent, i: number) {
     if (!interactive) return
+    if (pointerKind.current !== 'touch') { e.preventDefault(); return }
     hideGhost(e)
     dragIdx.current = i; setDragging(i)
   }
   function onDragOver(e: React.DragEvent, i: number) {
     if (!interactive) return
     e.preventDefault()
-    if (dragIdx.current === null || dragIdx.current === i) return
-    setOverIdx(i)
-    const next = [...flat]; const [m] = next.splice(dragIdx.current, 1); next.splice(i, 0, m)
-    movedId.current = m.specId
-    dragIdx.current = i; onChange!(next)
+    moveTo(i)
   }
   function onDragEnd() {
     setDragging(null); setOverIdx(null); dragIdx.current = null
@@ -182,7 +214,9 @@ export function FlatView({ flat, onChange, submitted = false, levelNames }: {
           return (
             <div
               key={row.specId}
+              data-flat-idx={i}
               draggable={interactive}
+              onPointerDown={e => onPointerDown(e, i)}
               onDragStart={e => onDragStart(e, i)}
               onDragOver={e => onDragOver(e, i)}
               onDragEnd={onDragEnd}
