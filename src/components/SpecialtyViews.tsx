@@ -1,5 +1,17 @@
 import { useState, useRef } from 'react'
-import { P, O } from '../palette'
+import { P, O, L } from '../palette'
+
+// Son səviyyə (hərbi uçot ixtisası) rəngləri — açıq rejimdə qəhvəyi əvəzinə mavi tonlar
+const LAST_HEAD_BG = L('#d4e2ef', '#fff4ef')
+const LAST_HEAD_FG = L('#1d5a8c', '#8c3a1f')
+const LAST_ACCENT  = L('#1d5a8c', '#ff7c4f')
+const LAST_BOX_BG  = L('#f4f8fc', '#fff9f6')
+const LAST_BOX_BD  = L('#d4e2ef', '#fde8dc')
+const LAST_ITEM_BG = L('#eef4fa', '#fff4ef')
+const LAST_ITEM_OV = L('#dbe8f4', '#ffe8d8')
+const LAST_ITEM_BD = L('#c9dbeb', '#ffd5c2')
+const LAST_ITEM_FG = L('#1d3a5c', '#7a2a10')
+const LAST_SHADOW  = L('rgba(29,90,140,.45)', 'rgba(255,124,79,.5)')
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 export interface SpecEntry  { specId: string; specName: string; quota: number }
@@ -125,10 +137,10 @@ export function FlatView({ flat, onChange, submitted = false, levelNames }: {
     ? '40px minmax(0,1fr) minmax(0,1fr) 44px'
     : '40px minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) 44px'
   const headCells: Array<[string, string, string, string]> = oneLevel
-    ? [['№','center',`${P.line3}`,`${O(P.navyDk, '#5a4a12')}`], [lv[0] || 'Səviyyə 1','left','#fff4ef','#8c3a1f'], ['','center',`${P.line3}`,`${O(P.navyDk, '#5a4a12')}`]]
+    ? [['№','center',`${P.line3}`,`${O(P.navyDk, '#5a4a12')}`], [lv[0] || 'Səviyyə 1','left',LAST_HEAD_BG,LAST_HEAD_FG], ['','center',`${P.line3}`,`${O(P.navyDk, '#5a4a12')}`]]
     : twoLevel
-    ? [['№','center',`${P.line3}`,`${O(P.navyDk, '#5a4a12')}`], [lv[0] || 'Səviyyə 1','left',`${P.line3}`,`${O(P.navyDk, '#5a4a12')}`], [lv[1] || 'Səviyyə 2','left','#fff4ef','#8c3a1f'], ['','center',`${P.line3}`,`${O(P.navyDk, '#5a4a12')}`]]
-    : [['№','center',`${P.line3}`,`${O(P.navyDk, '#5a4a12')}`], [lv[0] || 'Səviyyə 1','left',`${P.line3}`,`${O(P.navyDk, '#5a4a12')}`], [lv[1] || 'Səviyyə 2','left',`${O(P.tint, '#f7eccf')}`,`${O(P.navyDk, '#6a4a12')}`], [lv[2] || 'Səviyyə 3','left','#fff4ef','#8c3a1f'], ['','center',`${P.line3}`,`${O(P.navyDk, '#5a4a12')}`]]
+    ? [['№','center',`${P.line3}`,`${O(P.navyDk, '#5a4a12')}`], [lv[0] || 'Səviyyə 1','left',`${P.line3}`,`${O(P.navyDk, '#5a4a12')}`], [lv[1] || 'Səviyyə 2','left',LAST_HEAD_BG,LAST_HEAD_FG], ['','center',`${P.line3}`,`${O(P.navyDk, '#5a4a12')}`]]
+    : [['№','center',`${P.line3}`,`${O(P.navyDk, '#5a4a12')}`], [lv[0] || 'Səviyyə 1','left',`${P.line3}`,`${O(P.navyDk, '#5a4a12')}`], [lv[1] || 'Səviyyə 2','left',`${O(P.tint, '#f7eccf')}`,`${O(P.navyDk, '#6a4a12')}`], [lv[2] || 'Səviyyə 3','left',LAST_HEAD_BG,LAST_HEAD_FG], ['','center',`${P.line3}`,`${O(P.navyDk, '#5a4a12')}`]]
 
   // Siçanla sürükləmə pointer hadisələri ilə aparılır: brauzerin öz (HTML5) sürükləməsində
   // kursoru dəyişmək mümkün deyil, burada isə bütün müddət "sıxılmış əl" (grabbing) görünür.
@@ -431,7 +443,7 @@ export function NestedView({ nested, onChange, submitted = false }: {
                     )}
 
                     {/* İxtisaslar */}
-                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4, background: '#fff9f6', border: '1.5px solid #fde8dc', borderRadius: 8, padding: 6 }}>
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4, background: LAST_BOX_BG, border: `1.5px solid ${LAST_BOX_BD}`, borderRadius: 8, padding: 6 }}>
                       {sub.specialties.map((spec, pi) => {
                         pr++; const pn = pr
                         const pk = `${gi}-${si}-${pi}`
@@ -449,18 +461,18 @@ export function NestedView({ nested, onChange, submitted = false }: {
                             onDragEnd={pEnd}
                             style={{
                               display: 'flex', alignItems: 'stretch',
-                              background: isFP ? '#fffbe6' : isOP ? '#ffe8d8' : '#fff4ef',
-                              border: `1.5px solid ${isFP ? '#f5a623' : isOP ? '#ff7c4f' : '#ffd5c2'}`,
+                              background: isFP ? '#fffbe6' : isOP ? LAST_ITEM_OV : LAST_ITEM_BG,
+                              border: `1.5px solid ${isFP ? '#f5a623' : isOP ? LAST_ACCENT : LAST_ITEM_BD}`,
                               borderRadius: 6, overflow: 'hidden',
                               cursor: interactive ? 'grab' : 'default',
                               opacity: 1,
-                              boxShadow: isFP ? '0 0 0 2px #f5a62330' : isDP ? '0 8px 18px rgba(255,124,79,.5), 0 0 0 2px #ff7c4f' : isOP ? '0 0 0 2px #ff7c4f28' : 'none',
+                              boxShadow: isFP ? '0 0 0 2px #f5a62330' : isDP ? `0 8px 18px ${LAST_SHADOW}, 0 0 0 2px ${LAST_ACCENT}` : isOP ? `0 0 0 2px ${LAST_ACCENT}28` : 'none',
                               userSelect: 'none',
                               transition: isFP ? 'background 1.8s ease, border-color 1.8s ease' : 'border-color .1s',
                             }}
                           >
-                            <div style={{ minWidth: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#ff7c4f', fontSize: 10, fontWeight: 700, color: '#fff' }}>{pn}</div>
-                            <div style={{ flex: 1, padding: '7px 8px', fontSize: 11, fontWeight: 500, color: '#7a2a10', lineHeight: 1.3 }}>{spec.specName}</div>
+                            <div style={{ minWidth: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', background: LAST_ACCENT, fontSize: 10, fontWeight: 700, color: '#fff' }}>{pn}</div>
+                            <div style={{ flex: 1, padding: '7px 8px', fontSize: 11, fontWeight: 500, color: LAST_ITEM_FG, lineHeight: 1.3 }}>{spec.specName}</div>
                             {interactive && <div style={{ display: 'flex', alignItems: 'center', padding: '0 5px', color: '#ddd', fontSize: 11 }}>⠿</div>}
                           </div>
                         )
