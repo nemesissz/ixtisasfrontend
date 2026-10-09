@@ -34,7 +34,7 @@ const pctText = (a: number, b: number): string => {
 // Donut seqmentinin və legend nişanının «Hesabatı yüklə» düyməsindəki qradiyentlə çəkilməsi
 const GRAD = 'grad'
 // Parlaq variant: əsas göydən açıq, işıqlı göyə keçid (diaqramda yüngül işıltı ilə)
-const GRAD_FROM = '#3f78bd', GRAD_TO = '#6fa3dc'
+const GRAD_FROM = '#3a6ead', GRAD_TO = '#5b8cc4'
 const GRAD_CSS = `linear-gradient(135deg,${GRAD_FROM},${GRAD_TO})`
 
 // ── SVG halqa (donut) ─────────────────────────────────────────────────────────
@@ -55,7 +55,7 @@ function Donut({ segments, size = 150, stroke = 20, center }: {
             <stop offset="100%" stopColor={GRAD_TO} />
           </linearGradient>
           <filter id="donut-glow" x="-20%" y="-20%" width="140%" height="140%">
-            <feDropShadow dx="0" dy="0" stdDeviation="3" floodColor={GRAD_FROM} floodOpacity="0.45" />
+            <feDropShadow dx="0" dy="0" stdDeviation="2" floodColor={GRAD_FROM} floodOpacity="0.25" />
           </filter>
         </defs>
         <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#eef0f7" strokeWidth={stroke} />
