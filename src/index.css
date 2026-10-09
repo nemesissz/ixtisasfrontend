@@ -594,3 +594,12 @@ html[data-mode="light"] .admin-role { color: #525f68; font-size: 11px; }
 @media (max-width: 768px) {
   html[data-mode="light"] .sidebar.collapsed .nav-item { justify-content: flex-start; gap: 12px; padding: 8px 12px; margin: 2px 12px; }
 }
+/* Emoji ikonlar → xətti (Lucide) ikonlar. Şrift yalnız siyahıdakı emojiləri əhatə edir
+   (bax: scripts/isp-icons), qalan bütün simvollar Inter ilə göstərilir. */
+@font-face {
+  font-family: 'IspIcons';
+  src: url('/fonts/isp-icons.woff2') format('woff2');
+  unicode-range: U+FE0F, U+23ED-23F8, U+2694-2795, U+2B07, U+1F300-1FAFF;
+  font-display: block;
+}
+html[data-mode="light"] body { font-family: 'IspIcons', 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif; }
