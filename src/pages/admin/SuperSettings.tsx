@@ -14,7 +14,8 @@ import {
 import { getAdminSession } from "../../api/auth";
 import MonitorSettingsCard from "../../components/MonitorSettingsCard";
 import ThemeSettingsCard from "../../components/ThemeSettingsCard";
-import { P, O } from '../../palette'
+import { P, O, IS_LIGHT_MODE } from '../../palette'
+import InstTabs from '../../components/InstTabs'
 
 /**
  * Superadmin parametrləri — yalnız baş admin görür.
@@ -183,7 +184,14 @@ export default function SuperSettings() {
             </div>
           </div>
 
-          {/* Müəssisə tab sətri */}
+          {/* Müəssisə tab sətri — açıq rejimdə digər səhifələrdəki ortaq tablar */}
+          {IS_LIGHT_MODE ? (
+            <div style={{ padding: '22px 28px 0', marginBottom: -16 }}>
+              {institutions.length === 0
+                ? <span style={{ fontSize: 13, color: 'var(--muted)' }}>Müəssisə tapılmadı</span>
+                : <InstTabs insts={institutions} activeId={selInst} onSelect={handleInstChange} />}
+            </div>
+          ) : (
           <div
             style={{
               background: "#f4f6ff",
@@ -231,6 +239,7 @@ export default function SuperSettings() {
               </span>
             )}
           </div>
+          )}
 
           {/* Sahə konfiqurasiyası */}
           {selInst && (

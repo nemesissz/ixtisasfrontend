@@ -6,7 +6,8 @@ import { AppDialog, useDialog } from '../../components/AppDialog'
 import { useTopbar } from '../../contexts/TopbarContext'
 import InstIcon from '../../components/InstIcon'
 import { formatDate } from '../../utils-date'
-import { P, O } from '../../palette'
+import { P, O, IS_LIGHT_MODE } from '../../palette'
+import SharedInstTabs from '../../components/InstTabs'
 
 function getLeavesWithPath(nodes: any[], anc: any[] = []): Array<{ leaf: any; path: any[] }> {
   const res: Array<{ leaf: any; path: any[] }> = []
@@ -178,7 +179,9 @@ export default function Archive() {
   }
 
   // ── Müəssisə tablarını topbar-a inject et ──────────────────────────────────
+  // Açıq rejimdə tablar digər səhifələrdəki kimi səhifənin özündə (ortaq InstTabs) göstərilir
   useEffect(() => {
+    if (IS_LIGHT_MODE) return
     const token = setSlot(
       insts.length === 0
         ? <></>
@@ -210,6 +213,10 @@ export default function Archive() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+
+      {IS_LIGHT_MODE && (
+        <SharedInstTabs insts={insts} activeId={instId} onSelect={id => { setActiveInst(id); setExpandedId(null) }} />
+      )}
 
       {/* ── Xüsusi dialog ── */}
       {dialog && <AppDialog cfg={dialog} onClose={closeDialog} />}
