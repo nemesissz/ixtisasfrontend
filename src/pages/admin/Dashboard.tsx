@@ -84,18 +84,13 @@ function seqColor(rank: number, n: number): string {
   const t = n <= 1 ? 0 : (rank / (n - 1)) * 0.68
   return '#' + SEQ_BASE.map((v, i) => Math.round(v + (SEQ_TO[i] - v) * t).toString(16).padStart(2, '0')).join('')
 }
-function seqColors(values: number[]): string[] {
-  const order = values.map((_, i) => i).sort((a, b) => values[b] - values[a])
-  const out: string[] = []
-  order.forEach((idx, rank) => { out[idx] = seqColor(rank, values.length) })
-  return out
-}
+// Statistika barlarının vahid (monoxrom) rəngi — bütün kartlarda eyni
+const MONO = seqColor(1, 5)
 
-// mono: bütün barlar bir rəngdə (ardıcıl şkala yerinə)
-function Bars({ data, max, mono }: { data: { label: string; value: number; color: string; sub?: string }[]; max?: number; mono?: string }) {
+function Bars({ data, max }: { data: { label: string; value: number; color: string; sub?: string }[]; max?: number }) {
   const m = max ?? Math.max(1, ...data.map(d => d.value))
-  // Köhnə rejimdə hər bar öz rəngindədir, yenidə dəyərə görə ardıcıl şkala
-  const cols = IS_OLD_PALETTE ? data.map(d => d.color) : mono ? data.map(() => mono) : seqColors(data.map(d => d.value))
+  // Köhnə rejimdə hər bar öz rəngindədir, yenidə hamısı eyni (monoxrom)
+  const cols = IS_OLD_PALETTE ? data.map(d => d.color) : data.map(() => MONO)
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       {data.map((d, i) => (
@@ -115,8 +110,8 @@ function Bars({ data, max, mono }: { data: { label: string; value: number; color
 // hər sətirdə eyni sütunlarda başlayır, bütün barlar eyni enlidir
 function GridBars({ data, max }: { data: { label: string; value: number; color: string; sub?: string }[]; max?: number }) {
   const m = max ?? Math.max(1, ...data.map(d => d.value))
-  // Köhnə rejimdə hər bar öz rəngindədir, yenidə dəyərə görə ardıcıl şkala
-  const cols = IS_OLD_PALETTE ? data.map(d => d.color) : seqColors(data.map(d => d.value))
+  // Köhnə rejimdə hər bar öz rəngindədir, yenidə hamısı eyni (monoxrom)
+  const cols = IS_OLD_PALETTE ? data.map(d => d.color) : data.map(() => MONO)
   const hasSub = data.some(d => d.sub)
   return (
     <div style={{
@@ -858,7 +853,7 @@ export default function Dashboard() {
 
             <Card title="Bal bölgüsü">
               {/* Yüksək baldan aşağıya doğru */}
-              <Bars mono={seqColor(1, 5)} data={A.scoreBuckets.map(([lo, hi], i) => ({
+              <Bars data={A.scoreBuckets.map(([lo, hi], i) => ({
                 label: `${lo}–${hi}`, value: A.hist[i], color: O(`${P.navy}`, '#c9962a'),
               })).reverse()} />
             </Card>
@@ -923,8 +918,8 @@ export default function Dashboard() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                   {A.branchStats.map((b: any, bi: number, arr: any[]) => {
                     const fillP = pct(b.placed, b.quota)
-                    // Bütün barlar eyni rəngdə (bar sayından asılı olmayaraq): şkalanın orta tonu
-                    const barCol = IS_OLD_PALETTE ? (fillP >= 100 ? '#52c41a' : '#c9962a') : seqColor(1, 3)
+                    // Bütün barlar eyni rəngdə (monoxrom)
+                    const barCol = IS_OLD_PALETTE ? (fillP >= 100 ? '#52c41a' : '#c9962a') : MONO
                     const comp = b.quota > 0 ? b.demand / b.quota : 0
                     return (
                       <div key={b.name}>
