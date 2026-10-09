@@ -7,7 +7,22 @@ import { AppDialog, useDialog } from '../../components/AppDialog'
 import { can } from '../../permissions'
 import { today } from '../../utils-date'
 import { ord } from '../../ordinal'
-import { P } from '../../palette'
+import { P, DS, IS_LIGHT_MODE } from '../../palette'
+
+// Açıq rejim: status nişanı — yerləşdi (dairədə işarə) / yerləşməyib (dairədə xətt)
+function StatusPill({ placed }: { placed: boolean }) {
+  const c = placed ? DS.success : DS.warning
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '3px 10px 3px 8px', borderRadius: 999, fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap',
+      color: c, background: placed ? '#e3f0e8' : '#f6ecdc' }}>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="10" />
+        {placed ? <path d="M8 12.5l2.8 2.8L16 10" /> : <path d="M8 12h8" />}
+      </svg>
+      {placed ? 'Yerləşdi' : 'Yerləşməyib'}
+    </span>
+  )
+}
 
 const pct = (a: number, b: number) => (b > 0 ? Math.round((a / b) * 100) : 0)
 
@@ -428,6 +443,8 @@ export default function Results() {
     )
   }
 
+  const COLS = (showGroup ? 9 : 8) - (IS_LIGHT_MODE ? 1 : 0)
+
   const KPIS = [
     { label: 'Ümumi təhsilalan', val: stats.total, icon: '👥', color: `${P.navy}` },
     { label: 'Yerləşdi', val: stats.placed, sub: `${stats.rate}%`, icon: '✅', color: '#52c41a' },
@@ -470,8 +487,8 @@ export default function Results() {
         </div>
       )}
 
-      {/* KPI */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
+      {/* KPI — açıq rejimdə göstərilmir */}
+      {!IS_LIGHT_MODE && <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
         {KPIS.map(s => (
           <div key={s.label} style={{ background: '#fff', border: '1.5px solid var(--border)', borderRadius: 13, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{ width: 40, height: 40, borderRadius: 11, background: s.color + '14', color: s.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>{s.icon}</div>
@@ -481,7 +498,7 @@ export default function Results() {
             </div>
           </div>
         ))}
-      </div>
+      </div>}
 
       {/* Yerləşmə faizi bar */}
       <div style={{ background: '#fff', border: '1.5px solid var(--border)', borderRadius: 13, padding: '14px 18px' }}>
@@ -552,10 +569,12 @@ export default function Results() {
         {/* Filtrlər */}
         <div style={{ display: 'flex', gap: 10, padding: '10px 18px', borderBottom: '1px solid var(--border)', flexWrap: 'wrap', alignItems: 'center' }}>
           <input className="search-input" placeholder="🔍  Ad və ya FİN..." value={search} onChange={e => setSearch(e.target.value)} style={{ minWidth: 160, flex: 1 }} />
+          {!IS_LIGHT_MODE && (
           <select className="filter-select" value={instFlt} onChange={e => setInstFlt(e.target.value)}>
             <option value="all">Bütün müəssisələr</option>
             {institutions.map((inst: any) => <option key={inst.id} value={inst.id}>{inst.label}</option>)}
           </select>
+          )}
           <select className="filter-select" value={statusFlt} onChange={e => setStatusFlt(e.target.value as any)}>
             <option value="all">Bütün statuslar</option>
             <option value="placed">✅ Yerləşdi</option>
@@ -576,7 +595,7 @@ export default function Results() {
                 <th>TƏHSİLALAN</th>
                 <th>FİN</th>
                 <th style={{ width: 80 }}>BAL</th>
-                <th>MÜƏSSİSƏ</th>
+                {!IS_LIGHT_MODE && <th>MÜƏSSİSƏ</th>}
                 {showGroup && <th style={{ width: 60 }}>QRUP</th>}
                 <th>YERLƏŞDİYİ İXTİSAS</th>
                 <th style={{ width: 110 }}>STATUS</th>
@@ -585,7 +604,7 @@ export default function Results() {
             </thead>
             <tbody>
               {rows.length === 0 && (
-                <tr><td colSpan={showGroup ? 9 : 8} style={{ textAlign: 'center', padding: '40px', color: 'var(--muted)', fontSize: 13 }}>Nəticə tapılmadı</td></tr>
+                <tr><td colSpan={COLS} style={{ textAlign: 'center', padding: '40px', color: 'var(--muted)', fontSize: 13 }}>Nəticə tapılmadı</td></tr>
               )}
               {rows.map((u, i) => {
                 const inst = u.institution ? instMap[u.institution] : null
@@ -604,11 +623,11 @@ export default function Results() {
                     <td style={{ textAlign: 'center' }}>
                       <span style={{ background: '#e8f4ff', color: 'var(--blue)', borderRadius: 20, padding: '3px 12px', fontWeight: 800, fontSize: 13 }}>{Number(u.score).toFixed(2)}</span>
                     </td>
-                    <td>
+                    {!IS_LIGHT_MODE && <td>
                       {inst
                         ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 12px', borderRadius: 8, background: '#edfdf4', color: '#1d6f42', fontWeight: 700, fontSize: 12 }}><InstIcon icon={inst.icon} size={13} /> {inst.label}</span>
                         : <span style={{ fontSize: 12, color: '#ccc' }}>—</span>}
-                    </td>
+                    </td>}
                     {showGroup && <td style={{ textAlign: 'center', fontWeight: 700, color: 'var(--muted)', fontSize: 13 }}>{u.group || '—'}</td>}
                     <td style={{ fontSize: 12.5, color: placed ? 'var(--text)' : '#bbb', fontWeight: placed ? 600 : 400 }}>
                       {placed
@@ -616,7 +635,7 @@ export default function Results() {
                         : 'Yerləşdirilməyib'}
                     </td>
                     <td style={{ textAlign: 'center' }}>
-                      {placed
+                      {IS_LIGHT_MODE ? <StatusPill placed={placed} /> : placed
                         ? <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700, background: '#f6ffed', color: '#237804', border: '1px solid #b7eb8f' }}>✅ Yerləşdi</span>
                         : <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700, background: '#fff7e6', color: '#d46b08', border: '1px solid #ffd591' }}>⏳ Gözləyir</span>}
                     </td>
@@ -631,7 +650,7 @@ export default function Results() {
                   </tr>
                   {isOpen && ranking.length > 0 && (
                     <tr key={u.id + '_d'}>
-                      <td colSpan={showGroup ? 9 : 8} style={{ background: '#f7f9ff', padding: '12px 18px' }}>
+                      <td colSpan={COLS} style={{ background: '#f7f9ff', padding: '12px 18px' }}>
                         <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--muted)', marginBottom: 8 }}>📋 {u.name} — prioritet sırası ilə seçimləri:</div>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 6 }}>
                           {ranking.map((rid, idx) => {
