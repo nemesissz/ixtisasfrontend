@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { P } from '../palette'
 
 // ── Tip ───────────────────────────────────────────────────────────────────────
 export type DialogCfg = {
@@ -73,7 +74,7 @@ export function AppDialog({ cfg, onClose }: { cfg: DialogCfg; onClose: () => voi
                 background: '#f4f6fb', color: 'var(--muted)',
                 fontWeight: 700, fontSize: 14, cursor: 'pointer', transition: 'all .15s',
               }}
-              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#eef2f7' }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = `${P.tint}` }}
               onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = '#f4f6fb' }}
             >
               {cfg.cancelLabel ?? 'Ləğv et'}
@@ -86,7 +87,7 @@ export function AppDialog({ cfg, onClose }: { cfg: DialogCfg; onClose: () => voi
               background: cfg.confirmColor ?? 'var(--blue)',
               color: '#fff', fontWeight: 700, fontSize: 14,
               cursor: 'pointer', transition: 'all .15s',
-              boxShadow: `0 4px 14px ${cfg.confirmColor ?? '#1f3f6b'}44`,
+              boxShadow: `0 4px 14px ${cfg.confirmColor ?? `${P.navy}`}44`,
             }}
             onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = '.88' }}
             onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = '1' }}

@@ -6,6 +6,7 @@ import { AppDialog, useDialog } from '../../components/AppDialog'
 import { useTopbar } from '../../contexts/TopbarContext'
 import InstIcon from '../../components/InstIcon'
 import { formatDate } from '../../utils-date'
+import { P } from '../../palette'
 
 function getLeavesWithPath(nodes: any[], anc: any[] = []): Array<{ leaf: any; path: any[] }> {
   const res: Array<{ leaf: any; path: any[] }> = []
@@ -124,10 +125,10 @@ export default function Archive() {
   }
   function handleRestoreTreeArc(arc: any) {
     showConfirm({
-      icon: '🎓', iconBg: '#eef2f7', iconColor: '#1f3f6b',
+      icon: '🎓', iconBg: `${P.tint}`, iconColor: `${P.navy}`,
       title: 'Strukturu bərpa et',
       message: `"${arc.name}" ixtisas strukturu və onunla birlikdə arxivə düşmüş seçimlər geri qaytarılacaq. Eyni struktur bərpa olunur — nəticələr də yenidən işlək olur. (Əvvəllər əl ilə arxivlənmiş seçimlərə toxunulmur.)`,
-      confirmLabel: 'Bərpa et', confirmColor: '#1f3f6b',
+      confirmLabel: 'Bərpa et', confirmColor: `${P.navy}`,
       onConfirm: async () => {
         // Nüsxə yaradılmır: eyni sətir yenidən aktiv edilir, ona görə
         // Selection.TreeId bağlantıları və nəticələr qırılmır.
@@ -194,7 +195,7 @@ export default function Archive() {
                   transition: 'all .15s',
                   background: instId === inst.id ? 'var(--blue)' : '#f0f2fa',
                   color:      instId === inst.id ? '#fff'        : 'var(--muted)',
-                  boxShadow:  instId === inst.id ? '0 2px 8px #1f3f6b33' : 'none',
+                  boxShadow:  instId === inst.id ? `0 2px 8px ${P.navy}33` : 'none',
                 }}
               >
                 <InstIcon icon={inst.icon} size={14} />
@@ -233,17 +234,17 @@ export default function Archive() {
                 padding: '8px 18px', borderRadius: 10, border: 'none',
                 cursor: 'pointer', fontWeight: 700, fontSize: 13,
                 transition: 'all .15s',
-                background: isActive ? 'linear-gradient(135deg,#1f3f6b,#4a6f8f)' : '#f0f2fa',
+                background: isActive ? `linear-gradient(135deg,${P.navy},${P.steel})` : '#f0f2fa',
                 color:      isActive ? '#fff' : 'var(--muted)',
-                boxShadow:  isActive ? '0 4px 14px #1f3f6b33' : 'none',
+                boxShadow:  isActive ? `0 4px 14px ${P.navy}33` : 'none',
               }}
             >
               <span style={{ fontSize: 14 }}>{s.icon}</span>
               {s.label}
               <span style={{
                 fontSize: 11, fontWeight: 800, padding: '1px 7px', borderRadius: 20,
-                background: isActive ? 'rgba(255,255,255,0.25)' : '#eef2f7',
-                color: isActive ? '#fff' : '#3b5a7d', minWidth: 18, textAlign: 'center',
+                background: isActive ? 'rgba(255,255,255,0.25)' : `${P.tint}`,
+                color: isActive ? '#fff' : `${P.ink}`, minWidth: 18, textAlign: 'center',
               }}>{counts[s.id]}</span>
             </button>
           )
@@ -357,15 +358,15 @@ function InstTabs({ insts, active, counts, onSelect }: {
               transition: 'all .15s',
               background: isActive ? 'var(--blue)' : '#f0f2fa',
               color:      isActive ? '#fff'        : 'var(--muted)',
-              boxShadow:  isActive ? '0 3px 10px #1f3f6b33' : 'none',
+              boxShadow:  isActive ? `0 3px 10px ${P.navy}33` : 'none',
             }}
           >
             <InstIcon icon={inst.icon} size={16} style={{ marginRight: 2 }} />
             {inst.label}
             <span style={{
               fontSize: 11, fontWeight: 800, padding: '1px 8px', borderRadius: 20,
-              background: isActive ? 'rgba(255,255,255,0.25)' : '#eef2f7',
-              color:      isActive ? '#fff' : '#3b5a7d',
+              background: isActive ? 'rgba(255,255,255,0.25)' : `${P.tint}`,
+              color:      isActive ? '#fff' : `${P.ink}`,
               minWidth: 20, textAlign: 'center',
             }}>{cnt}</span>
           </button>
@@ -429,7 +430,7 @@ function RestoreUsersModal({ arc, onClose, onRestore }: {
   const opt = (key: typeof mode, title: string, sub?: React.ReactNode) => (
     <label key={key} style={{
       display: 'flex', gap: 10, alignItems: 'flex-start', padding: '10px 12px', borderRadius: 10, cursor: 'pointer',
-      border: `1.5px solid ${mode === key ? '#1f3f6b' : '#e6e9f5'}`, background: mode === key ? '#f6f8fb' : '#fff',
+      border: `1.5px solid ${mode === key ? `${P.navy}` : '#e6e9f5'}`, background: mode === key ? `${P.tint2}` : '#fff',
     }}>
       <input type="radio" checked={mode === key} onChange={() => setMode(key)} style={{ marginTop: 3 }} />
       <span style={{ flex: 1, minWidth: 0 }}>
@@ -481,7 +482,7 @@ function RestoreUsersModal({ arc, onClose, onRestore }: {
           )}
 
           {mode !== 'keep' && subCount > 0 && (
-            <div style={{ fontSize: 12, color: '#3b5a7d', background: '#fff7e6', border: '1px solid #ffd591', borderRadius: 8, padding: '8px 10px' }}>
+            <div style={{ fontSize: 12, color: `${P.ink}`, background: '#fff7e6', border: '1px solid #ffd591', borderRadius: 8, padding: '8px 10px' }}>
               Qeyd: seçimlər qrupa bağlı struktura aiddir. Təhsilalanları başqa qrupa salsanız, köhnə seçim nəticələri həmin qrupun strukturunda görünməyə bilər.
             </div>
           )}
@@ -506,7 +507,7 @@ function EmptyState({ icon, text, sub }: { icon: string; text: string; sub: stri
     }}>
       <div style={{
         width: 80, height: 80, borderRadius: 22,
-        background: 'linear-gradient(135deg,#f0f2fa,#eef2f7)',
+        background: `linear-gradient(135deg,#f0f2fa,${P.tint})`,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         fontSize: 36, boxShadow: '0 4px 20px #0001',
       }}>{icon}</div>
@@ -522,8 +523,8 @@ function UserArchiveCard({ arc, idx, insts, expanded, searchQ, onToggle, onSearc
 
   // Müəssisə adı siyahıdan götürülür (köhnə 'kollec'/'ahm' sabitləri deyil)
   const inst      = (insts || []).find((i: any) => i.id === arc.institution)
-  const instColor = '#152c4d'
-  const instBg    = '#eef2f7'
+  const instColor = `${P.navyDk}`
+  const instBg    = `${P.tint}`
   const instIcon  = inst?.icon
   const instLabel = inst?.label || arc.institution || '—'
 
@@ -576,9 +577,9 @@ function UserArchiveCard({ arc, idx, insts, expanded, searchQ, onToggle, onSearc
       >
         <div style={{
           width: 36, height: 36, borderRadius: 10, flexShrink: 0,
-          background: 'linear-gradient(135deg,#3b5a7d22,#9aa0ac22)',
+          background: `linear-gradient(135deg,${P.ink}22,#9aa0ac22)`,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 13, fontWeight: 800, color: '#3b5a7d',
+          fontSize: 13, fontWeight: 800, color: `${P.ink}`,
         }}>{String(idx + 1).padStart(2, '0')}</div>
 
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -793,8 +794,8 @@ function ArchiveCard({ sel, idx, allUsers, insts, expanded, instFlt, searchQ,
 
   // Müəssisə adı siyahıdan götürülür (köhnə 'kollec'/'ahm' sabitləri deyil)
   const inst      = (insts || []).find((i: any) => i.id === sel.institution)
-  const instColor = '#152c4d'
-  const instBg    = '#eef2f7'
+  const instColor = `${P.navyDk}`
+  const instBg    = `${P.tint}`
   const instIcon  = inst?.icon
   const instLabel = inst?.label || sel.institution || '—'
 
@@ -837,9 +838,9 @@ function ArchiveCard({ sel, idx, allUsers, insts, expanded, instFlt, searchQ,
       >
         <div style={{
           width: 36, height: 36, borderRadius: 10, flexShrink: 0,
-          background: 'linear-gradient(135deg,#3b5a7d22,#9aa0ac22)',
+          background: `linear-gradient(135deg,${P.ink}22,#9aa0ac22)`,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 13, fontWeight: 800, color: '#3b5a7d',
+          fontSize: 13, fontWeight: 800, color: `${P.ink}`,
         }}>{String(idx + 1).padStart(2, '0')}</div>
 
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -906,10 +907,10 @@ function ArchiveCard({ sel, idx, allUsers, insts, expanded, instFlt, searchQ,
             borderBottom: '1px solid var(--border)',
           }}>
             {[
-              { icon: '👥', label: 'Seçim edib',       val: submitted.length,               color: '#1f3f6b' },
+              { icon: '👥', label: 'Seçim edib',       val: submitted.length,               color: `${P.navy}` },
               { icon: '✅', label: 'Yerləşdirilib',     val: placed.length,                  color: '#52c41a' },
               { icon: '⏳', label: 'Yerləşdirilməyib',  val: submitted.length - placed.length, color: '#f5a623' },
-              { icon: '🎓', label: 'Cəmi kvota',        val: totalQuota,                     color: '#152c4d' },
+              { icon: '🎓', label: 'Cəmi kvota',        val: totalQuota,                     color: `${P.navyDk}` },
             ].map(s => (
               <div key={s.label} style={{
                 background: '#fff', borderRadius: 12, padding: '12px 16px',
@@ -971,7 +972,7 @@ function ArchiveCard({ sel, idx, allUsers, insts, expanded, instFlt, searchQ,
                 {rows.map((u: any, i: number) => {
                   const uInst = (insts || []).find((i: any) => i.id === u.institution)
                   const instOpt = uInst
-                    ? { label: uInst.label, icon: uInst.icon, color: '#152c4d', bg: '#eef2f7' }
+                    ? { label: uInst.label, icon: uInst.icon, color: `${P.navyDk}`, bg: `${P.tint}` }
                     : null
                   return (
                     <tr key={u.id}>
@@ -1019,7 +1020,7 @@ function ArchiveCard({ sel, idx, allUsers, insts, expanded, instFlt, searchQ,
 }
 
 // ── Rəng sxemi (Specialties ilə eyni) ────────────────────────────────────────
-const DEPTH_COLORS = ['#1f3f6b', '#152c4d', '#ff7c4f', '#237804', '#c41d7f', '#d48806']
+const DEPTH_COLORS = [`${P.navy}`, `${P.navyDk}`, '#ff7c4f', '#237804', '#c41d7f', '#d48806']
 function depthColor(d: number) { return DEPTH_COLORS[Math.min(d, DEPTH_COLORS.length - 1)] }
 
 function arcCountLeaves(nodes: any[]): number {
@@ -1146,7 +1147,7 @@ function TreeArchiveCard({ arc, idx, expanded, onToggle, onDelete, onRestore }: 
           display: 'flex', alignItems: 'center', gap: 14,
           padding: '15px 20px', cursor: 'pointer', userSelect: 'none',
           background: expanded ? '#f4f7ff' : '#fff',
-          borderBottom: expanded ? '1.5px solid #dfe6ef' : 'none',
+          borderBottom: expanded ? `1.5px solid ${P.line3}` : 'none',
           transition: 'background .15s',
         }}
         onMouseEnter={e => { if (!expanded) (e.currentTarget as HTMLElement).style.background = '#fafbff' }}
@@ -1165,7 +1166,7 @@ function TreeArchiveCard({ arc, idx, expanded, onToggle, onDelete, onRestore }: 
         {/* Logo */}
         <div style={{
           width: 42, height: 42, borderRadius: 10, flexShrink: 0, overflow: 'hidden',
-          background: '#fff', border: '1.5px solid #d5dde8',
+          background: '#fff', border: `1.5px solid ${P.line2}`,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           fontSize: 22, transition: 'all .15s',
         }}>

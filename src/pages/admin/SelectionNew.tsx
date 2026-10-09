@@ -5,6 +5,7 @@ import { readActiveInst, writeActiveInst } from '../../activeInst'
 import { FlatView, NestedView, treeToNested, nestedToFlat } from '../../components/SpecialtyViews'
 import InstIcon from '../../components/InstIcon'
 import { filterTreeByBranch, collapseLevel } from '../student/SelectionPage'
+import { P } from '../../palette'
 
 // ── Təhsilalan görünüşü önizləmə overlay ─────────────────────────────────────────
 function ViewPreviewOverlay({
@@ -216,12 +217,12 @@ export default function SelectionNew() {
             <div style={{
               display: 'flex', gap: 12, marginBottom: 16,
               padding: '14px 18px', borderRadius: 12,
-              background: 'linear-gradient(135deg,#f6f8fb,#eef2f7)',
-              border: '1.5px solid #c9d4e2',
+              background: `linear-gradient(135deg,${P.tint2},${P.tint})`,
+              border: `1.5px solid ${P.line}`,
             }}>
               <div style={{
                 width: 42, height: 42, borderRadius: 10, flexShrink: 0,
-                background: '#fff', border: '1.5px solid #c9d4e2',
+                background: '#fff', border: `1.5px solid ${P.line}`,
                 display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
               }}>
                 <InstIcon icon={activeInst.icon} size={26} />
@@ -232,8 +233,8 @@ export default function SelectionNew() {
                 </div>
                 <span style={{
                   display: 'inline-block', padding: '2px 10px', borderRadius: 20,
-                  background: studentCount > 0 ? '#eef2f7' : '#f5f5f5',
-                  color: studentCount > 0 ? '#3b5a7d' : 'var(--muted)',
+                  background: studentCount > 0 ? `${P.tint}` : '#f5f5f5',
+                  color: studentCount > 0 ? `${P.ink}` : 'var(--muted)',
                   fontWeight: 800, fontSize: 13,
                 }}>👥 {studentCount}</span>
                 <span style={{ color: 'var(--muted)', fontSize: 12, marginLeft: 6 }}>təhsilalan qeydiyyatda</span>
@@ -306,9 +307,9 @@ export default function SelectionNew() {
           {selectedTree && (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12, marginBottom: 16 }}>
               {[
-                { label: `${leafLevelName} sayı`,  value: totalSpec,    icon: '📚', color: '#1f3f6b', bg: '#eef2f7' },
+                { label: `${leafLevelName} sayı`,  value: totalSpec,    icon: '📚', color: `${P.navy}`, bg: `${P.tint}` },
                 { label: 'Ümumi kvota',   value: totalQuota,   icon: '🎯', color: '#237804', bg: '#f0fff4' },
-                { label: 'Təhsilalan sayı',   value: studentCount, icon: '👥', color: '#152c4d', bg: '#eef2f7' },
+                { label: 'Təhsilalan sayı',   value: studentCount, icon: '👥', color: `${P.navyDk}`, bg: `${P.tint}` },
               ].map(item => (
                 <div key={item.label} style={{
                   padding: '14px 16px', borderRadius: 12, textAlign: 'center',
@@ -329,7 +330,7 @@ export default function SelectionNew() {
             </div>
           )}
           {selectedTree && totalQuota > 0 && totalQuota > studentCount && studentCount > 0 && (
-            <div style={{ background: '#eef2f7', border: '1.5px solid #c9d4e2', borderRadius: 10, padding: '10px 14px', fontSize: 12, color: '#3b5a7d', marginBottom: 12 }}>
+            <div style={{ background: `${P.tint}`, border: `1.5px solid ${P.line}`, borderRadius: 10, padding: '10px 14px', fontSize: 12, color: `${P.ink}`, marginBottom: 12 }}>
               ℹ️ Ümumi kvota ({totalQuota}) təhsilalan sayından ({studentCount}) <strong>çoxdur</strong> — bəzi ixtisas yerləri boş qala bilər.
             </div>
           )}
@@ -352,18 +353,18 @@ export default function SelectionNew() {
                     onClick={() => set('viewMode', opt.v)}
                     style={{
                       flex: 1, padding: '12px 16px', borderRadius: 12, cursor: 'pointer',
-                      border: `2px solid ${active ? '#1f3f6b' : '#e0e4f0'}`,
-                      background: active ? '#eef2f7' : '#fff',
+                      border: `2px solid ${active ? `${P.navy}` : '#e0e4f0'}`,
+                      background: active ? `${P.tint}` : '#fff',
                       textAlign: 'left', transition: 'all .15s', position: 'relative',
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                       <span style={{ fontSize: 18 }}>{opt.icon}</span>
-                      <span style={{ fontWeight: 800, fontSize: 13, color: active ? '#1f3f6b' : 'var(--text)' }}>
+                      <span style={{ fontWeight: 800, fontSize: 13, color: active ? `${P.navy}` : 'var(--text)' }}>
                         {opt.label}
                       </span>
                       {active && (
-                        <span style={{ background: '#1f3f6b', color: '#fff', fontSize: 9, fontWeight: 800, padding: '2px 7px', borderRadius: 6 }}>
+                        <span style={{ background: `${P.navy}`, color: '#fff', fontSize: 9, fontWeight: 800, padding: '2px 7px', borderRadius: 6 }}>
                           SEÇİLİB
                         </span>
                       )}
@@ -380,12 +381,12 @@ export default function SelectionNew() {
                           marginLeft: 'auto', flexShrink: 0,
                           width: 30, height: 30, borderRadius: 8,
                           display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                          border: '1.5px solid #c9d4e2', background: '#fff',
+                          border: `1.5px solid ${P.line}`, background: '#fff',
                           fontSize: 15, cursor: selectedTree ? 'pointer' : 'not-allowed',
                           opacity: selectedTree ? 1 : 0.4, transition: 'all .15s',
                         }}
-                        onMouseEnter={ev => { if (selectedTree) { (ev.currentTarget as HTMLElement).style.background = '#eef2f7'; (ev.currentTarget as HTMLElement).style.borderColor = '#1f3f6b' } }}
-                        onMouseLeave={ev => { (ev.currentTarget as HTMLElement).style.background = '#fff'; (ev.currentTarget as HTMLElement).style.borderColor = '#c9d4e2' }}
+                        onMouseEnter={ev => { if (selectedTree) { (ev.currentTarget as HTMLElement).style.background = `${P.tint}`; (ev.currentTarget as HTMLElement).style.borderColor = `${P.navy}` } }}
+                        onMouseLeave={ev => { (ev.currentTarget as HTMLElement).style.background = '#fff'; (ev.currentTarget as HTMLElement).style.borderColor = `${P.line}` }}
                       >👁</span>
                     </div>
                     <div style={{ fontSize: 11, color: 'var(--muted)', paddingLeft: 26 }}>{opt.desc}</div>

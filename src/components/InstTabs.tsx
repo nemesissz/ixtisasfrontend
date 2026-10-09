@@ -1,5 +1,6 @@
 import React from 'react'
 import InstIcon from './InstIcon'
+import { P } from '../palette'
 
 // ── Bütün bölmələrdə eyni standart müəssisə tabları ──
 // insts: müəssisə siyahısı, activeId: seçili, onSelect: klik
@@ -27,7 +28,7 @@ export default function InstTabs({ insts, activeId, onSelect, onEdit, trailing }
                 border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 14, whiteSpace: 'nowrap',
                 background: active ? 'var(--blue)' : '#f0f2fa',
                 color: active ? '#fff' : 'var(--muted)',
-                boxShadow: active ? '0 2px 10px #1f3f6b33' : 'none',
+                boxShadow: active ? `0 2px 10px ${P.navy}33` : 'none',
                 transition: 'all .15s',
               }}
             >

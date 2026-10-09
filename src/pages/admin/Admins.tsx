@@ -11,6 +11,7 @@ import { AppDialog, useDialog } from "../../components/AppDialog";
 import { PERM_GROUPS, ALL_PERMS } from "../../permissions";
 import { getAdminSession, setAdminSession } from "../../api/auth";
 import { can } from "../../permissions";
+import { P } from '../../palette'
 
 const EyeIcon = ({ off }: { off: boolean }) =>
   off ? (
@@ -80,7 +81,7 @@ function InstSelector({
   return (
     <div style={{ border: "1.5px solid #e8eaf5", borderRadius: 12, overflow: "hidden", marginTop: 14 }}>
       <div style={{ padding: "9px 14px", background: "#f8f9fd", borderBottom: "1.5px solid #eef0f8", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span style={{ fontSize: 11, fontWeight: 800, color: "#3b5a7d", textTransform: "uppercase", letterSpacing: 0.5 }}>
+        <span style={{ fontSize: 11, fontWeight: 800, color: `${P.ink}`, textTransform: "uppercase", letterSpacing: 0.5 }}>
           🏛️ Müəssisə əhatəsi {value.length > 0 ? `(${value.length})` : "(hamısı)"}
         </span>
         <button type="button" onClick={() => onChange([])}
@@ -94,7 +95,7 @@ function InstSelector({
         </div>
         {institutions.map((inst) => (
           <label key={inst.id} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 12.5, color: value.includes(inst.id) ? "#3a4cad" : "#555" }}>
-            <input type="checkbox" checked={value.includes(inst.id)} onChange={() => toggle(inst.id)} style={{ accentColor: "#1f3f6b" }} />
+            <input type="checkbox" checked={value.includes(inst.id)} onChange={() => toggle(inst.id)} style={{ accentColor: `${P.navy}` }} />
             {inst.label}
           </label>
         ))}
@@ -148,7 +149,7 @@ function PermSelector({
           style={{
             fontSize: 11,
             fontWeight: 800,
-            color: "#3b5a7d",
+            color: `${P.ink}`,
             textTransform: "uppercase",
             letterSpacing: 0.5,
           }}
@@ -162,7 +163,7 @@ function PermSelector({
             style={{
               fontSize: 11,
               fontWeight: 700,
-              color: "#1f3f6b",
+              color: `${P.navy}`,
               background: "none",
               border: "none",
               cursor: "pointer",
@@ -220,10 +221,10 @@ function PermSelector({
                   type="checkbox"
                   checked={allOn}
                   onChange={() => toggleGroup(codes)}
-                  style={{ accentColor: "#1f3f6b" }}
+                  style={{ accentColor: `${P.navy}` }}
                 />
                 <span
-                  style={{ fontSize: 12.5, fontWeight: 800, color: "#152c4d" }}
+                  style={{ fontSize: 12.5, fontWeight: 800, color: `${P.navyDk}` }}
                 >
                   {g.icon} {g.group}
                 </span>
@@ -253,7 +254,7 @@ function PermSelector({
                       type="checkbox"
                       checked={value.includes(p.code)}
                       onChange={() => toggle(p.code)}
-                      style={{ accentColor: "#1f3f6b" }}
+                      style={{ accentColor: `${P.navy}` }}
                     />
                     {p.label}
                   </label>
@@ -932,7 +933,7 @@ export default function Admins() {
                           height: 34,
                           borderRadius: 10,
                           flexShrink: 0,
-                          background: "linear-gradient(135deg,#1f3f6b,#4a6f8f)",
+                          background: `linear-gradient(135deg,${P.navy},${P.steel})`,
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
@@ -976,7 +977,7 @@ export default function Admins() {
                           title="Şifrəni dəyiş"
                           onClick={() => openPwModal(a)}
                           style={{
-                            color: "#1f3f6b",
+                            color: `${P.navy}`,
                             border: "1.5px solid #c5d0ff",
                             borderRadius: 8,
                             padding: "4px 10px",
@@ -993,7 +994,7 @@ export default function Admins() {
                             title="İcazələr"
                             onClick={() => openPerms(a)}
                             style={{
-                              color: "#152c4d",
+                              color: `${P.navyDk}`,
                               border: "1.5px solid #d5c5ff",
                               borderRadius: 8,
                               padding: "4px 10px",

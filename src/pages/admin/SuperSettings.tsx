@@ -14,6 +14,7 @@ import {
 import { getAdminSession } from "../../api/auth";
 import MonitorSettingsCard from "../../components/MonitorSettingsCard";
 import ThemeSettingsCard from "../../components/ThemeSettingsCard";
+import { P } from '../../palette'
 
 /**
  * Superadmin parametrləri — yalnız baş admin görür.
@@ -125,7 +126,7 @@ export default function SuperSettings() {
           {/* Başlıq */}
           <div
             style={{
-              background: "linear-gradient(135deg,#1f3f6b,#4a6f8f)",
+              background: `linear-gradient(135deg,${P.navy},${P.steel})`,
               padding: "20px 28px",
               display: "flex",
               alignItems: "center",
@@ -169,12 +170,12 @@ export default function SuperSettings() {
                   padding: "9px 20px",
                   borderRadius: 10,
                   border: "none",
-                  background: "linear-gradient(135deg,#1f3f6b,#4a6f8f)",
+                  background: `linear-gradient(135deg,${P.navy},${P.steel})`,
                   color: "#fff",
                   fontWeight: 700,
                   fontSize: 13,
                   cursor: "pointer",
-                  boxShadow: "0 4px 14px #1f3f6b44",
+                  boxShadow: `0 4px 14px ${P.navy}44`,
                 }}
               >
                 💾 Yadda Saxla
@@ -204,10 +205,10 @@ export default function SuperSettings() {
                   fontSize: 13,
                   background: "transparent",
                   transition: "all .15s",
-                  color: selInst === inst.id ? "#1f3f6b" : "#8892b0",
+                  color: selInst === inst.id ? `${P.navy}` : "#8892b0",
                   borderBottom:
                     selInst === inst.id
-                      ? "2px solid #1f3f6b"
+                      ? `2px solid ${P.navy}`
                       : "2px solid transparent",
                   marginBottom: -2,
                 }}
@@ -246,16 +247,16 @@ export default function SuperSettings() {
                   {
                     title: "İstifadəçi adı",
                     icon: "🪪",
-                    accent: "#1f3f6b",
-                    accentBg: "#eef2f7",
+                    accent: `${P.navy}`,
+                    accentBg: `${P.tint}`,
                     field: instCfg.field1,
                     setF: setF1,
                   },
                   {
                     title: "Parol",
                     icon: "🔑",
-                    accent: "#152c4d",
-                    accentBg: "#eef2f7",
+                    accent: `${P.navyDk}`,
+                    accentBg: `${P.tint}`,
                     field: instCfg.field2,
                     setF: setF2,
                   },
@@ -324,7 +325,7 @@ export default function SuperSettings() {
                           display: "block",
                           fontSize: 11,
                           fontWeight: 700,
-                          color: "#3b5a7d",
+                          color: `${P.ink}`,
                           textTransform: "uppercase",
                           letterSpacing: 0.5,
                           marginBottom: 6,
@@ -356,7 +357,7 @@ export default function SuperSettings() {
                           display: "block",
                           fontSize: 11,
                           fontWeight: 700,
-                          color: "#3b5a7d",
+                          color: `${P.ink}`,
                           textTransform: "uppercase",
                           letterSpacing: 0.5,
                           marginBottom: 6,
@@ -401,7 +402,7 @@ export default function SuperSettings() {
                               display: "block",
                               fontSize: 11,
                               fontWeight: 700,
-                              color: "#3b5a7d",
+                              color: `${P.ink}`,
                               textTransform: "uppercase",
                               letterSpacing: 0.5,
                               marginBottom: 6,
@@ -435,7 +436,7 @@ export default function SuperSettings() {
                         padding: "10px 14px",
                         borderRadius: 10,
                         background: field.required ? accentBg : "#f8f9fd",
-                        border: `1.5px solid ${field.required ? accent + "44" : "#d5dde8"}`,
+                        border: `1.5px solid ${field.required ? accent + "44" : `${P.line2}`}`,
                         transition: "all .15s",
                       }}
                     >
@@ -450,7 +451,7 @@ export default function SuperSettings() {
                           style={{
                             fontSize: 13,
                             fontWeight: 700,
-                            color: field.required ? accent : "#3b5a7d",
+                            color: field.required ? accent : `${P.ink}`,
                           }}
                         >
                           Məcburi sahədir
@@ -470,7 +471,7 @@ export default function SuperSettings() {
                         borderRadius: 9,
                         background: "#f4f6ff",
                         fontSize: 11,
-                        color: "#3b5a7d",
+                        color: `${P.ink}`,
                         display: "flex",
                         alignItems: "center",
                         gap: 6,
@@ -498,16 +499,16 @@ export default function SuperSettings() {
           <div style={{ padding: "0 28px 28px" }}>
             <div
               style={{
-                border: "1.5px solid #1f3f6b33",
+                border: `1.5px solid ${P.navy}33`,
                 borderRadius: 14,
                 overflow: "hidden",
               }}
             >
               <div
                 style={{
-                  background: "#eef2f7",
+                  background: `${P.tint}`,
                   padding: "14px 20px",
-                  borderBottom: "1px solid #1f3f6b22",
+                  borderBottom: `1px solid ${P.navy}22`,
                   display: "flex",
                   alignItems: "center",
                   gap: 10,
@@ -518,7 +519,7 @@ export default function SuperSettings() {
                     width: 34,
                     height: 34,
                     borderRadius: 10,
-                    background: "#1f3f6b",
+                    background: `${P.navy}`,
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
@@ -550,7 +551,7 @@ export default function SuperSettings() {
                 }}
               >
                 <label
-                  style={{ fontSize: 13, fontWeight: 700, color: "#3b5a7d" }}
+                  style={{ fontSize: 13, fontWeight: 700, color: `${P.ink}` }}
                 >
                   Vaxt (saniyə):
                 </label>
@@ -568,7 +569,7 @@ export default function SuperSettings() {
                   style={{
                     width: 120,
                     textAlign: "center",
-                    borderColor: "#1f3f6b33",
+                    borderColor: `${P.navy}33`,
                   }}
                 />
                 <span style={{ fontSize: 12, color: "#8892b0" }}>
@@ -588,7 +589,7 @@ export default function SuperSettings() {
           Boş saxlansa heç nə göstərilmir. */}
       {isSuperAdmin && (
         <div className="card" style={{ marginTop: 20, overflow: "hidden" }}>
-          <div style={{ background: "linear-gradient(135deg,#1f3f6b,#4a6f8f)", padding: "20px 28px" }}>
+          <div style={{ background: `linear-gradient(135deg,${P.navy},${P.steel})`, padding: "20px 28px" }}>
             <div style={{ fontSize: 15, fontWeight: 800, color: "#fff", marginBottom: 3 }}>
               📣 Təsdiqdən Sonrakı Elan
             </div>
@@ -638,7 +639,7 @@ export default function SuperSettings() {
                   Təhsilalanın görəcəyi
                 </div>
                 <div style={{
-                  background: "#f6f8fb", border: "1.5px solid #eef2f7", borderLeft: "5px solid #1f3f6b",
+                  background: `${P.tint2}`, border: `1.5px solid ${P.tint}`, borderLeft: `5px solid ${P.navy}`,
                   borderRadius: 12, padding: "14px 18px", fontSize: 13.5, color: "#4a5060",
                   lineHeight: 1.7, whiteSpace: "pre-wrap",
                 }}>{(submitNotice || "").trim()}</div>

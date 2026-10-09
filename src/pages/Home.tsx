@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { selectionDb } from '../db'
+import { P } from '../palette'
 
 export default function Home() {
   const navigate  = useNavigate()
@@ -23,13 +24,13 @@ export default function Home() {
       <div style={{
         position: 'absolute', top: '15%', left: '10%',
         width: 320, height: 320, borderRadius: '50%',
-        background: 'radial-gradient(circle, #1f3f6b18 0%, transparent 70%)',
+        background: `radial-gradient(circle, ${P.navy}18 0%, transparent 70%)`,
         pointerEvents: 'none',
       }} />
       <div style={{
         position: 'absolute', bottom: '15%', right: '10%',
         width: 280, height: 280, borderRadius: '50%',
-        background: 'radial-gradient(circle, #152c4d18 0%, transparent 70%)',
+        background: `radial-gradient(circle, ${P.navyDk}18 0%, transparent 70%)`,
         pointerEvents: 'none',
       }} />
 
@@ -55,11 +56,11 @@ export default function Home() {
         {/* İdarəetmə girişi — admin / superadmin */}
         <RoleCard
           icon="🔐"
-          iconBg="linear-gradient(135deg,#1f3f6b,#3a5ecc)"
-          iconShadow="#1f3f6b44"
+          iconBg={`linear-gradient(135deg,${P.navy},#3a5ecc)`}
+          iconShadow={`${P.navy}44`}
           title="İdarəetmə Girişi"
           subtitle="Admin"
-          accentColor="#1f3f6b"
+          accentColor={`${P.navy}`}
           active={true}
           onClick={() => navigate('/admin/login')}
         />
@@ -67,11 +68,11 @@ export default function Home() {
         {/* Təhsilalan portalı */}
         <RoleCard
           icon="🎓"
-          iconBg="linear-gradient(135deg,#152c4d,#5a33cc)"
-          iconShadow="#152c4d44"
+          iconBg={`linear-gradient(135deg,${P.navyDk},#5a33cc)`}
+          iconShadow={`${P.navyDk}44`}
           title="Təhsilalan Girişi"
           subtitle={hasActive ? `${published.length} aktiv seçim` : 'Aktiv seçim yoxdur'}
-          accentColor="#152c4d"
+          accentColor={`${P.navyDk}`}
           active={hasActive}
           onClick={() => hasActive && navigate('/student')}
         />

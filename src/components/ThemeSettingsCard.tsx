@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 import { addLog } from '../db'
 import { getAdminSession } from '../api/auth'
-import { ThemeMode, fetchTheme, getThemeMode, saveTheme } from '../theme'
+import { ThemeMode, applyTheme, fetchTheme, getThemeMode, saveTheme } from '../theme'
+import { P } from '../palette'
 
 const OPTIONS: { key: ThemeMode; label: string; hint: string }[] = [
   { key: 'light',  label: 'Açıq',   hint: 'Ağ fon və kartlar' },
   { key: 'dark',   label: 'Tünd',   hint: 'Tünd fon, açıq mətn' },
-  { key: 'system', label: 'Sistem', hint: 'Hər istifadəçinin cihaz temasına görə' },
+  { key: 'old',    label: 'Köhnə',  hint: 'Əvvəlki qızılı rənglər, ağ fon' },
 ]
 
 /**
@@ -28,7 +29,9 @@ export default function ThemeSettingsCard() {
       setMode(m)
       setMsg({ ok: true, t: '✅ Yadda saxlanıldı' })
       setTimeout(() => setMsg(null), 2000)
-      await addLog('admin', 'success', 'Görünüş rejimi dəyişdirildi', OPTIONS.find(o => o.key === m)?.label || m, getAdminSession()?.name)
+      try { await addLog('admin', 'success', 'Görünüş rejimi dəyişdirildi', OPTIONS.find(o => o.key === m)?.label || m, getAdminSession()?.name) } catch { /* log vacib deyil */ }
+      // Köhnə ↔ yeni palitra keçidində səhifə yenilənir
+      applyTheme(m)
     } catch {
       setMsg({ ok: false, t: 'Yadda saxlanmadı' })
     } finally { setBusy(false) }
@@ -36,20 +39,20 @@ export default function ThemeSettingsCard() {
 
   return (
     <div className="card" style={{ marginTop: 20, overflow: 'hidden' }}>
-      <div style={{ background: 'linear-gradient(135deg,#1f3f6b,#4a6f8f)', padding: '20px 28px' }}>
+      <div style={{ background: `linear-gradient(135deg,${P.navy},${P.steel})`, padding: '20px 28px' }}>
         <div style={{ fontSize: 15, fontWeight: 800, color: '#fff', marginBottom: 3 }}>🌓 Görünüş rejimi</div>
-        <div style={{ fontSize: 12, color: '#ffffffcc' }}>Açıq və ya tünd rejim — bütün proqrama (adminlər və təhsilalanlar) tətbiq olunur</div>
+        <div style={{ fontSize: 12, color: '#ffffffcc' }}>Açıq, tünd və ya köhnə (qızılı) rənglər — bütün proqrama (adminlər və təhsilalanlar) tətbiq olunur</div>
       </div>
       <div style={{ padding: '22px 28px', display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
         <div role="group" aria-label="Görünüş rejimi"
-          style={{ display: 'inline-flex', border: '1.5px solid #c9d4e2', borderRadius: 10, overflow: 'hidden' }}>
+          style={{ display: 'inline-flex', border: `1.5px solid ${P.line}`, borderRadius: 10, overflow: 'hidden' }}>
           {OPTIONS.map((o, i) => {
             const on = mode === o.key
             return (
               <button key={o.key} type="button" aria-pressed={on} disabled={busy} title={o.hint} onClick={() => choose(o.key)}
                 style={{
-                  padding: '9px 20px', border: 'none', borderLeft: i ? '1.5px solid #c9d4e2' : 'none',
-                  background: on ? '#1f3f6b' : '#fff', color: on ? '#fff' : '#2b2f3a',
+                  padding: '9px 20px', border: 'none', borderLeft: i ? `1.5px solid ${P.line}` : 'none',
+                  background: on ? `${P.navy}` : '#fff', color: on ? '#fff' : '#2b2f3a',
                   fontWeight: 700, fontSize: 13, cursor: busy ? 'progress' : 'pointer', fontFamily: 'inherit',
                 }}>{o.label}</button>
             )

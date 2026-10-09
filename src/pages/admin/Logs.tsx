@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { logDb, usePoll, type LogEntry, type LogCategory, type LogType } from '../../db'
+import { P } from '../../palette'
 
 // ── Sabit etiketlər ──────────────────────────────────────────────────────────
 const CAT_LABEL: Record<LogCategory, string> = {
@@ -126,7 +127,7 @@ export default function Logs() {
       <div style={{ background: '#fff', border: '1.5px solid var(--border)', borderRadius: 14, padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
         {/* Sıra 1: kateqoriya çipləri + əməliyyatlar (bir sətir) */}
         <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 7 }}>
-          <button onClick={() => setCatFlt('all')} style={chip(catFlt === 'all', '#1f3f6b', '#eef2f7')}>Hamısı ({stats.all})</button>
+          <button onClick={() => setCatFlt('all')} style={chip(catFlt === 'all', `${P.navy}`, `${P.tint}`)}>Hamısı ({stats.all})</button>
           {(Object.keys(CAT_LABEL) as LogCategory[]).map(cat => (
             <button key={cat} onClick={() => setCatFlt(catFlt === cat ? 'all' : cat)}
               style={chip(catFlt === cat, CAT_COLOR[cat].text, CAT_COLOR[cat].bg)}>

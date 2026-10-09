@@ -5,6 +5,7 @@ import InstTabs from '../../components/InstTabs'
 import { AppDialog, useDialog } from '../../components/AppDialog'
 import { can } from '../../permissions'
 import { makeMeritCompare, buildDefaultTiebreaker, setDefaultTiebreaker } from '../../placement'
+import { P } from '../../palette'
 
 // ── Tiebreaker köməkçiləri (Yerləşdirmə ilə eyni məntiq) ──────────────────────
 function getLeavesWithPath(nodes: any[], anc: any[] = []): Array<{ leaf: any; path: any[] }> {
@@ -204,10 +205,10 @@ export default function Redistribute() {
   function handleApply() {
     if (!preview || !sel) return
     showConfirm({
-      icon: '⚖️', iconBg: '#eef2f7', iconColor: '#1f3f6b',
+      icon: '⚖️', iconBg: `${P.tint}`, iconColor: `${P.navy}`,
       title: 'Qismən yerləşdirməni tətbiq et',
       message: `${pool.length} təhsilalanın yerləşməsi yenidən hesablanıb bazaya yazılacaq. Əvvəlki vəziyyət snapshot kimi saxlanılacaq (geri alına bilər).`,
-      confirmLabel: 'Tətbiq et', confirmColor: '#1f3f6b',
+      confirmLabel: 'Tətbiq et', confirmColor: `${P.navy}`,
       onConfirm: async () => {
         setBusy(true)
         // Snapshot — köhnə yerləşmə + köhnə kvotalar (= seçilmiş ixtisasların köhnə yerləşən sayı)
@@ -268,7 +269,7 @@ export default function Redistribute() {
       ) : (
         <>
           {/* İzah */}
-          <div style={{ background: '#eef2f7', border: '1.5px solid #c9d4e2', borderRadius: 12, padding: '12px 16px', marginBottom: 16, fontSize: 12.5, color: '#3a4cad', lineHeight: 1.6 }}>
+          <div style={{ background: `${P.tint}`, border: `1.5px solid ${P.line}`, borderRadius: 12, padding: '12px 16px', marginBottom: 16, fontSize: 12.5, color: '#3a4cad', lineHeight: 1.6 }}>
             ℹ️ Kvota dəyişdiyi ixtisasları seçin. <b>Yalnız seçilmiş ixtisaslardakı təhsilalanlar</b> yenidən bölünür (digərlərinə toxunulmur).
             Seçilmiş ixtisasların <b>yeni kvota cəmi = bu ixtisaslardakı təhsilalan sayı</b> olmalıdır.
           </div>
@@ -286,11 +287,11 @@ export default function Redistribute() {
                   const isSel = selected.has(s.id)
                   return (
                     <label key={s.id} style={{ display: 'grid', minWidth: 560, gridTemplateColumns: '40px 1fr 110px 90px 90px', gap: 8, padding: '10px 18px', alignItems: 'center', cursor: 'pointer',
-                      borderBottom: i < leafStats.length - 1 ? '1px solid #f4f5fb' : 'none', background: isSel ? '#eef2f7' : diff !== 0 ? '#fffbe6' : i % 2 === 0 ? '#fff' : '#fafbff' }}>
-                      <input type="checkbox" checked={isSel} onChange={() => toggle(s.id)} style={{ accentColor: '#1f3f6b', width: 16, height: 16 }} />
+                      borderBottom: i < leafStats.length - 1 ? '1px solid #f4f5fb' : 'none', background: isSel ? `${P.tint}` : diff !== 0 ? '#fffbe6' : i % 2 === 0 ? '#fff' : '#fafbff' }}>
+                      <input type="checkbox" checked={isSel} onChange={() => toggle(s.id)} style={{ accentColor: `${P.navy}`, width: 16, height: 16 }} />
                       <div><div style={{ fontWeight: 700, fontSize: 12.5 }}>{s.name}</div>{s.pathStr && <div style={{ fontSize: 10, color: '#aaa' }}>{s.pathStr}</div>}</div>
                       <span style={{ textAlign: 'center', fontWeight: 800, fontSize: 13, color: '#555' }}>{s.placedCount}</span>
-                      <span style={{ textAlign: 'center', fontWeight: 800, fontSize: 13, color: '#1f3f6b' }}>{s.quota}</span>
+                      <span style={{ textAlign: 'center', fontWeight: 800, fontSize: 13, color: `${P.navy}` }}>{s.quota}</span>
                       <span style={{ textAlign: 'center', fontWeight: 800, fontSize: 13, color: diff > 0 ? '#10b981' : diff < 0 ? '#ef4444' : '#bbb' }}>{diff > 0 ? `+${diff}` : diff}</span>
                     </label>
                   )
@@ -310,7 +311,7 @@ export default function Redistribute() {
               </div>
               <button onClick={handlePreview} disabled={!balanced}
                 style={{ padding: '10px 24px', borderRadius: 10, border: 'none', cursor: balanced ? 'pointer' : 'not-allowed',
-                  background: balanced ? 'linear-gradient(135deg,#1f3f6b,#4a6f8f)' : '#e4e7ee', color: balanced ? '#fff' : '#aab', fontWeight: 800, fontSize: 13 }}>
+                  background: balanced ? `linear-gradient(135deg,${P.navy},${P.steel})` : '#e4e7ee', color: balanced ? '#fff' : '#aab', fontWeight: 800, fontSize: 13 }}>
                 Önbaxış →
               </button>
             </div>
@@ -339,10 +340,10 @@ export default function Redistribute() {
                   return (
                     <div key={u.id} style={{ display: 'grid', gridTemplateColumns: '1fr 60px 1fr 1fr 70px', gap: 8, padding: '9px 18px', alignItems: 'center', borderBottom: '1px solid #f4f5fb', background: changed ? '#fffbe6' : i % 2 === 0 ? '#fff' : '#fafbff' }}>
                       <div><div style={{ fontWeight: 700, fontSize: 12.5 }}>{u.name}</div><div style={{ fontSize: 10, color: '#aaa', fontFamily: 'monospace' }}>{u.fin}</div></div>
-                      <span style={{ textAlign: 'center', fontWeight: 800, fontSize: 12, color: '#1f3f6b' }}>{(u.score || 0).toFixed(1)}</span>
+                      <span style={{ textAlign: 'center', fontWeight: 800, fontSize: 12, color: `${P.navy}` }}>{(u.score || 0).toFixed(1)}</span>
                       <span style={{ fontSize: 11.5, color: '#999' }}>{nameById(u.placedSpecialtyId)}</span>
                       <span style={{ fontSize: 11.5, fontWeight: changed ? 800 : 400, color: changed ? '#237804' : '#555' }}>{changed ? '→ ' : ''}{nw ? nameById(nw.specId) : '—'}</span>
-                      <span style={{ textAlign: 'center', fontWeight: 800, fontSize: 12, color: '#152c4d' }}>{nw?.choiceNum ?? '—'}</span>
+                      <span style={{ textAlign: 'center', fontWeight: 800, fontSize: 12, color: `${P.navyDk}` }}>{nw?.choiceNum ?? '—'}</span>
                     </div>
                   )
                 })}
