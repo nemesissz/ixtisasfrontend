@@ -13,6 +13,7 @@ import {
 } from "../../db";
 import { getAdminSession } from "../../api/auth";
 import MonitorSettingsCard from "../../components/MonitorSettingsCard";
+import ThemeSettingsCard from "../../components/ThemeSettingsCard";
 
 /**
  * Superadmin parametrləri — yalnız baş admin görür.
@@ -649,6 +650,9 @@ export default function SuperSettings() {
 
       {/* ── Canlı nəzarət — ümumi açar və intervallar ── */}
       {isSuperAdmin && <MonitorSettingsCard />}
+
+      {/* ── Görünüş rejimi (açıq / tünd / sistem) — bütün proqrama tətbiq olunur ── */}
+      {isSuperAdmin && <ThemeSettingsCard />}
     </>
   );
 }

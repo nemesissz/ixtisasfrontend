@@ -492,3 +492,29 @@ tr.stu-last td { border-bottom: 2px solid #c9d4e2; }
   /* Proporsional toggle kiçilsin */
   .spec-prop-label { display: none; }
 }
+
+/* ── Tünd rejim ─────────────────────────────────────────────────────────────
+   Proqramın rəngləri əsasən komponentlərin öz stillərində yazılıb, ona görə
+   tünd rejim bütün səhifəyə tətbiq olunan rəng çevirməsi ilə qurulur: açıq
+   fon tündləşir, tünd mətn açılır, rənglərin çaları (göy, yaşıl, qırmızı)
+   isə saxlanır. Şəkillər, loqolar və videolar geri çevrilir ki, əsl
+   rənglərində qalsın. Rejimi yalnız superadmin «Parametrlər»-dən dəyişir. */
+html[data-theme="dark"] {
+  color-scheme: dark;
+  filter: invert(1) hue-rotate(180deg) contrast(0.88);
+  background: #fff;
+}
+/* Fon şəkli tünddə çevrilib bulanıq görünürdü — sadə açıq fonla əvəz olunur
+   (çevrilmədən sonra tünd göy-boz olur). */
+html[data-theme="dark"] body { background: #eef1f5; }
+html[data-theme="dark"] img,
+html[data-theme="dark"] video,
+html[data-theme="dark"] picture,
+html[data-theme="dark"] iframe {
+  /* Səhifə filtrinin tərsi (ardıcıllıq tərsinə): şəkil əsl rəngində qalır */
+  filter: contrast(1.136) hue-rotate(180deg) invert(1);
+}
+/* Kölgələr çevrilmədən sonra açıq «parıltı» kimi görünür — tünddə söndürülür,
+   kartları çərçivələr ayırır. */
+html[data-theme="dark"] *:not(:focus-visible) { box-shadow: none !important; }
+html[data-theme="dark"] *, html[data-theme="dark"] *::before, html[data-theme="dark"] *::after { text-shadow: none !important; }
