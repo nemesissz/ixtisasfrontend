@@ -7,7 +7,7 @@ import InstTabs from '../../components/InstTabs'
 import { formatDate } from '../../utils-date'
 import { canChoose } from '../../quota-pool'
 import { ord } from '../../ordinal'
-import { P, O, L, DS, IS_OLD_PALETTE, hexRgb } from '../../palette'
+import { P, O, L, DS, IS_OLD_PALETTE, IS_LIGHT_MODE, hexRgb } from '../../palette'
 
 // ── Köməkçilər ────────────────────────────────────────────────────────────────
 function getLeaves(nodes: any[], anc: any[] = []): Array<{ leaf: any; path: any[] }> {
@@ -750,11 +750,18 @@ export default function Dashboard() {
           Statistika tək bir struktur üzrədir; struktur öz təhsilalan qrupunu
           gətirir, ona görə fərqli qrupların rəqəmləri qarışmır. Struktur adları
           uzun ola bildiyi üçün sekmə yox, açılan siyahı istifadə olunur. */}
-      {activeInst && instTrees.length > 1 && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+      {/* Açıq rejimdə sətir həmişə görünür (tək struktur olanda adı yazılır) —
+          müəssisələr arasında keçəndə səhifə yuxarı-aşağı tullanmasın. */}
+      {activeInst && (IS_LIGHT_MODE || instTrees.length > 1) && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', minHeight: L(36, undefined) }}>
           <span style={{ fontSize: L(14, 12), fontWeight: L(500, 800), color: 'var(--muted)', whiteSpace: 'nowrap' }}>
-            Struktur:
+            {L('İxtisas strukturu:', 'Struktur:')}
           </span>
+          {instTrees.length <= 1 ? (
+            <span style={{ fontSize: 14, fontWeight: 600, color: DS.ink, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>
+              {activeTree ? (cohortLabelOf(activeTree) || activeTree.name) : '—'}
+            </span>
+          ) : (<>
           <select
             value={treeId}
             onChange={e => setTreeId(e.target.value)}
@@ -783,6 +790,7 @@ export default function Dashboard() {
               textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 420,
             }}>{activeTree.name}</span>
           )}
+          </>)}
         </div>
       )}
 
