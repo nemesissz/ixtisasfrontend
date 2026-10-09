@@ -5,8 +5,8 @@
 // Palitra səhifə açılarkən bir dəfə seçilir (theme.ts-in yadda saxladığı
 // rejimə görə); rejim dəyişəndə səhifə yenilənir ki, hər yer yeni rəngi alsın.
 const NAVY = {
-  navy:   '#1f3f6b', // əsas vurğu
-  navyDk: '#152c4d', // tünd mətn
+  navy:   '#2a5283', // əsas vurğu (əvvəl #1f3f6b — açıq rejimdə çox tünd idi)
+  navyDk: '#1d3a63', // tünd mətn (əvvəl #152c4d)
   steel:  '#4a6f8f', // qradiyentin ikinci rəngi
   ink:    '#3b5a7d', // ikinci dərəcəli mətn
   sky:    '#86a3bd',

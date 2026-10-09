@@ -31,6 +31,10 @@ const pctText = (a: number, b: number): string => {
   return v >= 0.1 ? v.toFixed(1) : '<0.1'
 }
 
+// Donut seqmentinin və legend nişanının «Hesabatı yüklə» düyməsindəki qradiyentlə çəkilməsi
+const GRAD = 'grad'
+const GRAD_CSS = `linear-gradient(135deg,${P.navy},${P.steel})`
+
 // ── SVG halqa (donut) ─────────────────────────────────────────────────────────
 function Donut({ segments, size = 150, stroke = 20, center }: {
   segments: { value: number; color: string; label: string }[]; size?: number; stroke?: number; center?: React.ReactNode
@@ -42,11 +46,18 @@ function Donut({ segments, size = 150, stroke = 20, center }: {
   return (
     <div style={{ position: 'relative', width: size, height: size, flexShrink: 0 }}>
       <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
+        <defs>
+          {/* «Hesabatı yüklə» düyməsi ilə eyni parlaq qradiyent */}
+          <linearGradient id="donut-grad" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor={P.navy} />
+            <stop offset="100%" stopColor={P.steel} />
+          </linearGradient>
+        </defs>
         <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#eef0f7" strokeWidth={stroke} />
         {segments.map((s, i) => {
           const len = (s.value / total) * circ
           const el = (
-            <circle key={i} cx={size / 2} cy={size / 2} r={r} fill="none" stroke={s.color} strokeWidth={stroke}
+            <circle key={i} cx={size / 2} cy={size / 2} r={r} fill="none" stroke={s.color === GRAD ? 'url(#donut-grad)' : s.color} strokeWidth={stroke}
               strokeDasharray={`${len} ${circ - len}`} strokeDashoffset={-offset}
               style={{ transition: 'stroke-dasharray .6s' }} />
           )
@@ -796,11 +807,11 @@ export default function Dashboard() {
             <Card title="Yerləşdirmə statusu">
               <div style={{ display: 'flex', alignItems: 'center', gap: 22, flexWrap: 'wrap' }}>
                 <Donut size={150} segments={A.placed ? [
-                  { value: A.placed, color: O(`${P.navy}`, '#52c41a'), label: 'Yerləşdi' },
+                  { value: A.placed, color: O(GRAD, '#52c41a'), label: 'Yerləşdi' },
                   { value: A.unplacedSubmitted, color: O('#3e7c86', '#faad14'), label: 'Yerləşmədi' },
                   { value: A.pendingCount, color: '#d9d9d9', label: 'Seçim etmədi' },
                 ] : [
-                  { value: A.submittedCount, color: O(`${P.navy}`, '#52c41a'), label: 'Seçim etdi' },
+                  { value: A.submittedCount, color: O(GRAD, '#52c41a'), label: 'Seçim etdi' },
                   { value: A.pendingCount, color: '#d9d9d9', label: 'Seçim etmədi' },
                 ]} center={<>
                   <div style={{ fontSize: 26, fontWeight: 800, color: 'var(--text)' }}>
@@ -810,11 +821,11 @@ export default function Dashboard() {
                 </>} />
                 <div style={{ flex: 1, minWidth: 160, display: 'flex', flexDirection: 'column', gap: 10 }}>
                   {(A.placed ? [
-                    { c: O(`${P.navy}`, '#52c41a'), l: 'Yerləşdi', v: A.placed },
+                    { c: O(GRAD_CSS, '#52c41a'), l: 'Yerləşdi', v: A.placed },
                     { c: O('#3e7c86', '#faad14'), l: 'Seçim etdi, yerləşdirilmədi', v: A.unplacedSubmitted },
                     { c: '#d9d9d9', l: 'Seçim etmədi', v: A.pendingCount },
                   ] : [
-                    { c: O(`${P.navy}`, '#52c41a'), l: 'Seçim etdi', v: A.submittedCount },
+                    { c: O(GRAD_CSS, '#52c41a'), l: 'Seçim etdi', v: A.submittedCount },
                     { c: '#d9d9d9', l: 'Seçim etmədi', v: A.pendingCount },
                   ]).map(x => (
                     <div key={x.l} style={{ display: 'flex', alignItems: 'center', gap: 9, fontSize: 13 }}>
