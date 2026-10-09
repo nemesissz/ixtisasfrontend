@@ -1,5 +1,5 @@
 import { http } from './api/http'
-import { IS_OLD_PALETTE, PALETTE_KEY } from './palette'
+import { IS_LIGHT_MODE, IS_OLD_PALETTE, PALETTE_KEY } from './palette'
 
 // ── Görünüş rejimi (açıq / tünd / köhnə) ──────────────────────────────────
 // Rejimi yalnız superadmin «Parametrlər» səhifəsindən dəyişir; dəyər backend-də
@@ -24,12 +24,13 @@ export function applyTheme(mode: ThemeMode) {
   else root.removeAttribute('data-theme')
   if (mode === 'old') root.setAttribute('data-palette', 'old')
   else root.removeAttribute('data-palette')
+  root.setAttribute('data-mode', mode)
   let stored = false
   try { localStorage.setItem(KEY, mode); stored = localStorage.getItem(KEY) === mode } catch { /* yaddaş əlçatmazdır */ }
-  // Komponentlərdəki rənglər (palette.ts) səhifə açılarkən seçilir — palitra
-  // dəyişibsə səhifə yenilənir ki, hər yer yeni rəngi alsın. Yaddaş işləmirsə
+  // Komponentlərdəki rənglər (palette.ts) səhifə açılarkən seçilir — palitra və ya
+  // açıq rejim dəyişibsə səhifə yenilənir ki, hər yer yeni rəngi alsın. Yaddaş işləmirsə
   // yenilənmə sonsuz dövrəyə düşməsin deyə edilmir.
-  if (stored && (mode === 'old') !== IS_OLD_PALETTE) window.location.reload()
+  if (stored && ((mode === 'old') !== IS_OLD_PALETTE || (mode === 'light') !== IS_LIGHT_MODE)) window.location.reload()
 }
 
 export function getThemeMode(): ThemeMode { return current }

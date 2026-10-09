@@ -7,7 +7,7 @@ import InstTabs from '../../components/InstTabs'
 import { formatDate } from '../../utils-date'
 import { canChoose } from '../../quota-pool'
 import { ord } from '../../ordinal'
-import { P, O, IS_OLD_PALETTE, hexRgb } from '../../palette'
+import { P, O, L, DS, IS_OLD_PALETTE, hexRgb } from '../../palette'
 
 // ── Köməkçilər ────────────────────────────────────────────────────────────────
 function getLeaves(nodes: any[], anc: any[] = []): Array<{ leaf: any; path: any[] }> {
@@ -58,7 +58,7 @@ function Donut({ segments, size = 150, stroke = 20, center }: {
             <feDropShadow dx="0" dy="0" stdDeviation="2" floodColor={GRAD_FROM} floodOpacity="0.25" />
           </filter>
         </defs>
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#eef0f7" strokeWidth={stroke} />
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={L(DS.sunken, '#eef0f7')} strokeWidth={stroke} />
         {segments.map((s, i) => {
           const len = (s.value / total) * circ
           const el = (
@@ -85,9 +85,10 @@ function seqColor(rank: number, n: number): string {
   return '#' + SEQ_BASE.map((v, i) => Math.round(v + (SEQ_TO[i] - v) * t).toString(16).padStart(2, '0')).join('')
 }
 // Statistika barlarının vahid (monoxrom) rəngi — bütün kartlarda eyni
-const MONO = seqColor(1, 5)
+const MONO = L(DS.data1, seqColor(1, 5))
 
-function Bars({ data, max }: { data: { label: string; value: number; color: string; sub?: string }[]; max?: number }) {
+// color: (açıq rejim) bütün barlar üçün vahid rəng
+function Bars({ data, max, color }: { data: { label: string; value: number; color: string; sub?: string }[]; max?: number; color?: string }) {
   const m = max ?? Math.max(1, ...data.map(d => d.value))
   // Köhnə rejimdə hər bar öz rəngindədir, yenidə hamısı eyni (monoxrom)
   const cols = IS_OLD_PALETTE ? data.map(d => d.color) : data.map(() => MONO)
@@ -95,11 +96,11 @@ function Bars({ data, max }: { data: { label: string; value: number; color: stri
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       {data.map((d, i) => (
         <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ width: 120, fontSize: 12, color: 'var(--text)', fontWeight: 600, textAlign: 'right', flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.label}</div>
-          <div style={{ flex: 1, background: O('#e8ecf2', '#f0f2f8'), borderRadius: 6, height: 22, position: 'relative', overflow: 'hidden' }}>
-            <div style={{ width: `${pct(d.value, m)}%`, background: cols[i], height: '100%', borderRadius: 6, minWidth: d.value > 0 ? 3 : 0, transition: 'width .5s' }} />
+          <div style={{ width: 120, fontSize: L(14, 12), color: 'var(--text)', fontWeight: L(500, 600), textAlign: 'right', flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.label}</div>
+          <div style={{ flex: 1, background: L(DS.sunken, O('#e8ecf2', '#f0f2f8')), borderRadius: L(9999, 6), height: L(14, 22), position: 'relative', overflow: 'hidden' }}>
+            <div style={{ width: `${pct(d.value, m)}%`, background: (color ?? cols[i]), height: '100%', borderRadius: L(9999, 6), minWidth: d.value > 0 ? 3 : 0, transition: 'width .5s' }} />
           </div>
-          <div style={{ minWidth: 64, fontSize: 12, fontWeight: 700, color: 'var(--text)', flexShrink: 0, whiteSpace: 'nowrap' }}>{d.value}{d.sub ? <span style={{ color: 'var(--muted)', fontWeight: 500 }}> {d.sub}</span> : ''}</div>
+          <div style={{ minWidth: 64, fontSize: L(14, 12), fontWeight: L(600, 700), color: 'var(--text)', flexShrink: 0, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{d.value}{d.sub ? <span style={{ color: 'var(--muted)', fontWeight: L(400, 500), fontSize: L(13, undefined) }}> {d.sub}</span> : ''}</div>
         </div>
       ))}
     </div>
@@ -120,12 +121,12 @@ function GridBars({ data, max }: { data: { label: string; value: number; color: 
     }}>
       {data.map((d, i) => (
         <Fragment key={i}>
-          <div title={d.label} style={{ fontSize: 12, color: 'var(--text)', fontWeight: 600, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.label}</div>
-          <div style={{ background: O('#e8ecf2', '#f0f2f8'), borderRadius: 6, height: 22, position: 'relative', overflow: 'hidden' }}>
-            <div style={{ width: `${pct(d.value, m)}%`, background: cols[i], height: '100%', borderRadius: 6, minWidth: d.value > 0 ? 3 : 0, transition: 'width .5s' }} />
+          <div title={d.label} style={{ fontSize: L(14, 12), color: 'var(--text)', fontWeight: L(500, 600), textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.label}</div>
+          <div style={{ background: L(DS.sunken, O('#e8ecf2', '#f0f2f8')), borderRadius: L(9999, 6), height: L(14, 22), position: 'relative', overflow: 'hidden' }}>
+            <div style={{ width: `${pct(d.value, m)}%`, background: cols[i], height: '100%', borderRadius: L(9999, 6), minWidth: d.value > 0 ? 3 : 0, transition: 'width .5s' }} />
           </div>
-          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{d.value}</div>
-          {hasSub && <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--muted)', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{d.sub || ''}</div>}
+          <div style={{ fontSize: L(14, 12), fontWeight: L(600, 700), color: 'var(--text)', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{d.value}</div>
+          {hasSub && <div style={{ fontSize: L(13, 12), fontWeight: L(400, 500), color: 'var(--muted)', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{d.sub || ''}</div>}
         </Fragment>
       ))}
     </div>
@@ -287,8 +288,8 @@ function buildStatsReportHtml(A: any, instLabel: string, selName: string): strin
 
 function Card({ title, children, span }: { title: string; children: React.ReactNode; span?: number }) {
   return (
-    <div style={{ background: '#fff', border: '1.5px solid var(--border)', borderRadius: 16, padding: '18px 20px', gridColumn: span ? `span ${span}` : undefined, minWidth: 0 }}>
-      <div className="dash-card-title" style={{ fontSize: 14, fontWeight: 800, color: 'var(--text)', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+    <div style={{ background: L(DS.raised, '#fff'), border: L(`1px solid ${DS.line}`, '1.5px solid var(--border)'), borderRadius: L(14, 16), padding: L('24px', '18px 20px'), boxShadow: L(DS.shadow, undefined), gridColumn: span ? `span ${span}` : undefined, minWidth: 0 }}>
+      <div className="dash-card-title" style={{ fontSize: L(18, 14), lineHeight: L('26px', undefined), fontWeight: L(600, 800), color: 'var(--text)', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
         {title}
       </div>
       {children}
@@ -716,7 +717,7 @@ export default function Dashboard() {
         {activeInst && (
           <div style={{ position: 'relative', flexShrink: 0 }}>
             <button onClick={() => setReportMenu(v => !v)} title="Statistik hesabatı yüklə"
-              style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 18px', borderRadius: 10, border: 'none', background: O(`linear-gradient(135deg,${P.navy},${P.steel})`, 'linear-gradient(135deg,#b8860b,#e0a92e)'), color: '#fff', fontWeight: 800, fontSize: 13, cursor: 'pointer', boxShadow: `0 3px 12px ${P.navy}55` }}>
+              style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 18px', borderRadius: 10, border: 'none', background: L(DS.primary, O(`linear-gradient(135deg,${P.navy},${P.steel})`, 'linear-gradient(135deg,#b8860b,#e0a92e)')), color: '#fff', fontWeight: L(600, 800), fontSize: L(14, 13), cursor: 'pointer', boxShadow: L('none', `0 3px 12px ${P.navy}55`) }}>
               Hesabatı yüklə <span style={{ fontSize: 10 }}>{reportMenu ? '▲' : '▼'}</span>
             </button>
             {reportMenu && (
@@ -751,7 +752,7 @@ export default function Dashboard() {
           uzun ola bildiyi üçün sekmə yox, açılan siyahı istifadə olunur. */}
       {activeInst && instTrees.length > 1 && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 12, fontWeight: 800, color: 'var(--muted)', whiteSpace: 'nowrap' }}>
+          <span style={{ fontSize: L(14, 12), fontWeight: L(500, 800), color: 'var(--muted)', whiteSpace: 'nowrap' }}>
             Struktur:
           </span>
           <select
@@ -759,8 +760,9 @@ export default function Dashboard() {
             onChange={e => setTreeId(e.target.value)}
             title={activeTree ? activeTree.name : ''}
             style={{
-              fontSize: 13, fontWeight: 700, padding: '8px 12px', borderRadius: 10,
-              border: '1.5px solid #adc6ff', background: '#f0f5ff', color: '#0958d9',
+              fontSize: L(14, 13), padding: L('6px 12px', '8px 12px'), borderRadius: 10,
+              border: L(`1px solid ${DS.line}`, '1.5px solid #adc6ff'), background: L(DS.raised, '#f0f5ff'), color: L(DS.ink, '#0958d9'),
+              fontWeight: L(500, 700),
               cursor: 'pointer', maxWidth: 520, minWidth: 260,
             }}>
             {instTrees.map((t: any) => {
@@ -793,9 +795,9 @@ export default function Dashboard() {
           {/* Müəssisənin fərdi KPI-ları */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12 }}>
             {INST_KPIS.map(k => (
-              <div key={k.label} style={{ background: '#fff', border: '1.5px solid var(--border)', borderRadius: 14, padding: '15px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', gap: 5, minWidth: 0 }}>
-                <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--text)', lineHeight: 1 }}>{k.value}</div>
-                <div style={{ fontSize: 11, color: 'var(--muted)', overflowWrap: 'anywhere' }}>{k.label}{k.sub ? ` · ${k.sub}` : ''}</div>
+              <div key={k.label} style={{ background: L(DS.raised, '#fff'), border: L(`1px solid ${DS.line}`, '1.5px solid var(--border)'), borderRadius: 14, padding: L('16px 12px', '15px 16px'), display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', gap: 5, minWidth: 0 }}>
+                <div style={{ fontSize: L(28, 22), fontWeight: L(700, 800), letterSpacing: L('-0.01em', undefined), color: 'var(--text)', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{k.value}</div>
+                <div style={{ fontSize: L(13, 11), fontWeight: L(500, undefined), color: 'var(--muted)', overflowWrap: 'anywhere' }}>{k.label}{k.sub ? ` · ${k.sub}` : ''}</div>
               </div>
             ))}
           </div>
@@ -808,29 +810,29 @@ export default function Dashboard() {
             <Card title="Yerləşdirmə statusu">
               <div style={{ display: 'flex', alignItems: 'center', gap: 22, flexWrap: 'wrap' }}>
                 <Donut size={150} segments={A.placed ? [
-                  { value: A.placed, color: O(GRAD, '#52c41a'), label: 'Yerləşdi' },
-                  { value: A.unplacedSubmitted, color: O('#3e7c86', '#faad14'), label: 'Yerləşmədi' },
-                  { value: A.pendingCount, color: '#d9d9d9', label: 'Seçim etmədi' },
+                  { value: A.placed, color: L(DS.success, O(GRAD, '#52c41a')), label: 'Yerləşdi' },
+                  { value: A.unplacedSubmitted, color: L(DS.warning, O('#3e7c86', '#faad14')), label: 'Yerləşmədi' },
+                  { value: A.pendingCount, color: L(DS.neutral, '#d9d9d9'), label: 'Seçim etmədi' },
                 ] : [
-                  { value: A.submittedCount, color: O(GRAD, '#52c41a'), label: 'Seçim etdi' },
-                  { value: A.pendingCount, color: '#d9d9d9', label: 'Seçim etmədi' },
+                  { value: A.submittedCount, color: L(DS.success, O(GRAD, '#52c41a')), label: 'Seçim etdi' },
+                  { value: A.pendingCount, color: L(DS.neutral, '#d9d9d9'), label: 'Seçim etmədi' },
                 ]} center={<>
-                  <div style={{ fontSize: 26, fontWeight: 800, color: 'var(--text)' }}>
+                  <div style={{ fontSize: L(30, 26), fontWeight: L(700, 800), color: 'var(--text)' }}>
                     {A.placed ? pctText(A.placed, A.instUsers.length) : pctText(A.submittedCount, A.instUsers.length)}%
                   </div>
-                  <div style={{ fontSize: 11, color: 'var(--muted)' }}>{A.placed ? 'yerləşdi' : 'seçim etdi'}</div>
+                  <div style={{ fontSize: L(12, 11), color: 'var(--muted)' }}>{A.placed ? 'yerləşdi' : 'seçim etdi'}</div>
                 </>} />
                 <div style={{ flex: 1, minWidth: 160, display: 'flex', flexDirection: 'column', gap: 10 }}>
                   {(A.placed ? [
-                    { c: O(GRAD_CSS, '#52c41a'), l: 'Yerləşdi', v: A.placed },
-                    { c: O('#3e7c86', '#faad14'), l: 'Seçim etdi, yerləşdirilmədi', v: A.unplacedSubmitted },
-                    { c: '#d9d9d9', l: 'Seçim etmədi', v: A.pendingCount },
+                    { c: L(DS.success, O(GRAD_CSS, '#52c41a')), l: 'Yerləşdi', v: A.placed },
+                    { c: L(DS.warning, O('#3e7c86', '#faad14')), l: 'Seçim etdi, yerləşdirilmədi', v: A.unplacedSubmitted },
+                    { c: L(DS.neutral, '#d9d9d9'), l: 'Seçim etmədi', v: A.pendingCount },
                   ] : [
-                    { c: O(GRAD_CSS, '#52c41a'), l: 'Seçim etdi', v: A.submittedCount },
-                    { c: '#d9d9d9', l: 'Seçim etmədi', v: A.pendingCount },
+                    { c: L(DS.success, O(GRAD_CSS, '#52c41a')), l: 'Seçim etdi', v: A.submittedCount },
+                    { c: L(DS.neutral, '#d9d9d9'), l: 'Seçim etmədi', v: A.pendingCount },
                   ]).map(x => (
-                    <div key={x.l} style={{ display: 'flex', alignItems: 'center', gap: 9, fontSize: 13 }}>
-                      <span style={{ width: 12, height: 12, borderRadius: 3, background: x.c, flexShrink: 0 }} />
+                    <div key={x.l} style={{ display: 'flex', alignItems: 'center', gap: 9, fontSize: L(14, 13) }}>
+                      <span style={{ width: L(10, 12), height: L(10, 12), borderRadius: 3, background: x.c, flexShrink: 0 }} />
                       <span style={{ flex: 1, color: 'var(--text)' }}>{x.l}</span>
                       <b style={{ color: 'var(--text)' }}>{x.v}</b>
                     </div>
@@ -841,9 +843,9 @@ export default function Dashboard() {
                       ? [['Ən aşağı bal', A.placedMinScore, O(`${P.slate}`, '#ff4d4f')], ['Orta bal', A.placedAvgScore, O(`${P.steel}`, '#c9962a')], ['Ən yüksək bal', A.placedMaxScore, O(`${P.navy}`, '#52c41a')]]
                       : [['Ən aşağı bal', A.minScore, O(`${P.slate}`, '#ff4d4f')], ['Orta bal', A.avgScore, O(`${P.steel}`, '#c9962a')], ['Ən yüksək bal', A.maxScore, O(`${P.navy}`, '#52c41a')]]
                     ).map(([l, v, c]: any) => (
-                      <div key={l} style={{ textAlign: 'center', background: `${c}10`, borderRadius: 10, padding: '12px 4px', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 4 }}>
-                        <div style={{ fontSize: 18, fontWeight: 800, color: c, lineHeight: 1 }}>{Number(v).toFixed(1)}</div>
-                        <div style={{ fontSize: 11, color: 'var(--muted)' }}>{l}</div>
+                      <div key={l} style={{ textAlign: 'center', background: L(DS.sunken, `${c}10`), borderRadius: L(6, 10), padding: L('8px 4px', '12px 4px'), display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 4 }}>
+                        <div style={{ fontSize: L(20, 18), fontWeight: L(700, 800), color: L(DS.primary, c), lineHeight: L<string | number>('28px', 1), fontVariantNumeric: 'tabular-nums' }}>{Number(v).toFixed(1)}</div>
+                        <div style={{ fontSize: L(12, 11), color: 'var(--muted)' }}>{l}</div>
                       </div>
                     ))}
                   </div>
@@ -888,8 +890,8 @@ export default function Dashboard() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                   {A.hasGender && (
                     <div>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', marginBottom: 8 }}>Cins</div>
-                      <Bars data={[
+                      <div style={{ fontSize: 12, fontWeight: L(600, 700), color: 'var(--muted)', marginBottom: 8, textTransform: L('uppercase', undefined), letterSpacing: L('.06em', undefined) }}>Cins</div>
+                      <Bars color={L(DS.data3, undefined)} data={[
                         { label: 'Qadın', value: A.fem, color: O('#7a9a62', '#eb2f96'), sub: `(${pctText(A.fem, A.instUsers.length)}%)` },
                         { label: 'Kişi', value: A.mal, color: O('#2f619c', '#1677ff'), sub: `(${pctText(A.mal, A.instUsers.length)}%)` },
                       ]} />
@@ -897,8 +899,8 @@ export default function Dashboard() {
                   )}
                   {A.hasSource && (
                     <div>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', marginBottom: 8 }}>Mənbə</div>
-                      <Bars data={[
+                      <div style={{ fontSize: 12, fontWeight: L(600, 700), color: 'var(--muted)', marginBottom: 8, textTransform: L('uppercase', undefined), letterSpacing: L('.06em', undefined) }}>Mənbə</div>
+                      <Bars color={L(DS.data3, undefined)} data={[
                         { label: 'Mülki', value: A.mulki, color: O('#a39478', '#c9962a'), sub: `(${pctText(A.mulki, A.instUsers.length)}%)` },
                         { label: 'Lisey', value: A.lisey, color: O(`${P.slate}`, '#722ed1'), sub: `(${pctText(A.lisey, A.instUsers.length)}%)` },
                       ]} />
@@ -927,8 +929,8 @@ export default function Dashboard() {
                           <span style={{ fontWeight: 700, color: 'var(--text)' }}>{b.name}</span>
                           <span style={{ color: 'var(--muted)' }}>{b.quota} kvota · {b.specs} hərbi uçot ixtisası · tələb sayı {b.demand} ({comp.toFixed(1)}×)</span>
                         </div>
-                        <div style={{ background: O('#e8ecf2', '#f0f2f8'), borderRadius: 6, height: 10, overflow: 'hidden' }}>
-                          <div style={{ width: `${fillP}%`, height: '100%', background: barCol }} />
+                        <div style={{ background: L(DS.sunken, O('#e8ecf2', '#f0f2f8')), borderRadius: L(9999, 6), height: 10, overflow: 'hidden' }}>
+                          <div style={{ width: `${fillP}%`, height: '100%', background: barCol, borderRadius: L(9999, 0) }} />
                         </div>
                       </div>
                     )

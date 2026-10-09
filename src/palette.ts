@@ -41,6 +41,34 @@ function readOld(): boolean {
   try { return localStorage.getItem(PALETTE_KEY) === 'old' } catch { return false }
 }
 export const IS_OLD_PALETTE = readOld()
+
+// Açıq rejim (İSP dizayn sistemi, claude.ai design) — yalnız bu rejimdə tətbiq olunan
+// üslublar L(açıq, digər) ilə seçilir. Rejim yaddaşda yoxdursa açıq sayılır.
+function readLight(): boolean {
+  try { const m = localStorage.getItem(PALETTE_KEY); return !m || m === 'light' } catch { return true }
+}
+export const IS_LIGHT_MODE = readLight()
+export function L<T>(light: T, other: T): T { return IS_LIGHT_MODE ? light : other }
+
+/** İSP dizayn sisteminin açıq rejim tokenləri */
+export const DS = {
+  surface: '#f3f4f1',       // səhifə fonu
+  raised: '#fbfbf9',        // kartlar, sidebar
+  sunken: '#e9ece7',        // bar izi, mini-kartlar, passiv tablar
+  line: '#dcdfd8',          // kart sərhədləri
+  ink: '#1d2830',           // əsas mətn, rəqəmlər
+  muted: '#525f68',         // altyazılar, faizlər
+  primary: '#1d5a8c',       // aktiv tab, əsas düymə
+  primarySoft: '#e2ebf3',   // aktiv menyu fonu
+  data1: '#2a6db3',         // göy — tək seriyalı barlar
+  data2: '#bd6418',         // narıncı
+  data3: '#1f8a6e',         // yaşılımtıl — Mülki
+  data4: '#9a5aa8',         // bənövşəyi
+  success: '#24734a',       // Yerləşdi
+  warning: '#9a5d08',       // Seçim etdi, yerləşdirilmədi
+  neutral: '#7a858b',       // Seçim etmədi
+  shadow: '0 1px 2px #1d28300d',
+}
 export const P: Palette = IS_OLD_PALETTE ? OLD : NAVY
 
 /** '#rrggbb' → [r, g, b] */

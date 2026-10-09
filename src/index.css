@@ -560,5 +560,17 @@ html[data-theme="dark"] *:not(:focus-visible) { box-shadow: none !important; }
 html[data-theme="dark"] *, html[data-theme="dark"] *::before, html[data-theme="dark"] *::after { text-shadow: none !important; }
 
 /* ── Yalnız açıq rejim (tünd və köhnə rejimə təsir etmir) ────────────────── */
-/* Statistika kartlarının başlıqları bir ölçü böyük (14px → 15px) */
-html:not([data-theme="dark"]):not([data-palette="old"]) .dash-card-title { font-size: 15px !important; }
+/* İSP dizayn sistemi (claude.ai design): neytral fon, yumşaq kartlar, iki tonlu mətn.
+   Statistika səhifəsinin daxili üslubları Dashboard.tsx-də L(...) ilə verilir. */
+html[data-mode="light"] {
+  --text: #1d2830; --muted: #525f68; --border: #dcdfd8; --surface: #fbfbf9; --bg: #f3f4f1;
+}
+html[data-mode="light"] body { background: #f3f4f1; color: #1d2830; }
+html[data-mode="light"] .sidebar { background: #fbfbf9; border-right-color: #dcdfd8; }
+html[data-mode="light"] .sidebar-logo { border-bottom-color: #dcdfd8; }
+html[data-mode="light"] .sidebar-logo-title { color: #1d2830; }
+html[data-mode="light"] .nav-section { font-size: 11px; font-weight: 600; letter-spacing: .08em; color: #525f68; }
+html[data-mode="light"] .nav-item { color: #1d2830; font-size: 14px; }
+html[data-mode="light"] .nav-item:hover { background: #e9ece7; color: #1d2830; }
+html[data-mode="light"] .nav-item.active { background: #e2ebf3; color: #1d5a8c; font-weight: 600; border-left-color: #1d5a8c; }
+html[data-mode="light"] .topbar { background: #fbfbf9; border-bottom-color: #dcdfd8; box-shadow: none; }
