@@ -91,10 +91,11 @@ function seqColors(values: number[]): string[] {
   return out
 }
 
-function Bars({ data, max }: { data: { label: string; value: number; color: string; sub?: string }[]; max?: number }) {
+// mono: bütün barlar bir rəngdə (ardıcıl şkala yerinə)
+function Bars({ data, max, mono }: { data: { label: string; value: number; color: string; sub?: string }[]; max?: number; mono?: string }) {
   const m = max ?? Math.max(1, ...data.map(d => d.value))
   // Köhnə rejimdə hər bar öz rəngindədir, yenidə dəyərə görə ardıcıl şkala
-  const cols = IS_OLD_PALETTE ? data.map(d => d.color) : seqColors(data.map(d => d.value))
+  const cols = IS_OLD_PALETTE ? data.map(d => d.color) : mono ? data.map(() => mono) : seqColors(data.map(d => d.value))
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       {data.map((d, i) => (
@@ -857,7 +858,7 @@ export default function Dashboard() {
 
             <Card title="Bal bölgüsü">
               {/* Yüksək baldan aşağıya doğru */}
-              <Bars data={A.scoreBuckets.map(([lo, hi], i) => ({
+              <Bars mono={seqColor(1, 5)} data={A.scoreBuckets.map(([lo, hi], i) => ({
                 label: `${lo}–${hi}`, value: A.hist[i], color: O(`${P.navy}`, '#c9962a'),
               })).reverse()} />
             </Card>
