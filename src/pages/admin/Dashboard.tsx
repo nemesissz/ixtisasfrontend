@@ -33,7 +33,9 @@ const pctText = (a: number, b: number): string => {
 
 // Donut seqmentinin və legend nişanının «Hesabatı yüklə» düyməsindəki qradiyentlə çəkilməsi
 const GRAD = 'grad'
-const GRAD_CSS = `linear-gradient(135deg,${P.navy},${P.steel})`
+// Parlaq variant: əsas göydən açıq, işıqlı göyə keçid (diaqramda yüngül işıltı ilə)
+const GRAD_FROM = '#3f78bd', GRAD_TO = '#6fa3dc'
+const GRAD_CSS = `linear-gradient(135deg,${GRAD_FROM},${GRAD_TO})`
 
 // ── SVG halqa (donut) ─────────────────────────────────────────────────────────
 function Donut({ segments, size = 150, stroke = 20, center }: {
@@ -45,19 +47,22 @@ function Donut({ segments, size = 150, stroke = 20, center }: {
   let offset = 0
   return (
     <div style={{ position: 'relative', width: size, height: size, flexShrink: 0 }}>
-      <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
+      <svg width={size} height={size} style={{ transform: 'rotate(-90deg)', overflow: 'visible' }}>
         <defs>
           {/* «Hesabatı yüklə» düyməsi ilə eyni parlaq qradiyent */}
           <linearGradient id="donut-grad" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stopColor={P.navy} />
-            <stop offset="100%" stopColor={P.steel} />
+            <stop offset="0%" stopColor={GRAD_FROM} />
+            <stop offset="100%" stopColor={GRAD_TO} />
           </linearGradient>
+          <filter id="donut-glow" x="-20%" y="-20%" width="140%" height="140%">
+            <feDropShadow dx="0" dy="0" stdDeviation="3" floodColor={GRAD_FROM} floodOpacity="0.45" />
+          </filter>
         </defs>
         <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#eef0f7" strokeWidth={stroke} />
         {segments.map((s, i) => {
           const len = (s.value / total) * circ
           const el = (
-            <circle key={i} cx={size / 2} cy={size / 2} r={r} fill="none" stroke={s.color === GRAD ? 'url(#donut-grad)' : s.color} strokeWidth={stroke}
+            <circle key={i} cx={size / 2} cy={size / 2} r={r} fill="none" stroke={s.color === GRAD ? 'url(#donut-grad)' : s.color} filter={s.color === GRAD ? 'url(#donut-glow)' : undefined} strokeWidth={stroke}
               strokeDasharray={`${len} ${circ - len}`} strokeDashoffset={-offset}
               style={{ transition: 'stroke-dasharray .6s' }} />
           )
