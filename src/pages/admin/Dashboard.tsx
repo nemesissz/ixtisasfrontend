@@ -922,7 +922,8 @@ export default function Dashboard() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                   {A.branchStats.map((b: any, bi: number, arr: any[]) => {
                     const fillP = pct(b.placed, b.quota)
-                    const barCol = IS_OLD_PALETTE ? (fillP >= 100 ? '#52c41a' : '#c9962a') : seqColors(arr.map((x: any) => x.quota))[bi]
+                    // Bütün barlar eyni rəngdə (bar sayından asılı olmayaraq): şkalanın orta tonu
+                    const barCol = IS_OLD_PALETTE ? (fillP >= 100 ? '#52c41a' : '#c9962a') : seqColor(1, 3)
                     const comp = b.quota > 0 ? b.demand / b.quota : 0
                     return (
                       <div key={b.name}>
