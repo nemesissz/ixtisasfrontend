@@ -1,9 +1,27 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, type ReactNode } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { userDb, selectionDb, addLog } from '../db'
 import { TopbarProvider, useTopbar } from '../contexts/TopbarContext'
 import { PATH_PERM, hasPerm, pathAllowed } from '../permissions'
 import { getAdminSession, clearAdminSession } from '../api/auth'
+import { IS_LIGHT_MODE } from '../palette'
+
+// Açıq rejimdə emoji əvəzinə xətti ikonlar (İSP dizayn sistemi)
+const LINE_ICONS: Record<string, ReactNode> = {
+  '/admin/dashboard':   <path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>,
+  '/admin/users':       <><circle cx="9" cy="8" r="4"/><path d="M2 21c0-4 3-6 7-6s7 2 7 6M17 11a3 3 0 1 0 0-6M22 21c0-3-2-5-5-5"/></>,
+  '/admin/specialties': <path d="M2 9l10-5 10 5-10 5zM6 11v5c3 2 9 2 12 0v-5"/>,
+  '/admin/selections':  <><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></>,
+  '/admin/distribution': <path d="M12 3v18M5 7h14M3 14l2-7 2 7a2 2 0 0 1-4 0zM17 14l2-7 2 7a2 2 0 0 1-4 0z"/>,
+  '/admin/redistribute': <path d="M12 3v18M3 12h18"/>,
+  '/admin/results':     <path d="M6 3h9l4 4v14H6zM9 12l2 2 4-4"/>,
+  '/admin/archive':     <><rect x="3" y="4" width="18" height="5" rx="1"/><path d="M5 9v11h14V9M10 13h4"/></>,
+  '/admin/logs':        <path d="M4 6h16M4 12h16M4 18h10"/>,
+  '/admin/integrity':   <path d="M12 3l8 3v6c0 5-4 8-8 9-4-1-8-4-8-9V6z"/>,
+  '/admin/admins':      <><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></>,
+  '/admin/super-settings': <><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2"/></>,
+  '/admin/live':        <><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></>,
+}
 
 const NAV = [
   { section: 'Əsas' },
@@ -105,7 +123,7 @@ function AdminLayoutInner() {
       {/* ── Sidebar yığ/aç oxu (kənarda) ── */}
       <button
         className="sidebar-toggle"
-        style={{ left: collapsed ? 53 : 227 }}
+        style={{ left: collapsed ? 53 : (IS_LIGHT_MODE ? 235 : 227) }}
         onClick={toggleCollapsed}
         title={collapsed ? 'Yan paneli aç' : 'Yan paneli bağla'}
         aria-label="Yan paneli aç/bağla"
@@ -118,13 +136,13 @@ function AdminLayoutInner() {
         {/* Logo */}
         <div className="sidebar-logo">
           <div style={{
-            width: 44, height: 44, flexShrink: 0,
+            width: IS_LIGHT_MODE ? 40 : 44, height: IS_LIGHT_MODE ? 40 : 44, flexShrink: 0,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
             <img src="/mmu-logo.png" alt="MMU" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
           </div>
           <div>
-            <div className="sidebar-logo-title">İxtisas Seçim Proqramı</div>
+            <div className="sidebar-logo-title">{IS_LIGHT_MODE ? <>İxtisas Seçim<br />Proqramı</> : 'İxtisas Seçim Proqramı'}</div>
           </div>
         </div>
 
@@ -144,7 +162,9 @@ function AdminLayoutInner() {
                 className={() => `nav-item${isActive ? ' active' : ''}`}
                 onClick={() => setSidebarOpen(false)}
               >
-                <span className="nav-icon">{item.icon}</span>
+                <span className="nav-icon">{IS_LIGHT_MODE && LINE_ICONS[item.to]
+                  ? <svg viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round">{LINE_ICONS[item.to]}</svg>
+                  : item.icon}</span>
                 <span className="nav-label">{item.label}</span>
                 {badge !== undefined && <span className="nav-badge">{badge}</span>}
               </NavLink>

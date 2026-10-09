@@ -574,3 +574,23 @@ html[data-mode="light"] .nav-item { color: #1d2830; font-size: 14px; }
 html[data-mode="light"] .nav-item:hover { background: #e9ece7; color: #1d2830; }
 html[data-mode="light"] .nav-item.active { background: #e2ebf3; color: #1d5a8c; font-weight: 600; border-left-color: #1d5a8c; }
 html[data-mode="light"] .topbar { background: #fbfbf9; border-bottom-color: #dcdfd8; box-shadow: none; }
+/* Sidebar — İSP dizayn sistemi: 248px, xətti ikonlar, yumşaq aktiv bənd */
+html[data-mode="light"] .sidebar:not(.collapsed) { width: 248px; min-width: 248px; }
+html[data-mode="light"] .sidebar-logo { border-bottom: none; padding: 24px 20px 16px; }
+html[data-mode="light"] .sidebar-logo-title { font-size: 16px; font-weight: 700; line-height: 20px; }
+html[data-mode="light"] .nav-section { padding: 16px 24px 4px; color: #525f68; }
+html[data-mode="light"] .nav-item { gap: 12px; padding: 8px 12px; margin: 2px 12px; border-radius: 10px; line-height: 20px; }
+html[data-mode="light"] .nav-item.active { border-left: none; margin-left: 12px; }
+html[data-mode="light"] .nav-icon { width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; }
+html[data-mode="light"] .nav-icon svg { width: 18px; height: 18px; fill: none; stroke: #525f68; stroke-width: 1.8; }
+html[data-mode="light"] .nav-item.active .nav-icon svg { stroke: #1d5a8c; }
+html[data-mode="light"] .nav-badge { background: #1d5a8c; }
+html[data-mode="light"] .sidebar.collapsed .nav-item { margin: 2px 8px; padding: 10px 0; gap: 0; }
+html[data-mode="light"] .sidebar.collapsed .nav-item.active { box-shadow: none; }
+html[data-mode="light"] .sidebar-bottom { border-top-color: #dcdfd8; padding: 12px; }
+html[data-mode="light"] .admin-info:hover { background: #e9ece7; }
+html[data-mode="light"] .admin-name { color: #1d2830; font-size: 13px; font-weight: 600; }
+html[data-mode="light"] .admin-role { color: #525f68; font-size: 11px; }
+@media (max-width: 768px) {
+  html[data-mode="light"] .sidebar.collapsed .nav-item { justify-content: flex-start; gap: 12px; padding: 8px 12px; margin: 2px 12px; }
+}
