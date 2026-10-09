@@ -10,7 +10,7 @@ import { poolCounts, checkManual, leavesWithPath, balanceForLeaf, genderPool, ba
 import type { SourceSlotCheck } from '../../quota-pool'
 import { readImageResized } from '../../imageResize'
 import { UMUMI_KEY, SUM_SEP, isSumCrit, critParts } from '../../tiebreak'
-import { P } from '../../palette'
+import { P, O } from '../../palette'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type TNode = {
@@ -1285,7 +1285,7 @@ function BalanceModal({ tree, instUsers, onClose, onQuotaMode, onGenderConfig }:
                 </div>
                 {hasConf && (
                   <div style={{ border: '1px solid #ffe7ba', borderRadius: 10, marginBottom: 8, overflow: 'hidden' }}>
-                    <div style={{ padding: '6px 12px', background: `${P.tint2}`, fontSize: 10, fontWeight: 800, color: '#ad6800' }}>KƏSİŞMƏLƏR</div>
+                    <div style={{ padding: '6px 12px', background: `${O(P.tint2, '#fffbf0')}`, fontSize: 10, fontWeight: 800, color: '#ad6800' }}>KƏSİŞMƏLƏR</div>
                     {gbk.conflicts.map((c, i) => (
                       <div key={i} style={{ borderTop: '1px solid #fff1d6', padding: '6px 12px', fontSize: 11.5, color: '#3a4560' }}>
                         <b>{srcTxt(c.source)}</b> <span style={{ fontSize: 10, fontWeight: 800, color: '#d46b08' }}>[QRUP]</span>: «{c.a.label}» ↔ «{c.b.label}» — <b>{c.shared}</b> nəfər hər ikisinə gedə bilir
@@ -1647,7 +1647,7 @@ function GenderModal({ node, path, instUsers, treeNodes, onSave, onClose }: {
 
           <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
             <button onClick={save} disabled={!valid}
-              style={{ flex: 1, padding: '10px', borderRadius: 9, border: 'none', background: valid ? `linear-gradient(135deg,${P.navy},${P.steel})` : '#ccc', color: '#fff', fontWeight: 700, fontSize: 13, cursor: valid ? 'pointer' : 'not-allowed' }}>
+              style={{ flex: 1, padding: '10px', borderRadius: 9, border: 'none', background: valid ? `linear-gradient(135deg,${P.navy},${O(P.steel, '#b8860b')})` : '#ccc', color: '#fff', fontWeight: 700, fontSize: 13, cursor: valid ? 'pointer' : 'not-allowed' }}>
               Yadda saxla
             </button>
             <button onClick={() => onSave(null)}

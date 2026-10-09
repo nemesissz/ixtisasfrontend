@@ -1,4 +1,4 @@
-import { P } from '../palette'
+import { P, O } from '../palette'
 // "İxtisas seçimi necə aparılır?" təlimatı üçün GIF-ə bənzər animasiya:
 // siçan ⠿ işarəsindən tutub sonuncu sətri ən yuxarıya sürüşdürür, sonra dövr təkrarlanır.
 // Sətirlər təhsilalanın öz strukturundan gəlir (ən çox 3), sütunlar strukturun səviyyələrinə uyğundur.
@@ -12,7 +12,7 @@ function css(n: number) {
 .dd-row{position:absolute;left:0;right:0;height:30px;display:flex;align-items:center;gap:6px;
   padding:0 8px;background:#fff;border:1.5px solid #e6e8f0;border-radius:8px;font-size:12px;font-weight:700;color:#2b2f3a}
 .dd-head{display:flex;align-items:center;gap:6px;padding:5px 9.5px;margin-bottom:2px;background:${P.line3};
-  border:1.5px solid ${P.line};border-radius:8px;font-size:10px;font-weight:800;color:${P.navyDk};text-transform:uppercase;letter-spacing:.4px}
+  border:1.5px solid ${P.line};border-radius:8px;font-size:10px;font-weight:800;color:${O(P.navyDk, '#5a4a12')};text-transform:uppercase;letter-spacing:.4px}
 .dd-head .c:first-child,.dd-row .c:first-child{flex:0 0 74px}
 .dd-head .c{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .dd-head .c+.c{padding-left:6px;border-left:1px solid ${P.line}}
@@ -27,8 +27,8 @@ function css(n: number) {
 @keyframes dd-down{0%,30%{transform:none}55%,100%{transform:translateY(${STEP}px)}}
 @keyframes dd-up{
   0%,18%{transform:none;box-shadow:none;border-color:#e6e8f0}
-  25%{transform:scale(1.03);box-shadow:0 6px 16px rgba(0,0,0,.15);border-color:${P.navy}}
-  55%{transform:translateY(-${up}px) scale(1.03);box-shadow:0 6px 16px rgba(0,0,0,.15);border-color:${P.navy}}
+  25%{transform:scale(1.03);box-shadow:0 6px 16px rgba(0,0,0,.15);border-color:${O(P.navy, '#e0a92e')}}
+  55%{transform:translateY(-${up}px) scale(1.03);box-shadow:0 6px 16px rgba(0,0,0,.15);border-color:${O(P.navy, '#e0a92e')}}
   65%,100%{transform:translateY(-${up}px);box-shadow:none;border-color:#34a36b}}
 @keyframes dd-cur{
   0%{transform:translate(20px,30px);opacity:0}

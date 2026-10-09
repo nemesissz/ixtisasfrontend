@@ -6,7 +6,7 @@ import { AppDialog, useDialog } from '../../components/AppDialog'
 import { useTopbar } from '../../contexts/TopbarContext'
 import InstIcon from '../../components/InstIcon'
 import { formatDate } from '../../utils-date'
-import { P } from '../../palette'
+import { P, O } from '../../palette'
 
 function getLeavesWithPath(nodes: any[], anc: any[] = []): Array<{ leaf: any; path: any[] }> {
   const res: Array<{ leaf: any; path: any[] }> = []
@@ -234,7 +234,7 @@ export default function Archive() {
                 padding: '8px 18px', borderRadius: 10, border: 'none',
                 cursor: 'pointer', fontWeight: 700, fontSize: 13,
                 transition: 'all .15s',
-                background: isActive ? `linear-gradient(135deg,${P.navy},${P.steel})` : '#f0f2fa',
+                background: isActive ? `linear-gradient(135deg,${P.navy},${O(P.steel, '#b8860b')})` : '#f0f2fa',
                 color:      isActive ? '#fff' : 'var(--muted)',
                 boxShadow:  isActive ? `0 4px 14px ${P.navy}33` : 'none',
               }}
@@ -243,7 +243,7 @@ export default function Archive() {
               {s.label}
               <span style={{
                 fontSize: 11, fontWeight: 800, padding: '1px 7px', borderRadius: 20,
-                background: isActive ? 'rgba(255,255,255,0.25)' : `${P.tint}`,
+                background: isActive ? 'rgba(255,255,255,0.25)' : `${O(P.tint, '#f3e9cf')}`,
                 color: isActive ? '#fff' : `${P.ink}`, minWidth: 18, textAlign: 'center',
               }}>{counts[s.id]}</span>
             </button>
@@ -365,7 +365,7 @@ function InstTabs({ insts, active, counts, onSelect }: {
             {inst.label}
             <span style={{
               fontSize: 11, fontWeight: 800, padding: '1px 8px', borderRadius: 20,
-              background: isActive ? 'rgba(255,255,255,0.25)' : `${P.tint}`,
+              background: isActive ? 'rgba(255,255,255,0.25)' : `${O(P.tint, '#f3e9cf')}`,
               color:      isActive ? '#fff' : `${P.ink}`,
               minWidth: 20, textAlign: 'center',
             }}>{cnt}</span>
@@ -430,7 +430,7 @@ function RestoreUsersModal({ arc, onClose, onRestore }: {
   const opt = (key: typeof mode, title: string, sub?: React.ReactNode) => (
     <label key={key} style={{
       display: 'flex', gap: 10, alignItems: 'flex-start', padding: '10px 12px', borderRadius: 10, cursor: 'pointer',
-      border: `1.5px solid ${mode === key ? `${P.navy}` : '#e6e9f5'}`, background: mode === key ? `${P.tint2}` : '#fff',
+      border: `1.5px solid ${mode === key ? `${P.navy}` : '#e6e9f5'}`, background: mode === key ? `${O(P.tint2, '#fffbf0')}` : '#fff',
     }}>
       <input type="radio" checked={mode === key} onChange={() => setMode(key)} style={{ marginTop: 3 }} />
       <span style={{ flex: 1, minWidth: 0 }}>
@@ -482,7 +482,7 @@ function RestoreUsersModal({ arc, onClose, onRestore }: {
           )}
 
           {mode !== 'keep' && subCount > 0 && (
-            <div style={{ fontSize: 12, color: `${P.ink}`, background: '#fff7e6', border: '1px solid #ffd591', borderRadius: 8, padding: '8px 10px' }}>
+            <div style={{ fontSize: 12, color: `${O(P.ink, '#8a6d1b')}`, background: '#fff7e6', border: '1px solid #ffd591', borderRadius: 8, padding: '8px 10px' }}>
               Qeyd: seçimlər qrupa bağlı struktura aiddir. Təhsilalanları başqa qrupa salsanız, köhnə seçim nəticələri həmin qrupun strukturunda görünməyə bilər.
             </div>
           )}
@@ -507,7 +507,7 @@ function EmptyState({ icon, text, sub }: { icon: string; text: string; sub: stri
     }}>
       <div style={{
         width: 80, height: 80, borderRadius: 22,
-        background: `linear-gradient(135deg,#f0f2fa,${P.tint})`,
+        background: `linear-gradient(135deg,#f0f2fa,${O(P.tint, '#f3e9cf')})`,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         fontSize: 36, boxShadow: '0 4px 20px #0001',
       }}>{icon}</div>

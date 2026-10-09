@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { adminDb, addLog } from '../../db'
 import { pathAllowed } from '../../permissions'
 import { setAdminSession } from '../../api/auth'
-import { P } from '../../palette'
+import { P, O } from '../../palette'
 
 export default function AdminLogin() {
   const navigate  = useNavigate()
@@ -50,7 +50,7 @@ export default function AdminLogin() {
       position: 'relative', overflow: 'hidden',
     }}>
       {/* Arxa fon dairələri */}
-      <div style={{ position:'absolute', top:'10%', left:'8%', width:320, height:320, borderRadius:'50%', background:`radial-gradient(circle,${P.navy}1f 0%,transparent 70%)`, pointerEvents:'none' }} />
+      <div style={{ position:'absolute', top:'10%', left:'8%', width:320, height:320, borderRadius:'50%', background:`radial-gradient(circle,${O(P.navy, '#e0a92e')}1f 0%,transparent 70%)`, pointerEvents:'none' }} />
       <div style={{ position:'absolute', bottom:'10%', right:'8%', width:280, height:280, borderRadius:'50%', background:`radial-gradient(circle,${P.navyDk}1a 0%,transparent 70%)`, pointerEvents:'none' }} />
 
       {/* Kart */}
@@ -89,7 +89,7 @@ export default function AdminLogin() {
                 color: '#2b2f3a', outline: 'none', boxSizing: 'border-box',
                 transition: 'border-color .2s',
               }}
-              onFocus={e => e.currentTarget.style.borderColor = `${P.navy}`}
+              onFocus={e => e.currentTarget.style.borderColor = `${O(P.navy, '#e0a92e')}`}
               onBlur={e => e.currentTarget.style.borderColor = error ? '#ff4d4f88' : '#e0e4f0'}
             />
           </div>
@@ -110,7 +110,7 @@ export default function AdminLogin() {
                   color: '#2b2f3a', outline: 'none', boxSizing: 'border-box',
                   transition: 'border-color .2s',
                 }}
-                onFocus={e => e.currentTarget.style.borderColor = `${P.navy}`}
+                onFocus={e => e.currentTarget.style.borderColor = `${O(P.navy, '#e0a92e')}`}
                 onBlur={e => e.currentTarget.style.borderColor = error ? '#ff4d4f88' : '#e0e4f0'}
               />
               <button type="button" onClick={() => setShowPw(v => !v)} title={showPw ? 'Gizlət' : 'Göstər'}
@@ -133,9 +133,9 @@ export default function AdminLogin() {
           <button type="submit" disabled={loading}
             style={{
               width: '100%', padding: '14px', borderRadius: 12, border: 'none',
-              background: loading ? '#cfd2da' : `linear-gradient(135deg,${P.navy},${P.steel})`,
+              background: loading ? '#cfd2da' : `linear-gradient(135deg,${O(P.navy, '#b8860b')},${P.steel})`,
               color: '#fff', fontWeight: 800, fontSize: 15, cursor: loading ? 'not-allowed' : 'pointer',
-              boxShadow: loading ? 'none' : `0 6px 20px ${P.navy}55`,
+              boxShadow: loading ? 'none' : `0 6px 20px ${O(P.navy, '#e0a92e')}55`,
               transition: 'all .2s', letterSpacing: 0.3,
             }}>
             {loading ? '⏳ Yoxlanılır...' : '→ Daxil ol'}

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { P } from '../palette'
+import { P, O } from '../palette'
 
 // ── Tip ───────────────────────────────────────────────────────────────────────
 export type DialogCfg = {
@@ -74,7 +74,7 @@ export function AppDialog({ cfg, onClose }: { cfg: DialogCfg; onClose: () => voi
                 background: '#f4f6fb', color: 'var(--muted)',
                 fontWeight: 700, fontSize: 14, cursor: 'pointer', transition: 'all .15s',
               }}
-              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = `${P.tint}` }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = `${O(P.tint, '#f3e9cf')}` }}
               onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = '#f4f6fb' }}
             >
               {cfg.cancelLabel ?? 'Ləğv et'}

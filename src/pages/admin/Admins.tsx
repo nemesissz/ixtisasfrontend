@@ -11,7 +11,7 @@ import { AppDialog, useDialog } from "../../components/AppDialog";
 import { PERM_GROUPS, ALL_PERMS } from "../../permissions";
 import { getAdminSession, setAdminSession } from "../../api/auth";
 import { can } from "../../permissions";
-import { P } from '../../palette'
+import { P, O } from '../../palette'
 
 const EyeIcon = ({ off }: { off: boolean }) =>
   off ? (
@@ -224,7 +224,7 @@ function PermSelector({
                   style={{ accentColor: `${P.navy}` }}
                 />
                 <span
-                  style={{ fontSize: 12.5, fontWeight: 800, color: `${P.navyDk}` }}
+                  style={{ fontSize: 12.5, fontWeight: 800, color: `${O(P.navyDk, '#5a4a12')}` }}
                 >
                   {g.icon} {g.group}
                 </span>
@@ -933,7 +933,7 @@ export default function Admins() {
                           height: 34,
                           borderRadius: 10,
                           flexShrink: 0,
-                          background: `linear-gradient(135deg,${P.navy},${P.steel})`,
+                          background: `linear-gradient(135deg,${P.navy},${O(P.steel, '#b8860b')})`,
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",

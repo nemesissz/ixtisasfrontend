@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { integrityDb, addLog } from '../../db'
 import { can } from '../../permissions'
-import { P } from '../../palette'
+import { P, O } from '../../palette'
 
 const GOLD = `${P.navy}`
 const SEAL_KEY = 'isp_integrity_seal'
@@ -157,8 +157,8 @@ export default function Integrity() {
           style={{
             flex: 1, padding: '8px 10px', borderRadius: 9, fontSize: 12, fontWeight: 700, cursor: 'pointer',
             border: `1.5px solid ${value === v ? GOLD : '#e0e4f0'}`,
-            background: value === v ? `${P.tint2}` : '#f8f9fd',
-            color: value === v ? `${P.steel}` : '#8890a5',
+            background: value === v ? `${O(P.tint2, '#fdf6e6')}` : '#f8f9fd',
+            color: value === v ? `${O(P.steel, '#a5731a')}` : '#8890a5',
           }}>{lbl}</button>
       ))}
     </div>
@@ -196,7 +196,7 @@ export default function Integrity() {
           </button>
 
           {saved && (
-            <div style={{ marginTop: 16, background: `${P.tint2}`, border: `1.5px solid ${GOLD}55`, borderRadius: 12, padding: 16 }}>
+            <div style={{ marginTop: 16, background: `${O(P.tint2, '#faf7ef')}`, border: `1.5px solid ${GOLD}55`, borderRadius: 12, padding: 16 }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: .5 }}>SHA-256 möhürü</div>
               <div style={{ fontFamily: 'Consolas, monospace', fontSize: 14, wordBreak: 'break-all', margin: '8px 0', userSelect: 'all', lineHeight: 1.5 }}>{saved.hash}</div>
               <div style={{ fontSize: 12, color: 'var(--muted)' }}>{saved.label} · {saved.at}</div>

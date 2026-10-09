@@ -14,7 +14,7 @@ import {
 import { getAdminSession } from "../../api/auth";
 import MonitorSettingsCard from "../../components/MonitorSettingsCard";
 import ThemeSettingsCard from "../../components/ThemeSettingsCard";
-import { P } from '../../palette'
+import { P, O } from '../../palette'
 
 /**
  * Superadmin parametrləri — yalnız baş admin görür.
@@ -126,7 +126,7 @@ export default function SuperSettings() {
           {/* Başlıq */}
           <div
             style={{
-              background: `linear-gradient(135deg,${P.navy},${P.steel})`,
+              background: `linear-gradient(135deg,${O(P.navy, '#b8860b')},${P.steel})`,
               padding: "20px 28px",
               display: "flex",
               alignItems: "center",
@@ -170,7 +170,7 @@ export default function SuperSettings() {
                   padding: "9px 20px",
                   borderRadius: 10,
                   border: "none",
-                  background: `linear-gradient(135deg,${P.navy},${P.steel})`,
+                  background: `linear-gradient(135deg,${P.navy},${O(P.steel, '#b8860b')})`,
                   color: "#fff",
                   fontWeight: 700,
                   fontSize: 13,
@@ -499,7 +499,7 @@ export default function SuperSettings() {
           <div style={{ padding: "0 28px 28px" }}>
             <div
               style={{
-                border: `1.5px solid ${P.navy}33`,
+                border: `1.5px solid ${O(P.navy, '#e0a92e')}33`,
                 borderRadius: 14,
                 overflow: "hidden",
               }}
@@ -508,7 +508,7 @@ export default function SuperSettings() {
                 style={{
                   background: `${P.tint}`,
                   padding: "14px 20px",
-                  borderBottom: `1px solid ${P.navy}22`,
+                  borderBottom: `1px solid ${O(P.navy, '#e0a92e')}22`,
                   display: "flex",
                   alignItems: "center",
                   gap: 10,
@@ -569,7 +569,7 @@ export default function SuperSettings() {
                   style={{
                     width: 120,
                     textAlign: "center",
-                    borderColor: `${P.navy}33`,
+                    borderColor: `${O(P.navy, '#e0a92e')}33`,
                   }}
                 />
                 <span style={{ fontSize: 12, color: "#8892b0" }}>
@@ -589,7 +589,7 @@ export default function SuperSettings() {
           Boş saxlansa heç nə göstərilmir. */}
       {isSuperAdmin && (
         <div className="card" style={{ marginTop: 20, overflow: "hidden" }}>
-          <div style={{ background: `linear-gradient(135deg,${P.navy},${P.steel})`, padding: "20px 28px" }}>
+          <div style={{ background: `linear-gradient(135deg,${O(P.navy, '#b8860b')},${P.steel})`, padding: "20px 28px" }}>
             <div style={{ fontSize: 15, fontWeight: 800, color: "#fff", marginBottom: 3 }}>
               📣 Təsdiqdən Sonrakı Elan
             </div>
@@ -639,7 +639,7 @@ export default function SuperSettings() {
                   Təhsilalanın görəcəyi
                 </div>
                 <div style={{
-                  background: `${P.tint2}`, border: `1.5px solid ${P.tint}`, borderLeft: `5px solid ${P.navy}`,
+                  background: `${P.tint2}`, border: `1.5px solid ${O(P.tint, '#f1ead4')}`, borderLeft: `5px solid ${O(P.navy, '#e0a92e')}`,
                   borderRadius: 12, padding: "14px 18px", fontSize: 13.5, color: "#4a5060",
                   lineHeight: 1.7, whiteSpace: "pre-wrap",
                 }}>{(submitNotice || "").trim()}</div>

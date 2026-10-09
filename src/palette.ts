@@ -48,3 +48,6 @@ export function hexRgb(h: string): number[] {
   const s = h.replace('#', '')
   return [0, 2, 4].map(i => parseInt(s.substr(i, 2), 16))
 }
+
+/** Köhnə rejimdə bu yerdə palitranın ümumi rəngi yox, əvvəlki dəqiq rəng işlənirdi. */
+export function O(navy: string, old: string): string { return IS_OLD_PALETTE ? old : navy }

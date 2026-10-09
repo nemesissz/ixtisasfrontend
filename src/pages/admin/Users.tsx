@@ -8,7 +8,7 @@ import InstTabs from '../../components/InstTabs'
 import { AppDialog, useDialog } from '../../components/AppDialog'
 import { readImageResized } from '../../imageResize'
 import { can } from '../../permissions'
-import { P } from '../../palette'
+import { P, O } from '../../palette'
 
 // ── Tree-dən hər yarpaq üçün tam yol (node adları) ────────────────────────────
 function buildLeafPaths(nodes: any[], prefix: any[] = [], map: Record<string, any[]> = {}): Record<string, any[]> {
@@ -1968,7 +1968,7 @@ function BulkCohortModal({ count, cohorts, currentId, busy, warnDone, onClose, o
   const apply = () => { if (ok) onApply(mode === 'existing' ? pick : mode, label) }
   const opt = (key: typeof mode, title: string, disabled = false) => (
     <label style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '10px 12px', borderRadius: 10, cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.5 : 1,
-      border: `1.5px solid ${mode === key ? `${P.navy}` : '#e6e9f5'}`, background: mode === key ? `${P.tint2}` : '#fff' }}>
+      border: `1.5px solid ${mode === key ? `${P.navy}` : '#e6e9f5'}`, background: mode === key ? `${O(P.tint2, '#fffbf0')}` : '#fff' }}>
       <input type="radio" checked={mode === key} disabled={disabled} onChange={() => setMode(key)} />
       <span style={{ fontWeight: 700, fontSize: 13.5 }}>{title}</span>
     </label>
@@ -1995,7 +1995,7 @@ function BulkCohortModal({ count, cohorts, currentId, busy, warnDone, onClose, o
           )}
           {opt('none', 'Qrupdan çıxar (qrupsuz)', currentId === 'none')}
           {warnDone > 0 && (
-            <div style={{ fontSize: 12, color: `${P.ink}`, background: '#fff7e6', border: '1px solid #ffd591', borderRadius: 8, padding: '8px 10px' }}>
+            <div style={{ fontSize: 12, color: `${O(P.ink, '#8a6d1b')}`, background: '#fff7e6', border: '1px solid #ffd591', borderRadius: 8, padding: '8px 10px' }}>
               Seçilmişlərdən {warnDone} nəfər artıq seçim göndərib və ya yerləşdirilib — onların nəticələri köhnə qrupun seçiminə aid olaraq qalacaq.
             </div>
           )}
@@ -2382,7 +2382,7 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
             </div>
             <div className="modal-body">
               <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px', borderRadius: 12, background: '#f4f7ff', border: `1.5px solid ${P.line3}`, marginBottom: 16 }}>
-                <div style={{ width: 44, height: 44, borderRadius: 12, flexShrink: 0, background: `linear-gradient(135deg,${P.navy},${P.steel})`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }}>👤</div>
+                <div style={{ width: 44, height: 44, borderRadius: 12, flexShrink: 0, background: `linear-gradient(135deg,${P.navy},${O(P.steel, '#b8860b')})`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }}>👤</div>
                 <div>
                   <div style={{ fontWeight: 800, fontSize: 15 }}>{printUser.name}</div>
                   <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>FİN: {printUser.fin || '—'} · Bal: {Number(printUser.score || 0).toFixed(2)}</div>
@@ -2405,7 +2405,7 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
               )}
               <div style={{ display: 'flex', gap: 10 }}>
                 <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => setPrintUser(null)}>Ləğv et</button>
-                <button onClick={confirmPrint} style={{ flex: 1, padding: '11px 0', borderRadius: 12, border: 'none', background: `linear-gradient(135deg,${P.navy},${P.steel})`, color: '#fff', fontWeight: 700, fontSize: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                <button onClick={confirmPrint} style={{ flex: 1, padding: '11px 0', borderRadius: 12, border: 'none', background: `linear-gradient(135deg,${P.navy},${O(P.steel, '#b8860b')})`, color: '#fff', fontWeight: 700, fontSize: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
                   🖨️ Çap et
                 </button>
               </div>
@@ -2552,7 +2552,7 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
             )}
             {can('users.import') && (
             <button onClick={() => setShowImport(true)} title="Excel ilə əlavə et"
-              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 16px', borderRadius: 10, border: '1.5px solid var(--blue)', background: '#fff', color: 'var(--blue)', fontWeight: 800, fontSize: 13, boxShadow: `0 2px 8px ${P.navy}22`, cursor: 'pointer' }}>
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 16px', borderRadius: 10, border: '1.5px solid var(--blue)', background: '#fff', color: 'var(--blue)', fontWeight: 800, fontSize: 13, boxShadow: `0 2px 8px ${O(P.navy, '#e0a92e')}22`, cursor: 'pointer' }}>
               📤 Əlavə et
             </button>
             )}
@@ -2802,7 +2802,7 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
                                 border: 'none',
                                 background: isPrinted
                                   ? 'linear-gradient(135deg,#52c41a,#237804)'
-                                  : `linear-gradient(135deg,${P.navy},${P.steel})`,
+                                  : `linear-gradient(135deg,${P.navy},${O(P.steel, '#b8860b')})`,
                                 cursor: 'pointer',
                                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                                 padding: 0,

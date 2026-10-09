@@ -5,7 +5,7 @@ import { readActiveInst, writeActiveInst } from '../../activeInst'
 import { FlatView, NestedView, treeToNested, nestedToFlat } from '../../components/SpecialtyViews'
 import InstIcon from '../../components/InstIcon'
 import { filterTreeByBranch, collapseLevel } from '../student/SelectionPage'
-import { P } from '../../palette'
+import { P, O } from '../../palette'
 
 // ── Təhsilalan görünüşü önizləmə overlay ─────────────────────────────────────────
 function ViewPreviewOverlay({
@@ -217,7 +217,7 @@ export default function SelectionNew() {
             <div style={{
               display: 'flex', gap: 12, marginBottom: 16,
               padding: '14px 18px', borderRadius: 12,
-              background: `linear-gradient(135deg,${P.tint2},${P.tint})`,
+              background: `linear-gradient(135deg,${P.tint2},${O(P.tint, '#fff7e6')})`,
               border: `1.5px solid ${P.line}`,
             }}>
               <div style={{

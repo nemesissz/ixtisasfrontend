@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import { P } from '../palette'
+import { P, O } from '../palette'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 export interface SpecEntry  { specId: string; specName: string; quota: number }
@@ -125,10 +125,10 @@ export function FlatView({ flat, onChange, submitted = false, levelNames }: {
     ? '40px minmax(0,1fr) minmax(0,1fr) 44px'
     : '40px minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) 44px'
   const headCells: Array<[string, string, string, string]> = oneLevel
-    ? [['№','center',`${P.line3}`,`${P.navyDk}`], [lv[0] || 'Səviyyə 1','left','#fff4ef','#8c3a1f'], ['','center',`${P.line3}`,`${P.navyDk}`]]
+    ? [['№','center',`${P.line3}`,`${O(P.navyDk, '#5a4a12')}`], [lv[0] || 'Səviyyə 1','left','#fff4ef','#8c3a1f'], ['','center',`${P.line3}`,`${O(P.navyDk, '#5a4a12')}`]]
     : twoLevel
-    ? [['№','center',`${P.line3}`,`${P.navyDk}`], [lv[0] || 'Səviyyə 1','left',`${P.line3}`,`${P.navyDk}`], [lv[1] || 'Səviyyə 2','left','#fff4ef','#8c3a1f'], ['','center',`${P.line3}`,`${P.navyDk}`]]
-    : [['№','center',`${P.line3}`,`${P.navyDk}`], [lv[0] || 'Səviyyə 1','left',`${P.line3}`,`${P.navyDk}`], [lv[1] || 'Səviyyə 2','left',`${P.tint}`,`${P.navyDk}`], [lv[2] || 'Səviyyə 3','left','#fff4ef','#8c3a1f'], ['','center',`${P.line3}`,`${P.navyDk}`]]
+    ? [['№','center',`${P.line3}`,`${O(P.navyDk, '#5a4a12')}`], [lv[0] || 'Səviyyə 1','left',`${P.line3}`,`${O(P.navyDk, '#5a4a12')}`], [lv[1] || 'Səviyyə 2','left','#fff4ef','#8c3a1f'], ['','center',`${P.line3}`,`${O(P.navyDk, '#5a4a12')}`]]
+    : [['№','center',`${P.line3}`,`${O(P.navyDk, '#5a4a12')}`], [lv[0] || 'Səviyyə 1','left',`${P.line3}`,`${O(P.navyDk, '#5a4a12')}`], [lv[1] || 'Səviyyə 2','left',`${O(P.tint, '#f7eccf')}`,`${O(P.navyDk, '#6a4a12')}`], [lv[2] || 'Səviyyə 3','left','#fff4ef','#8c3a1f'], ['','center',`${P.line3}`,`${O(P.navyDk, '#5a4a12')}`]]
 
   // Siçanla sürükləmə pointer hadisələri ilə aparılır: brauzerin öz (HTML5) sürükləməsində
   // kursoru dəyişmək mümkün deyil, burada isə bütün müddət "sıxılmış əl" (grabbing) görünür.
@@ -248,17 +248,17 @@ export function FlatView({ flat, onChange, submitted = false, levelNames }: {
                 {i + 1}
               </div>
               {/* Ana Qrup — 1 səviyyəli rejimdə gizlidir */}
-              {!oneLevel && <div style={{ padding: '9px 12px', display: 'flex', alignItems: 'center', minWidth: 0, overflowWrap: 'anywhere', wordBreak: 'break-word', fontSize: 12, fontWeight: 500, color: `${P.navyDk}`, background: hl ? 'transparent' : '#f8f9ff', borderRight: '2px solid #dde2f5' }}>
+              {!oneLevel && <div style={{ padding: '9px 12px', display: 'flex', alignItems: 'center', minWidth: 0, overflowWrap: 'anywhere', wordBreak: 'break-word', fontSize: 12, fontWeight: 500, color: `${O(P.navyDk, '#5a4a12')}`, background: hl ? 'transparent' : '#f8f9ff', borderRight: '2px solid #dde2f5' }}>
                 {row.groupName}
               </div>}
               {/* Alt Qrup — 2 səviyyəli rejimdə gizlidir */}
               {!twoLevel && (
-                <div style={{ padding: '9px 12px', display: 'flex', alignItems: 'center', minWidth: 0, overflowWrap: 'anywhere', wordBreak: 'break-word', fontSize: 12, fontWeight: 500, color: `${P.navyDk}`, background: hl ? 'transparent' : '#faf8ff', borderRight: '1.5px solid #ece8ff' }}>
+                <div style={{ padding: '9px 12px', display: 'flex', alignItems: 'center', minWidth: 0, overflowWrap: 'anywhere', wordBreak: 'break-word', fontSize: 12, fontWeight: 500, color: `${O(P.navyDk, '#5a4a12')}`, background: hl ? 'transparent' : '#faf8ff', borderRight: '1.5px solid #ece8ff' }}>
                   {row.subName}
                 </div>
               )}
               {/* İxtisas */}
-              <div style={{ padding: '9px 12px', display: 'flex', alignItems: 'center', minWidth: 0, overflowWrap: 'anywhere', wordBreak: 'break-word', fontSize: 12, fontWeight: 500, color: `${P.navyDk}` }}>
+              <div style={{ padding: '9px 12px', display: 'flex', alignItems: 'center', minWidth: 0, overflowWrap: 'anywhere', wordBreak: 'break-word', fontSize: 12, fontWeight: 500, color: `${O(P.navyDk, '#5a4a12')}` }}>
                 {row.specName}
               </div>
               {/* Sürükləmə tutacağı */}
@@ -386,7 +386,7 @@ export function NestedView({ nested, onChange, submitted = false }: {
               }}
             >
               <div style={{ minWidth: 38, display: 'flex', alignItems: 'center', justifyContent: 'center', background: `${P.navy}`, fontSize: 14, fontWeight: 800, color: '#fff' }}>{gn}</div>
-              <div style={{ flex: 1, padding: '14px 10px', fontSize: 12, fontWeight: 700, color: `${P.navyDk}`, lineHeight: 1.4 }}>{group.groupName}</div>
+              <div style={{ flex: 1, padding: '14px 10px', fontSize: 12, fontWeight: 700, color: `${O(P.navyDk, '#5a4a12')}`, lineHeight: 1.4 }}>{group.groupName}</div>
               {interactive && <div style={{ display: 'flex', alignItems: 'center', padding: '0 8px', color: '#bbc', fontSize: 15 }}>⠿</div>}
             </div>
 
@@ -415,7 +415,7 @@ export function NestedView({ nested, onChange, submitted = false }: {
                       style={{
                         width: 160, flexShrink: 0, display: 'flex', alignItems: 'stretch',
                         background: isFS ? '#fffbe6' : isOS ? '#e8d8ff' : '#f4f0ff',
-                        border: `2px solid ${isFS ? '#f5a623' : isOS ? `${P.navyDk}` : `${P.tint}`}`,
+                        border: `2px solid ${isFS ? '#f5a623' : isOS ? `${P.navyDk}` : `${O(P.tint, '#f3e9cf')}`}`,
                         borderRadius: 8, overflow: 'hidden',
                         cursor: interactive ? 'grab' : 'default',
                         opacity: 1,
@@ -425,7 +425,7 @@ export function NestedView({ nested, onChange, submitted = false }: {
                       }}
                     >
                       <div style={{ minWidth: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', background: `${P.navyDk}`, fontSize: 11, fontWeight: 700, color: '#fff' }}>{sn}</div>
-                      <div style={{ flex: 1, padding: 9, fontSize: 11, fontWeight: 600, color: `${P.navyDk}`, lineHeight: 1.3 }}>{sub.subName}</div>
+                      <div style={{ flex: 1, padding: 9, fontSize: 11, fontWeight: 600, color: `${O(P.navyDk, '#6a4a12')}`, lineHeight: 1.3 }}>{sub.subName}</div>
                       {interactive && <div style={{ display: 'flex', alignItems: 'center', padding: '0 6px', color: '#ccc', fontSize: 13 }}>⠿</div>}
                     </div>
                     )}

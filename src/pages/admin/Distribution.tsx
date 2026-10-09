@@ -10,7 +10,7 @@ import { allocatePacketSpecs, splitPacketStudents } from '../../packet-alloc'
 import { UMUMI_KEY, isSumCrit } from '../../tiebreak'
 import { compareStudents, makeMeritCompare, pairTiebreaker, decidingCriterion, tieTrace, buildDefaultTiebreaker, setDefaultTiebreaker, getLeavesWithPath, genderAllowed, genderCapReached, rebalanceUnplaced, runPacketPlacement, runPlacement } from '../../placement'
 import { ord } from '../../ordinal'
-import { P } from '../../palette'
+import { P, O } from '../../palette'
 
 // ── Gale-Shapley (Deferred Acceptance) alqoritmi ─────────────────────────────
 function runGaleShapley(users: any[], subs: any[], tree: any) {
@@ -124,7 +124,7 @@ const SPEED_LABEL: Record<number, string>   = { 0: '0.5×', 1: '1×', 3: '3×', 
 
 // Paket rəngləri
 const PACK_COLORS = [
-  { bg: `linear-gradient(135deg,${P.navy},${P.steel})`, shadow: `${P.navy}44`, light: `${P.tint}`, text: `${P.navy}` },
+  { bg: `linear-gradient(135deg,${P.navy},${O(P.steel, '#b8860b')})`, shadow: `${P.navy}44`, light: `${P.tint}`, text: `${P.navy}` },
   { bg: 'linear-gradient(135deg,#52c41a,#237804)', shadow: '#52c41a44', light: '#f0fff4', text: '#237804' },
   { bg: 'linear-gradient(135deg,#f5a623,#d46b08)', shadow: '#f5a62344', light: '#fff8e6', text: '#d46b08' },
   { bg: 'linear-gradient(135deg,#ff4d4f,#cf1322)', shadow: '#ff4d4f44', light: '#fff0f0', text: '#cf1322' },
@@ -150,7 +150,7 @@ function tieTraceText(trace: TieStep[] | undefined, winner: string, me = 'bu tə
 }
 
 function TieTraceView({ trace, winner }: { trace: TieStep[]; winner: string }) {
-  const B = { color: `${P.navyDk}` }
+  const B = { color: `${O(P.navyDk, '#5a4a12')}` }
   if (!trace.length) return <> Bu ixtisas üçün prioritet meyarı təyin edilməyib — sıra siyahıdakı ardıcıllıqla müəyyənləşdi, bu təhsilalan həmin ixtisasa yerləşdirilmədi.</>
   const last = trace[trace.length - 1]
   return (
@@ -162,7 +162,7 @@ function TieTraceView({ trace, winner }: { trace: TieStep[]; winner: string }) {
             <b style={B}>{t.label}</b>:{' '}
             {t.decided
               ? <><b style={B}>{winner}</b> <b style={{ color: '#237804' }}>{critNum(t.w)}</b>, bu təhsilalan <b style={{ color: '#cf1322' }}>{critNum(t.l)}</b> — <b style={B}>fərq buradadır</b></>
-              : <>{critNum(t.w)} = {critNum(t.l)} <span style={{ color: `${P.steel}` }}>(bərabər, növbəti meyara keçildi)</span></>}
+              : <>{critNum(t.w)} = {critNum(t.l)} <span style={{ color: `${O(P.steel, '#a08a4a')}` }}>(bərabər, növbəti meyara keçildi)</span></>}
           </li>
         ))}
       </ol>
@@ -478,12 +478,12 @@ function StorySim({ students, packets, subs, tree, poolUsers, preAssignLevel, fi
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 600, background: "#eef1f5 url('/background.jpeg') center center / cover no-repeat fixed", display: 'flex', flexDirection: 'column' }}>
-      <style>{`@keyframes simFlash { 0%, 100% { background: #fff; box-shadow: 0 0 0 0 transparent } 50% { background: #fff1b8; box-shadow: 0 0 0 2px ${P.navy} } }
+      <style>{`@keyframes simFlash { 0%, 100% { background: #fff; box-shadow: 0 0 0 0 transparent } 50% { background: #fff1b8; box-shadow: 0 0 0 2px ${O(P.navy, '#e0a92e')} } }
         .sim-flash { animation: simFlash .6s ease-in-out 6 }`}</style>
       {/* Üst: idarə paneli (tam eni tutur) */}
       <div style={{ padding: '12px 20px', background: '#fff', borderBottom: '1px solid #e7eaf0', boxShadow: '0 2px 10px #1a1f3c0a', display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
         {data.multiPacket && (
-          <span style={{ fontSize: 12, fontWeight: 800, padding: '4px 12px', borderRadius: 20, background: `${P.tint2}`, color: `${P.ink}`, border: `1px solid ${P.navy}`, whiteSpace: 'nowrap' }}>
+          <span style={{ fontSize: 12, fontWeight: 800, padding: '4px 12px', borderRadius: 20, background: `${P.tint2}`, color: `${P.ink}`, border: `1px solid ${O(P.navy, '#e0a92e')}`, whiteSpace: 'nowrap' }}>
             📦 Paket {curPk}/{data.pkMeta.length}{curMeta ? ` · bal ${curMeta.minScore.toFixed(0)}–${curMeta.maxScore.toFixed(0)}` : ''}
           </span>
         )}
@@ -491,9 +491,9 @@ function StorySim({ students, packets, subs, tree, poolUsers, preAssignLevel, fi
         <button onClick={() => { setPlaying(false); setIdx(i => Math.max(i - 1, -1)) }} disabled={idx < 0}
           style={{ padding: '8px 16px', borderRadius: 9, border: '1.5px solid #e0e4f0', background: '#fff', color: '#5a6070', fontWeight: 700, fontSize: 13, cursor: idx < 0 ? 'not-allowed' : 'pointer', opacity: idx < 0 ? .4 : 1 }}>◀ Əvvəlki</button>
         <button onClick={() => { setPlaying(false); setIdx(i => Math.min(i + 1, total - 1)) }} disabled={idx >= total - 1}
-          style={{ padding: '8px 16px', borderRadius: 9, border: 'none', background: `${P.navy}`, color: '#fff', fontWeight: 800, fontSize: 13, boxShadow: `0 4px 14px ${P.navy}55`, cursor: idx >= total - 1 ? 'not-allowed' : 'pointer', opacity: idx >= total - 1 ? .4 : 1 }}>Növbəti addım ▶</button>
+          style={{ padding: '8px 16px', borderRadius: 9, border: 'none', background: `${O(P.navy, '#e0a92e')}`, color: '#fff', fontWeight: 800, fontSize: 13, boxShadow: `0 4px 14px ${O(P.navy, '#e0a92e')}55`, cursor: idx >= total - 1 ? 'not-allowed' : 'pointer', opacity: idx >= total - 1 ? .4 : 1 }}>Növbəti addım ▶</button>
         <button onClick={() => setPlaying(p => !p)} disabled={idx >= total - 1}
-          style={{ padding: '8px 16px', borderRadius: 9, border: playing ? `1.5px solid ${P.steel}` : '1.5px solid #e0e4f0', background: playing ? `${P.steel}` : '#fff', color: playing ? '#fff' : '#5a6070', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>{playing ? '⏸ Dayandır' : '⏵ Avtomatik'}</button>
+          style={{ padding: '8px 16px', borderRadius: 9, border: playing ? `1.5px solid ${O(P.steel, '#e0e4f0')}` : '1.5px solid #e0e4f0', background: playing ? `${O(P.steel, '#f5a623')}` : '#fff', color: playing ? '#fff' : '#5a6070', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>{playing ? '⏸ Dayandır' : '⏵ Avtomatik'}</button>
         <button onClick={() => setSpeed(s => s === 1200 ? 500 : s === 500 ? 150 : s === 150 ? 60 : 1200)} title="Sürət"
           style={{ padding: '8px 12px', borderRadius: 9, border: '1.5px solid #e0e4f0', background: '#fff', color: '#8a909c', fontSize: 12, cursor: 'pointer' }}>{speed === 1200 ? '1×' : speed === 500 ? '2×' : speed === 150 ? '5×' : '10×'}</button>
         <button onClick={() => { setPlaying(false); setIdx(total - 1) }} disabled={idx >= total - 1}
@@ -544,7 +544,7 @@ function StorySim({ students, packets, subs, tree, poolUsers, preAssignLevel, fi
           {([['left', '📚', 'İxtisaslar'], ['center', '👤', 'Təhsilalan'], ['right', '📦', 'Paket/Növbə']] as const).map(([k, ic, lbl]) => (
             <button key={k} onClick={() => setFocusCol(focusCol === k ? null : k)} title={lbl}
               style={{ width: 32, height: 32, borderRadius: 8, fontSize: 14, cursor: 'pointer',
-                border: `1.5px solid ${focusCol === k ? `${P.navy}` : '#e0e4f0'}`,
+                border: `1.5px solid ${focusCol === k ? `${O(P.navy, '#e0a92e')}` : '#e0e4f0'}`,
                 background: focusCol === k ? `${P.tint2}` : '#fff', color: focusCol === k ? `${P.ink}` : '#8a909c' }}>{ic}</button>
           ))}
         </div>
@@ -564,7 +564,7 @@ function StorySim({ students, packets, subs, tree, poolUsers, preAssignLevel, fi
             const justPlaced = cur?.placed === id
             return (
               <div key={id} onClick={() => setSelLeaf(id)} title="Yerləşən təhsilalanları gör"
-                style={{ marginBottom: 10, padding: 8, borderRadius: 10, cursor: 'pointer', background: justPlaced ? `${P.tint2}` : '#fff', border: justPlaced ? `1px solid ${P.navy}` : '1px solid #eef0f5', transition: 'all .2s' }}
+                style={{ marginBottom: 10, padding: 8, borderRadius: 10, cursor: 'pointer', background: justPlaced ? `${P.tint2}` : '#fff', border: justPlaced ? `1px solid ${O(P.navy, '#e0a92e')}` : '1px solid #eef0f5', transition: 'all .2s' }}
                 onMouseEnter={e => { if (!justPlaced) (e.currentTarget as HTMLElement).style.background = '#f7f8fc' }}
                 onMouseLeave={e => { if (!justPlaced) (e.currentTarget as HTMLElement).style.background = '#fff' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 5 }}>
@@ -572,8 +572,8 @@ function StorySim({ students, packets, subs, tree, poolUsers, preAssignLevel, fi
                   <span style={{ color: isFull ? '#237804' : '#8a909c', fontWeight: 700 }}>{f}/{q}{isFull ? ' ✓' : ''}</span>
                 </div>
                 {q <= 26
-                  ? <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>{Array.from({ length: q }, (_, k) => <Seat key={k} on={k < f} color={isFull ? '#52c41a' : `${P.navy}`} />)}</div>
-                  : <div style={{ height: 8, borderRadius: 8, background: `${P.tint}`, overflow: 'hidden' }}><div style={{ width: `${q ? (f / q) * 100 : 0}%`, height: '100%', background: isFull ? '#52c41a' : `${P.navy}`, transition: 'width .25s' }} /></div>}
+                  ? <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>{Array.from({ length: q }, (_, k) => <Seat key={k} on={k < f} color={isFull ? '#52c41a' : `${O(P.navy, '#e0a92e')}`} />)}</div>
+                  : <div style={{ height: 8, borderRadius: 8, background: `${O(P.tint, '#f0ead2')}`, overflow: 'hidden' }}><div style={{ width: `${q ? (f / q) * 100 : 0}%`, height: '100%', background: isFull ? '#52c41a' : `${O(P.navy, '#e0a92e')}`, transition: 'width .25s' }} /></div>}
                 {f > 0 && (
                   <div style={{ marginTop: 5, fontSize: 10.5, fontWeight: 700, color: isFull ? '#237804' : '#8a909c', display: 'flex', alignItems: 'center', gap: 4 }}>
                     {isFull ? '🔒 keçid balı:' : 'ən aşağı:'} <span style={{ color: isFull ? '#237804' : '#5a6070' }}>{cutoff[id].toFixed(2)}</span>
@@ -640,31 +640,31 @@ function StorySim({ students, packets, subs, tree, poolUsers, preAssignLevel, fi
           {cur && cur.tieRivals.length > 0 && (
             <div style={{ background: '#fff7e6', border: '1px solid #ffd591', borderRadius: 10, padding: '12px 16px', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
               <span style={{ fontSize: 18 }}>⚖️</span>
-              <div style={{ fontSize: 13, color: `${P.ink}`, lineHeight: 1.55 }}>
-                <b style={{ color: `${P.navyDk}` }}>Bərabər bal toqquşması:</b> “{data.leafName[cur.tieRivals[0].id]}” üçün <b style={{ color: `${P.navyDk}` }}>{cur.tieRivals[0].rival}</b> ilə hər ikisinin ümumi balı <b style={{ color: `${P.navyDk}` }}>{cur.tieRivals[0].score.toFixed(2)}</b> idi. Son yer bir nəfərə qalır.{cur.tieRivals[0].trace ? (<TieTraceView trace={cur.tieRivals[0].trace} winner={cur.tieRivals[0].rival} />) : cur.tieRivals[0].subject ? (<> —
-                  üstünlük meyarı <b style={{ color: `${P.navyDk}` }}>“{cur.tieRivals[0].subject}”</b> oldu: <b style={{ color: `${P.navyDk}` }}>{cur.tieRivals[0].rival}</b> = <b style={{ color: '#237804' }}>{critFmt(cur.tieRivals[0].rivalSubjScore)}</b>, bu təhsilalan = <b style={{ color: '#cf1322' }}>{critFmt(cur.tieRivals[0].mySubjScore)}</b> — {cur.tieRivals[0].rival} öndə olduğu üçün bu təhsilalan həmin ixtisasa yerləşdirilmədi.
+              <div style={{ fontSize: 13, color: `${O(P.ink, '#8a6d1b')}`, lineHeight: 1.55 }}>
+                <b style={{ color: `${O(P.navyDk, '#5a4a12')}` }}>Bərabər bal toqquşması:</b> “{data.leafName[cur.tieRivals[0].id]}” üçün <b style={{ color: `${O(P.navyDk, '#5a4a12')}` }}>{cur.tieRivals[0].rival}</b> ilə hər ikisinin ümumi balı <b style={{ color: `${O(P.navyDk, '#5a4a12')}` }}>{cur.tieRivals[0].score.toFixed(2)}</b> idi. Son yer bir nəfərə qalır.{cur.tieRivals[0].trace ? (<TieTraceView trace={cur.tieRivals[0].trace} winner={cur.tieRivals[0].rival} />) : cur.tieRivals[0].subject ? (<> —
+                  üstünlük meyarı <b style={{ color: `${O(P.navyDk, '#5a4a12')}` }}>“{cur.tieRivals[0].subject}”</b> oldu: <b style={{ color: `${O(P.navyDk, '#5a4a12')}` }}>{cur.tieRivals[0].rival}</b> = <b style={{ color: '#237804' }}>{critFmt(cur.tieRivals[0].rivalSubjScore)}</b>, bu təhsilalan = <b style={{ color: '#cf1322' }}>{critFmt(cur.tieRivals[0].mySubjScore)}</b> — {cur.tieRivals[0].rival} öndə olduğu üçün bu təhsilalan həmin ixtisasa yerləşdirilmədi.
                 </>) : (<> Bütün prioritet meyarları da eyni idi — sıra siyahıdakı ardıcıllıqla müəyyənləşdi, bu təhsilalan həmin ixtisasa yerləşdirilmədi.</>)}
               </div>
             </div>
           )}
 
           {/* İzah sətri */}
-          <div style={{ background: `${P.tint2}`, border: `1px solid ${P.tint}`, borderLeft: `3px solid ${P.navy}`, padding: '12px 16px', borderRadius: 6 }}>
-            <span style={{ fontSize: 13.5, color: `${P.ink}`, lineHeight: 1.6 }}><b style={{ color: '#2b2f3a' }}>İzah: </b>{narration}</span>
+          <div style={{ background: `${P.tint2}`, border: `1px solid ${O(P.tint, '#f1ead4')}`, borderLeft: `3px solid ${O(P.navy, '#e0a92e')}`, padding: '12px 16px', borderRadius: 6 }}>
+            <span style={{ fontSize: 13.5, color: `${O(P.ink, '#6a5a2e')}`, lineHeight: 1.6 }}><b style={{ color: '#2b2f3a' }}>İzah: </b>{narration}</span>
           </div>
         </div>
 
         {/* SAĞ: növbə + sayğaclar */}
         <div style={{ overflowY: 'auto', borderLeft: '1px solid #e7eaf0', padding: '12px 12px', display: 'flex', flexDirection: 'column', gap: 12 }}>
           {data.multiPacket && curMeta && (
-            <div style={{ background: `${P.tint2}`, borderRadius: 10, padding: '12px', border: `1px solid ${P.navy}` }}>
+            <div style={{ background: `${P.tint2}`, borderRadius: 10, padding: '12px', border: `1px solid ${O(P.navy, '#e0a92e')}` }}>
               <div style={{ fontSize: 10, fontWeight: 800, color: `${P.ink}`, textTransform: 'uppercase', letterSpacing: .5, marginBottom: 8 }}>📦 Cari paket {curPk}/{data.pkMeta.length}</div>
               <div style={{ fontSize: 11, color: '#8a909c', marginBottom: 8 }}>Bal: {curMeta.minScore.toFixed(1)} – {curMeta.maxScore.toFixed(1)} · {pkTotal} təhsilalan · {pkQuota} kvota</div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, color: '#5a6070', marginBottom: 4 }}>
                 <span>İşlənən</span><b>{pkProcessed} / {pkTotal}</b>
               </div>
-              <div style={{ height: 8, borderRadius: 8, background: `${P.tint}`, overflow: 'hidden', marginBottom: 8 }}>
-                <div style={{ width: `${pkTotal ? (pkProcessed / pkTotal) * 100 : 0}%`, height: '100%', background: `${P.navy}`, transition: 'width .25s' }} />
+              <div style={{ height: 8, borderRadius: 8, background: `${O(P.tint, '#f0ead2')}`, overflow: 'hidden', marginBottom: 8 }}>
+                <div style={{ width: `${pkTotal ? (pkProcessed / pkTotal) * 100 : 0}%`, height: '100%', background: `${O(P.navy, '#e0a92e')}`, transition: 'width .25s' }} />
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, color: '#237804' }}>
                 <span>Yerləşən</span><b style={{ color: '#237804' }}>{pkPlaced} / {pkQuota}</b>
@@ -674,12 +674,12 @@ function StorySim({ students, packets, subs, tree, poolUsers, preAssignLevel, fi
               </div>
               {pkProcessed >= pkTotal && pkTotal > 0 && <div style={{ fontSize: 11, fontWeight: 700, color: '#237804', marginTop: 8 }}>✅ Bu paket tamamlandı</div>}
               {/* Paketin təhsilalanları (adı ilə, status) */}
-              <div style={{ marginTop: 10, borderTop: `1px solid ${P.tint}`, paddingTop: 8, maxHeight: 260, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 3 }}>
+              <div style={{ marginTop: 10, borderTop: `1px solid ${O(P.tint, '#f1ead4')}`, paddingTop: 8, maxHeight: 260, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 3 }}>
                 {pkSteps.map(({ s, i }) => {
                   const now = i === idx, done = i <= idx
                   const bg = now ? '#fff7e6' : 'transparent'
                   return (
-                    <div key={s.u.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 6px', borderRadius: 6, background: bg, border: now ? `1px solid ${P.navy}` : '1px solid transparent' }}>
+                    <div key={s.u.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 6px', borderRadius: 6, background: bg, border: now ? `1px solid ${O(P.navy, '#e0a92e')}` : '1px solid transparent' }}>
                       <span style={{ flex: 1, minWidth: 0, fontSize: 11.5, fontWeight: now ? 800 : 500, color: !done ? '#aab0bd' : '#2b2f3a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.u.name}</span>
                       {s.u.source && (
                         <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 10, whiteSpace: 'nowrap', flexShrink: 0,
@@ -717,14 +717,14 @@ function StorySim({ students, packets, subs, tree, poolUsers, preAssignLevel, fi
             <div style={{ fontSize: 24, fontWeight: 900, color: `${P.navy}` }}>{placedTotal ? Math.round((firstChoice / placedTotal) * 100) : 0}%</div>
           </div>
           {idx >= total - 1 && total > 0 && data.rebalanced.length > 0 && (
-            <div style={{ background: `${P.tint2}`, borderRadius: 10, padding: '12px', border: `1px solid ${P.navy}` }}>
+            <div style={{ background: `${P.tint2}`, borderRadius: 10, padding: '12px', border: `1px solid ${O(P.navy, '#e0a92e')}` }}>
               <div style={{ fontSize: 12, fontWeight: 800, color: `${P.ink}` }}>⚖️ Tarazlama mərhələsi</div>
-              <div style={{ fontSize: 11, color: `${P.ink}`, marginTop: 4, lineHeight: 1.5 }}>
+              <div style={{ fontSize: 11, color: `${O(P.ink, '#8a6d1b')}`, marginTop: 4, lineHeight: 1.5 }}>
                 İlkin yerləşdirmədən sonra boş yerlər qalmışdı. Bal sıralaması pozulmadan <b>{data.rebalanced.length} təhsilalan</b> köçürülərək boş yerlər dolduruldu və yer çatmayanlara yer açıldı:
               </div>
               <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 3, maxHeight: 140, overflowY: 'auto' }}>
                 {data.rebalanced.map((r, k) => (
-                  <div key={k} style={{ fontSize: 10.5, color: `${P.navyDk}` }}>
+                  <div key={k} style={{ fontSize: 10.5, color: `${O(P.navyDk, '#5a4a12')}` }}>
                     • {r.name} ({r.score.toFixed(1)}): {r.fromSpec ? `${data.leafName[r.fromSpec]} → ` : 'yerləşmədi → '}<b>{data.leafName[r.toSpec]}</b>
                   </div>
                 ))}
@@ -788,7 +788,7 @@ function StorySim({ students, packets, subs, tree, poolUsers, preAssignLevel, fi
           <div onClick={() => setSelLeaf(null)} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10, padding: 24 }}>
             <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 18, width: 660, maxWidth: '95%', maxHeight: '88%', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 24px 70px #000b' }}>
               {/* Başlıq */}
-              <div style={{ background: `linear-gradient(135deg,${P.navy},${P.steel})`, padding: '20px 24px', color: '#fff', flexShrink: 0 }}>
+              <div style={{ background: `linear-gradient(135deg,${O(P.navy, '#b8860b')},${P.steel})`, padding: '20px 24px', color: '#fff', flexShrink: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 11, color: '#ffffff99', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>İxtisasa yerləşənlər{data.multiPacket ? (showAll ? ' · Bütün paketlər' : ` · Paket ${curPk}`) : ''}</div>
@@ -1818,7 +1818,7 @@ export default function Distribution() {
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(43,47,58,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000 }}>
           <div style={{ background: '#fff', borderRadius: 16, width: 420, maxWidth: '92vw', overflow: 'hidden', boxShadow: '0 16px 50px rgba(0,0,0,.3)' }}>
             {/* Başlıq */}
-            <div style={{ background: done ? 'linear-gradient(135deg,#389e0d,#52c41a)' : `linear-gradient(135deg,${P.navy},${P.steel})`, padding: '16px 22px', display: 'flex', alignItems: 'center', gap: 12, transition: 'background .4s' }}>
+            <div style={{ background: done ? 'linear-gradient(135deg,#389e0d,#52c41a)' : `linear-gradient(135deg,${O(P.navy, '#b8860b')},${P.steel})`, padding: '16px 22px', display: 'flex', alignItems: 'center', gap: 12, transition: 'background .4s' }}>
               {done
                 ? <div style={{ width: 30, height: 30, borderRadius: '50%', background: '#ffffff2e', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 17, flexShrink: 0 }}>✅</div>
                 : <div style={{ width: 30, height: 30, border: '3px solid #ffffff55', borderTopColor: '#fff', borderRadius: '50%', animation: 'distrib-spin 0.8s linear infinite', flexShrink: 0 }} />}
@@ -1852,8 +1852,8 @@ export default function Distribution() {
             </div>
             {/* Progress bar */}
             <div style={{ padding: '12px 22px 18px' }}>
-              <div style={{ height: 8, background: `${P.line2}`, borderRadius: 5, overflow: 'hidden' }}>
-                <div style={{ height: '100%', background: done ? 'linear-gradient(90deg,#389e0d,#52c41a)' : `linear-gradient(90deg,${P.navy},${P.steel})`, borderRadius: 5, animationName: 'distrib-fill', animationDuration: `${runDur}ms`, animationTimingFunction: 'linear', animationFillMode: 'forwards', transition: 'background .4s' }} />
+              <div style={{ height: 8, background: `${O(P.line2, '#f0e3bd')}`, borderRadius: 5, overflow: 'hidden' }}>
+                <div style={{ height: '100%', background: done ? 'linear-gradient(90deg,#389e0d,#52c41a)' : `linear-gradient(90deg,${O(P.navy, '#b8860b')},${P.steel})`, borderRadius: 5, animationName: 'distrib-fill', animationDuration: `${runDur}ms`, animationTimingFunction: 'linear', animationFillMode: 'forwards', transition: 'background .4s' }} />
               </div>
             </div>
             {/* Bağla düyməsi — yalnız uğur mesajından sonra */}
@@ -1954,7 +1954,7 @@ export default function Distribution() {
                 borderRadius: 16, padding: '28px 20px', cursor: okP ? 'pointer' : 'not-allowed',
                 transition: 'all .2s', textAlign: 'center', opacity: okP ? 1 : 0.55,
               }}
-              onMouseEnter={e => { if (!okP) return; (e.currentTarget as HTMLElement).style.background = `${P.navy}22`; (e.currentTarget as HTMLElement).style.borderColor = `${P.navy}` }}
+              onMouseEnter={e => { if (!okP) return; (e.currentTarget as HTMLElement).style.background = `${O(P.navy, '#f5a623')}22`; (e.currentTarget as HTMLElement).style.borderColor = `${O(P.navy, '#f5a623')}` }}
               onMouseLeave={e => { if (!okP) return; (e.currentTarget as HTMLElement).style.background = '#ffffff'; (e.currentTarget as HTMLElement).style.borderColor = '#e7eaf0' }}
             >
               <div style={{ fontSize: 40, marginBottom: 14 }}>📦</div>
@@ -1962,7 +1962,7 @@ export default function Distribution() {
               <div style={{ fontSize: 12, color: '#8a909c', lineHeight: 1.6 }}>
                 Təhsilalanlar bala görə paketlərə bölünür, hər paket ayrıca idarə edilir
               </div>
-              <div style={{ marginTop: 18, display: 'inline-block', padding: '8px 20px', borderRadius: 8, background: okP ? `${P.navy}` : '#c2c7d6', color: '#fff', fontWeight: 700, fontSize: 12 }}>
+              <div style={{ marginTop: 18, display: 'inline-block', padding: '8px 20px', borderRadius: 8, background: okP ? `${O(P.navy, '#f5a623')}` : '#c2c7d6', color: '#fff', fontWeight: 700, fontSize: 12 }}>
                 {okP ? 'Seç →' : '🔒 İcazə yoxdur'}
               </div>
             </div>
@@ -2015,8 +2015,8 @@ export default function Distribution() {
               <div style={{ display: 'flex', gap: 8 }}>
                 <button onClick={() => setStoryOpen(true)} disabled={submittedUsers.length === 0}
                   title="Addım-addım, izahlı simulyasiya — texniki bilməyənlər üçün"
-                  style={{ padding: '10px 20px', borderRadius: 10, border: `1.5px solid ${P.navy}`, fontWeight: 800, fontSize: 13, cursor: 'pointer',
-                    background: `${P.navy}`, color: '#fff',
+                  style={{ padding: '10px 20px', borderRadius: 10, border: `1.5px solid ${O(P.navy, '#e0a92e')}`, fontWeight: 800, fontSize: 13, cursor: 'pointer',
+                    background: `${O(P.navy, '#e0a92e')}`, color: '#fff',
                     opacity: submittedUsers.length === 0 ? 0.4 : 1 }}>
                   📖 İzahlı simulyasiya
                 </button>
@@ -2144,8 +2144,8 @@ export default function Distribution() {
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button onClick={() => setStoryOpen(true)} disabled={submittedUsers.length === 0}
                     title="Addım-addım, izahlı simulyasiya (paket-paket)"
-                    style={{ padding: '10px 20px', borderRadius: 10, border: `1.5px solid ${P.navy}`, fontWeight: 800, fontSize: 13,
-                      cursor: submittedUsers.length === 0 ? 'not-allowed' : 'pointer', background: `${P.navy}`, color: '#fff',
+                    style={{ padding: '10px 20px', borderRadius: 10, border: `1.5px solid ${O(P.navy, '#e0a92e')}`, fontWeight: 800, fontSize: 13,
+                      cursor: submittedUsers.length === 0 ? 'not-allowed' : 'pointer', background: `${O(P.navy, '#e0a92e')}`, color: '#fff',
                       opacity: submittedUsers.length === 0 ? 0.4 : 1 }}>
                     📖 İzahlı simulyasiya
                   </button>

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { monitorDb, addLog } from '../../db'
 import { getAdminSession } from '../../api/auth'
-import { P } from '../../palette'
+import { P, O } from '../../palette'
 
 // Canlı nəzarət (docs/PLAN-canli-nezaret.md) — yalnız superadmin.
 // Yüngül endpoint 5 saniyədən bir çəkilir; saniyə sayğacları arada brauzerdə
@@ -252,7 +252,7 @@ export default function LiveMonitor() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       {!cfg.enabled && (
-        <div className="card" style={{ padding: '16px 20px', background: '#fff8e6', border: `1.5px solid ${P.line}`, fontSize: 13.5 }}>
+        <div className="card" style={{ padding: '16px 20px', background: '#fff8e6', border: `1.5px solid ${O(P.line, '#f1dca0')}`, fontSize: 13.5 }}>
           ⚠️ Canlı nəzarət <b>sönülüdür</b> — təhsilalan səhifələri siqnal göndərmir.{' '}
           <Link to="/admin/super-settings" style={{ fontWeight: 700 }}>Superadmin parametrləri</Link>-ndən yandırın.
         </div>

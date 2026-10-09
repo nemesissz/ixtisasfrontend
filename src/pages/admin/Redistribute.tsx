@@ -5,7 +5,7 @@ import InstTabs from '../../components/InstTabs'
 import { AppDialog, useDialog } from '../../components/AppDialog'
 import { can } from '../../permissions'
 import { makeMeritCompare, buildDefaultTiebreaker, setDefaultTiebreaker } from '../../placement'
-import { P } from '../../palette'
+import { P, O } from '../../palette'
 
 // ── Tiebreaker köməkçiləri (Yerləşdirmə ilə eyni məntiq) ──────────────────────
 function getLeavesWithPath(nodes: any[], anc: any[] = []): Array<{ leaf: any; path: any[] }> {
@@ -311,7 +311,7 @@ export default function Redistribute() {
               </div>
               <button onClick={handlePreview} disabled={!balanced}
                 style={{ padding: '10px 24px', borderRadius: 10, border: 'none', cursor: balanced ? 'pointer' : 'not-allowed',
-                  background: balanced ? `linear-gradient(135deg,${P.navy},${P.steel})` : '#e4e7ee', color: balanced ? '#fff' : '#aab', fontWeight: 800, fontSize: 13 }}>
+                  background: balanced ? `linear-gradient(135deg,${P.navy},${O(P.steel, '#b8860b')})` : '#e4e7ee', color: balanced ? '#fff' : '#aab', fontWeight: 800, fontSize: 13 }}>
                 Önbaxış →
               </button>
             </div>

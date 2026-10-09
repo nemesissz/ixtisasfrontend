@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { selectionDb, institutionDb, systemSettingsDb, addLog, DEFAULT_INST_CONFIG, type InstLoginConfig } from '../../db'
 import { authDb } from '../../db'
 import { getStudentSession, setStudentSession, clearStudentSession } from '../../api/auth'
-import { P } from '../../palette'
+import { P, O } from '../../palette'
 
 export default function Landing() {
   const navigate     = useNavigate()
@@ -99,7 +99,7 @@ export default function Landing() {
     }
   }
 
-  const GOLD = `${P.navy}`
+  const GOLD = `${O(P.navy, '#e0a92e')}`
   const inputStyle: React.CSSProperties = {
     width: '100%', boxSizing: 'border-box', padding: '13px 16px',
     borderRadius: 8, border: '1.5px solid #d9dde6', background: '#fdfdfe',
@@ -207,7 +207,7 @@ export default function Landing() {
               onClick={login} disabled={loading}
               style={{
                 padding: '12px 28px', borderRadius: 8, border: 'none',
-                background: loading ? `${P.line}` : GOLD, color: '#fff',
+                background: loading ? `${O(P.line, '#e8d39a')}` : GOLD, color: '#fff',
                 fontWeight: 800, fontSize: 15, cursor: loading ? 'default' : 'pointer',
                 boxShadow: loading ? 'none' : `0 4px 14px ${GOLD}55`, transition: 'all .2s',
               }}

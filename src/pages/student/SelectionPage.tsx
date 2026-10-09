@@ -9,7 +9,7 @@ import {
   treeToNested, nestedToFlat, flatToNested,
   type FlatRow, type GroupEntry,
 } from '../../components/SpecialtyViews'
-import { P } from '../../palette'
+import { P, O } from '../../palette'
 
 // ── Qrupa görə ağacı filtrə et ───────────────────────────────────────────────
 function filterTreeByGroup(tree: any, studentGroup: string | null | undefined): any {
@@ -285,7 +285,7 @@ export default function SelectionPage() {
 
   // ── Mərhələ 3/3: təsdiq səhifəsi ──
   if (justSubmitted) {
-    const GOLD = `${P.navy}`
+    const GOLD = `${O(P.navy, '#e0a92e')}`
     const pct = redirectSeconds > 0 ? Math.min(100, Math.round((redirectSeconds - redirectIn) / redirectSeconds * 100)) : 100
     return (
       <div style={{
@@ -345,7 +345,7 @@ export default function SelectionPage() {
               <div style={{ fontSize: 13, color: `${P.ink}`, fontWeight: 600, marginBottom: 8 }}>
                 Səhifə {redirectIn} saniyə sonra avtomatik olaraq yenilənəcək...
               </div>
-              <div style={{ height: 8, borderRadius: 5, background: `${P.tint}`, overflow: 'hidden' }}>
+              <div style={{ height: 8, borderRadius: 5, background: `${O(P.tint, '#f0ead2')}`, overflow: 'hidden' }}>
                 <div style={{ height: '100%', width: `${pct}%`, background: GOLD, borderRadius: 5, transition: 'width 1s linear' }} />
               </div>
             </div>
@@ -377,8 +377,8 @@ export default function SelectionPage() {
           }}>
             {/* Modal başlıq */}
             <div style={{
-              background: `${P.tint2}`, borderTop: `4px solid ${P.navy}`,
-              padding: '22px 26px', textAlign: 'center', borderBottom: `1.5px solid ${P.tint}`,
+              background: `${P.tint2}`, borderTop: `4px solid ${O(P.navy, '#e0a92e')}`,
+              padding: '22px 26px', textAlign: 'center', borderBottom: `1.5px solid ${O(P.tint, '#f1ead4')}`,
             }}>
               <div style={{ fontSize: 38, marginBottom: 8 }}>⚠️</div>
               <div style={{ fontSize: 17, fontWeight: 800, color: '#2b2f3a', marginBottom: 6 }}>
@@ -433,9 +433,9 @@ export default function SelectionPage() {
                 onClick={confirmSubmit}
                 style={{
                   flex: 1, padding: '12px', borderRadius: 10, border: 'none',
-                  background: `${P.navy}`,
+                  background: `${O(P.navy, '#e0a92e')}`,
                   color: '#fff', fontWeight: 800, fontSize: 13, cursor: 'pointer',
-                  boxShadow: `0 4px 16px ${P.navy}55`,
+                  boxShadow: `0 4px 16px ${O(P.navy, '#e0a92e')}55`,
                 }}>
                 Bəli, təsdiqləyirəm
               </button>
@@ -461,13 +461,13 @@ export default function SelectionPage() {
             <div key={s.n} style={{ display: 'flex', alignItems: 'center' }}>
               <div style={{
                 width: 26, height: 26, borderRadius: '50%',
-                background: s.state === 'todo' ? '#d6dae3' : `${P.navy}`,
+                background: s.state === 'todo' ? '#d6dae3' : `${O(P.navy, '#e0a92e')}`,
                 color: s.state === 'todo' ? '#8a909c' : '#fff',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontWeight: 800, fontSize: 12,
-                boxShadow: s.state === 'active' ? `0 3px 10px ${P.navy}66` : 'none',
+                boxShadow: s.state === 'active' ? `0 3px 10px ${O(P.navy, '#e0a92e')}66` : 'none',
               }}>{s.state === 'done' ? '✓' : s.n}</div>
-              {i < 2 && <div style={{ width: 40, height: 3, background: s.n === 1 ? `${P.navy}` : '#d6dae3' }} />}
+              {i < 2 && <div style={{ width: 40, height: 3, background: s.n === 1 ? `${O(P.navy, '#e0a92e')}` : '#d6dae3' }} />}
             </div>
           ))}
         </div>
@@ -479,7 +479,7 @@ export default function SelectionPage() {
         background: '#ffffff', border: '1.5px solid #e7eaf0',
         borderRadius: 12, padding: '12px 20px', color: '#2b2f3a',
         display: 'flex', alignItems: 'center', gap: 16,
-        borderLeft: `5px solid ${P.navy}`, marginBottom: 12, boxShadow: '0 2px 10px #1a1f3c0d',
+        borderLeft: `5px solid ${O(P.navy, '#e0a92e')}`, marginBottom: 12, boxShadow: '0 2px 10px #1a1f3c0d',
       }}>
         {/* Təhsilalan məlumatları */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
@@ -518,8 +518,8 @@ export default function SelectionPage() {
       {!submitted && (
         <div style={{
           display: 'flex', gap: 12, alignItems: 'flex-start',
-          background: `${P.tint2}`, border: `1.5px solid ${P.tint}`,
-          borderLeft: `5px solid ${P.navy}`, borderRadius: 12,
+          background: `${P.tint2}`, border: `1.5px solid ${O(P.tint, '#f1ead4')}`,
+          borderLeft: `5px solid ${O(P.navy, '#e0a92e')}`, borderRadius: 12,
           padding: '14px 18px', marginBottom: 2,
         }}>
           <div style={{ fontSize: 20, lineHeight: 1.2 }}>💡</div>
@@ -532,7 +532,7 @@ export default function SelectionPage() {
                 gap: 10, marginBottom: howToOpen ? 4 : 0, userSelect: 'none',
               }}>
               <span>İxtisas seçimi necə aparılır?</span>
-              <span style={{ fontSize: 11.5, fontWeight: 700, color: `${P.steel}`, whiteSpace: 'nowrap' }}>
+              <span style={{ fontSize: 11.5, fontWeight: 700, color: `${O(P.steel, '#a9741a')}`, whiteSpace: 'nowrap' }}>
                 {howToOpen ? 'Gizlət ▲' : 'Göstər ▼'}
               </span>
             </div>
@@ -559,7 +559,7 @@ export default function SelectionPage() {
               uyğun gəlmədikdə isə siyahı üzrə sonrakı ixtisaslar nəzərə alınır. Buna görə
               <b> bütün ixtisasları həqiqi istəyinizə uyğun ardıcıllıqla</b> sıralayın.
             </div>
-            <div style={{ marginTop: 6, color: `${P.steel}`, fontWeight: 700 }}>
+            <div style={{ marginTop: 6, color: `${O(P.steel, '#a9741a')}`, fontWeight: 700 }}>
               Diqqət: Seçim təsdiqləndikdən sonra ixtisasların sırasını dəyişmək mümkün olmayacaq.
             </div>
             </>)}
@@ -586,11 +586,11 @@ export default function SelectionPage() {
             disabled={!isDirty || saving}
             style={{
               padding: '13px 30px', borderRadius: 10, border: 'none',
-              background: isDirty ? `${P.navy}` : '#e4e7ee',
+              background: isDirty ? `${O(P.navy, '#e0a92e')}` : '#e4e7ee',
               color: isDirty ? '#fff' : '#aab',
               cursor: isDirty ? 'pointer' : 'default',
               fontWeight: 800, fontSize: 15, transition: 'all .2s',
-              boxShadow: isDirty ? `0 4px 16px ${P.navy}55` : 'none',
+              boxShadow: isDirty ? `0 4px 16px ${O(P.navy, '#e0a92e')}55` : 'none',
               opacity: saving ? 0.7 : 1,
             }}>
             {saving ? 'Göndərilir...' : 'Təsdiqlə və Bitir →'}
