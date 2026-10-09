@@ -23,13 +23,13 @@ export default function Home() {
       <div style={{
         position: 'absolute', top: '15%', left: '10%',
         width: 320, height: 320, borderRadius: '50%',
-        background: 'radial-gradient(circle, #c9962a18 0%, transparent 70%)',
+        background: 'radial-gradient(circle, #1f3f6b18 0%, transparent 70%)',
         pointerEvents: 'none',
       }} />
       <div style={{
         position: 'absolute', bottom: '15%', right: '10%',
         width: 280, height: 280, borderRadius: '50%',
-        background: 'radial-gradient(circle, #b8860b18 0%, transparent 70%)',
+        background: 'radial-gradient(circle, #152c4d18 0%, transparent 70%)',
         pointerEvents: 'none',
       }} />
 
@@ -55,11 +55,11 @@ export default function Home() {
         {/* İdarəetmə girişi — admin / superadmin */}
         <RoleCard
           icon="🔐"
-          iconBg="linear-gradient(135deg,#c9962a,#3a5ecc)"
-          iconShadow="#c9962a44"
+          iconBg="linear-gradient(135deg,#1f3f6b,#3a5ecc)"
+          iconShadow="#1f3f6b44"
           title="İdarəetmə Girişi"
           subtitle="Admin"
-          accentColor="#c9962a"
+          accentColor="#1f3f6b"
           active={true}
           onClick={() => navigate('/admin/login')}
         />
@@ -67,11 +67,11 @@ export default function Home() {
         {/* Təhsilalan portalı */}
         <RoleCard
           icon="🎓"
-          iconBg="linear-gradient(135deg,#b8860b,#5a33cc)"
-          iconShadow="#b8860b44"
+          iconBg="linear-gradient(135deg,#152c4d,#5a33cc)"
+          iconShadow="#152c4d44"
           title="Təhsilalan Girişi"
           subtitle={hasActive ? `${published.length} aktiv seçim` : 'Aktiv seçim yoxdur'}
-          accentColor="#b8860b"
+          accentColor="#152c4d"
           active={hasActive}
           onClick={() => hasActive && navigate('/student')}
         />

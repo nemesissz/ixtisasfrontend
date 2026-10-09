@@ -49,7 +49,7 @@ function SubjectList({ items, onChange, autoSubjects, autoScores }: {
   // Cəm (toplama) qurucusunun vəziyyəti
   const [sumOpen, setSumOpen]     = useState(false)
   const [sumPicked, setSumPicked] = useState<string[]>([])
-  const RANK_COLORS = ['#c9962a', '#b8860b', '#52c41a', '#f5a623', '#ff4d4f', '#722ed1']
+  const RANK_COLORS = ['#1f3f6b', '#152c4d', '#52c41a', '#f5a623', '#ff4d4f', '#722ed1']
 
   function remove(i: number) { onChange(items.filter((_, idx) => idx !== i)) }
   function add(subj: string) { if (!items.includes(subj)) onChange([...items, subj]) }
@@ -97,7 +97,7 @@ function SubjectList({ items, onChange, autoSubjects, autoScores }: {
                 display: 'flex', alignItems: 'center', gap: 10,
                 padding: '8px 12px', borderRadius: 10,
                 background: isDragging ? '#eef0fa' : isSum ? '#f6fff2' : isUmumi ? '#f0f7ff' : '#f8f9fd',
-                border: isOver ? '2px dashed var(--blue)' : isSum ? '1.5px solid #b7e3a0' : isUmumi ? '1.5px solid #bfdbfe' : '1.5px solid #efe1bd',
+                border: isOver ? '2px dashed var(--blue)' : isSum ? '1.5px solid #b7e3a0' : isUmumi ? '1.5px solid #bfdbfe' : '1.5px solid #d5dde8',
                 opacity: isDragging ? 0.45 : 1, cursor: 'grab',
                 transition: 'opacity .15s, border .1s', userSelect: 'none',
               }}>
@@ -127,7 +127,7 @@ function SubjectList({ items, onChange, autoSubjects, autoScores }: {
       </div>
 
       {/* Cəm (toplama) qurucusu — bir neçə sütunu tək meyar kimi toplamaq üçün */}
-      <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1.5px dashed #efe1bd' }}>
+      <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1.5px dashed #d5dde8' }}>
         {!sumOpen ? (
           <button onClick={() => { setSumOpen(true); setSumPicked([]) }}
             style={{
@@ -178,7 +178,7 @@ function SubjectList({ items, onChange, autoSubjects, autoScores }: {
               </button>
             </div>
             {sumPicked.length === 1 && (
-              <div style={{ fontSize: 11, color: '#9a7b1e', marginTop: 6 }}>Ən azı iki sütun seçin.</div>
+              <div style={{ fontSize: 11, color: '#3b5a7d', marginTop: 6 }}>Ən azı iki sütun seçin.</div>
             )}
           </div>
         )}
@@ -186,15 +186,15 @@ function SubjectList({ items, onChange, autoSubjects, autoScores }: {
 
       {/* Əlavə et chipləri */}
       {available.length > 0 && (
-        <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1.5px dashed #efe1bd' }}>
+        <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1.5px dashed #d5dde8' }}>
           <div style={{ fontSize: 11, color: '#aaa', fontWeight: 600, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>Əlavə et</div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
             {available.map(s => (
               <button key={s} onClick={() => add(s)}
                 style={{
-                  padding: '4px 12px', borderRadius: 20, border: s === UMUMI_KEY ? '1.5px solid #bfdbfe' : '1.5px solid #efe1bd',
+                  padding: '4px 12px', borderRadius: 20, border: s === UMUMI_KEY ? '1.5px solid #bfdbfe' : '1.5px solid #d5dde8',
                   background: s === UMUMI_KEY ? '#eff6ff' : '#f8f9fd',
-                  color: s === UMUMI_KEY ? '#1d4ed8' : '#9a7b1e',
+                  color: s === UMUMI_KEY ? '#1d4ed8' : '#3b5a7d',
                   fontWeight: 600, fontSize: 12, cursor: 'pointer', transition: 'all .15s',
                 }}
                 onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = s === UMUMI_KEY ? '#dbeafe' : '#eef0ff' }}
@@ -295,13 +295,13 @@ function PriorityModal({ node, onSave, onClose, groupSubjectsMap, groupScoresMap
                     style={{
                       padding: '6px 16px', borderRadius: 8, border: 'none', cursor: 'pointer',
                       fontWeight: 700, fontSize: 13, transition: 'all .15s',
-                      background: activeGrp === g ? '#c9962a' : '#f0f2fa',
+                      background: activeGrp === g ? '#1f3f6b' : '#f0f2fa',
                       color:      activeGrp === g ? '#fff'     : 'var(--muted)',
-                      boxShadow:  activeGrp === g ? '0 2px 8px #c9962a44' : 'none',
+                      boxShadow:  activeGrp === g ? '0 2px 8px #1f3f6b44' : 'none',
                     }}>
                     Qrup {g}
                     {grpItems[g]?.length > 0 && (
-                      <span style={{ marginLeft: 6, background: activeGrp === g ? '#ffffff33' : '#efe1bd', color: activeGrp === g ? '#fff' : '#c9962a', borderRadius: 20, padding: '1px 7px', fontSize: 11 }}>
+                      <span style={{ marginLeft: 6, background: activeGrp === g ? '#ffffff33' : '#d5dde8', color: activeGrp === g ? '#fff' : '#1f3f6b', borderRadius: 20, padding: '1px 7px', fontSize: 11 }}>
                         {grpItems[g].length} fən
                       </span>
                     )}
@@ -455,7 +455,7 @@ function GroupModal({ node, users, levelNames, onSave, onClose }: {
                   display: 'flex', alignItems: 'center', gap: 12,
                   padding: '10px 14px', borderRadius: 10, cursor: 'pointer',
                   background: selected.includes(g) ? '#f0fff4' : '#f8f9fd',
-                  border: `1.5px solid ${selected.includes(g) ? '#52c41a' : '#efe1bd'}`,
+                  border: `1.5px solid ${selected.includes(g) ? '#52c41a' : '#d5dde8'}`,
                   transition: 'all .15s',
                 }}>
                   <input type="checkbox" checked={selected.includes(g)} onChange={() => toggle(g)}
@@ -485,7 +485,7 @@ function GroupModal({ node, users, levelNames, onSave, onClose }: {
             {activeCols.map(c => (
               <div key={c.key} style={{
                 marginBottom: 10, padding: '10px 12px', borderRadius: 10,
-                background: '#f8f9fd', border: '1.5px solid #efe1bd',
+                background: '#f8f9fd', border: '1.5px solid #d5dde8',
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', marginBottom: 8 }}>
                   <span style={{ fontSize: 13, fontWeight: 800 }}>{c.label}</span>
@@ -612,8 +612,8 @@ function IconPicker({ value, onChange }: { value: string; onChange: (v: string) 
         <div style={{ fontSize: 11, color: 'var(--muted)' }}>PNG, JPG, SVG — istənilən format</div>
       </label>
       {value && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12, padding: '10px 14px', background: '#f8f9fd', borderRadius: 10, border: '1.5px solid #efe1bd' }}>
-          <div style={{ width: 48, height: 48, borderRadius: 12, overflow: 'hidden', flexShrink: 0, background: '#fff', border: '1.5px solid #efe1bd', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12, padding: '10px 14px', background: '#f8f9fd', borderRadius: 10, border: '1.5px solid #d5dde8' }}>
+          <div style={{ width: 48, height: 48, borderRadius: 12, overflow: 'hidden', flexShrink: 0, background: '#fff', border: '1.5px solid #d5dde8', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             {isImage
               ? <img src={value} alt="logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
               : <span style={{ fontSize: 26 }}>{value}</span>
@@ -683,7 +683,7 @@ function ConfirmModal({ message, onConfirm, onCancel }: {
 }
 
 // ── Rəng sxemi (dərinliyə görə) ───────────────────────────────────────────────
-const DEPTH_COLORS = ['#c9962a', '#b8860b', '#ff7c4f', '#237804', '#c41d7f', '#d48806']
+const DEPTH_COLORS = ['#1f3f6b', '#152c4d', '#ff7c4f', '#237804', '#c41d7f', '#d48806']
 function depthColor(d: number) { return DEPTH_COLORS[Math.min(d, DEPTH_COLORS.length - 1)] }
 
 // ── Kvota bölgüsü modalı ─────────────────────────────────────────────────────
@@ -756,7 +756,7 @@ function QuotaModeModal({ node, path, treeNodes, instUsers, onSave, onClose }: {
         <div className="modal-body">
 
           {/* Ümumi kvota */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, padding: '10px 14px', background: '#f4f7ff', borderRadius: 10, border: '1.5px solid #f3e3b8' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, padding: '10px 14px', background: '#f4f7ff', borderRadius: 10, border: '1.5px solid #dfe6ef' }}>
             <span style={{ fontSize: 20 }}>🎯</span>
             <div>
               <div style={{ fontWeight: 700, fontSize: 13 }}>Ümumi kvota: <span style={{ color: 'var(--blue)' }}>{quota}</span></div>
@@ -782,9 +782,9 @@ function QuotaModeModal({ node, path, treeNodes, instUsers, onSave, onClose }: {
             {(['auto', 'manual'] as const).map(m => (
               <button key={m} onClick={() => setMode(m)} style={{
                 flex: 1, padding: '10px 0', borderRadius: 10, fontWeight: 700, fontSize: 12, cursor: 'pointer',
-                border: `2px solid ${mode === m ? (m === 'auto' ? '#c9962a' : '#c41d7f') : '#efe1bd'}`,
+                border: `2px solid ${mode === m ? (m === 'auto' ? '#1f3f6b' : '#c41d7f') : '#d5dde8'}`,
                 background: mode === m ? (m === 'auto' ? '#eef1ff' : '#fff0f6') : '#fff',
-                color: mode === m ? (m === 'auto' ? '#c9962a' : '#c41d7f') : '#8890b0',
+                color: mode === m ? (m === 'auto' ? '#1f3f6b' : '#c41d7f') : '#8890b0',
                 transition: 'all .15s',
               }}>
                 {m === 'auto' ? '⚖️ Avtomatik (faiz nisbəti)' : '✏️ Manual (özüm təyin edim)'}
@@ -802,7 +802,7 @@ function QuotaModeModal({ node, path, treeNodes, instUsers, onSave, onClose }: {
                   <div style={{ fontSize: 22, fontWeight: 800, color: '#1677ff' }}>{autoMülki}</div>
                   <div style={{ fontSize: 10, color: '#1677ff', opacity: 0.7 }}>{quota > 0 ? Math.round(autoMülki/quota*100) : 0}%</div>
                 </div>
-                <div style={{ flex: 1, padding: '10px 14px', borderRadius: 8, background: '#fbf1d6', border: '1px solid #d3adf7', textAlign: 'center' }}>
+                <div style={{ flex: 1, padding: '10px 14px', borderRadius: 8, background: '#eef2f7', border: '1px solid #d3adf7', textAlign: 'center' }}>
                   <div style={{ fontSize: 11, color: '#531dab', fontWeight: 600, marginBottom: 4 }}>Lisey</div>
                   <div style={{ fontSize: 22, fontWeight: 800, color: '#531dab' }}>{autoLisey}</div>
                   <div style={{ fontSize: 10, color: '#531dab', opacity: 0.7 }}>{quota > 0 ? Math.round(autoLisey/quota*100) : 0}%</div>
@@ -860,7 +860,7 @@ function QuotaModeModal({ node, path, treeNodes, instUsers, onSave, onClose }: {
                     onChange={e => handleLisey(parseInt(e.target.value) || 0)}
                     style={{
                       width: '100%', padding: '10px 12px', borderRadius: 8, fontSize: 15, fontWeight: 700,
-                      border: '2px solid #531dab', background: '#fbf1d6', color: '#531dab',
+                      border: '2px solid #531dab', background: '#eef2f7', color: '#531dab',
                       textAlign: 'center', boxSizing: 'border-box',
                     }}
                   />
@@ -891,11 +891,11 @@ function QuotaModeModal({ node, path, treeNodes, instUsers, onSave, onClose }: {
 
               {/* Vizual bar */}
               <div style={{ height: 10, borderRadius: 5, background: '#f0f0f0', overflow: 'hidden', display: 'flex' }}>
-                <div style={{ width: `${quota > 0 ? mülkiVal/quota*100 : 0}%`, background: 'linear-gradient(90deg,#c9962a,#69a0ff)', transition: 'width .2s' }} />
+                <div style={{ width: `${quota > 0 ? mülkiVal/quota*100 : 0}%`, background: 'linear-gradient(90deg,#1f3f6b,#69a0ff)', transition: 'width .2s' }} />
                 <div style={{ width: `${quota > 0 ? liseyVal/quota*100 : 0}%`, background: 'linear-gradient(90deg,#9b59d4,#c07ef8)', transition: 'width .2s' }} />
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--muted)', marginTop: 4 }}>
-                <span style={{ color: '#c9962a' }}>Mülki {quota > 0 ? Math.round(mülkiVal/quota*100) : 0}%</span>
+                <span style={{ color: '#1f3f6b' }}>Mülki {quota > 0 ? Math.round(mülkiVal/quota*100) : 0}%</span>
                 <span style={{ color: '#531dab' }}>Lisey {quota > 0 ? Math.round(liseyVal/quota*100) : 0}%</span>
               </div>
 
@@ -1185,7 +1185,7 @@ function BalanceModal({ tree, instUsers, onClose, onQuotaMode, onGenderConfig }:
 
               {/* Qrup üzrə kimin neçə nəfəri kənarda qala bilər */}
               <div style={{ borderTop: '1px solid #fff1b8' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 12px', background: '#fffdf5', fontSize: 10, fontWeight: 800, color: '#8a8ab0', letterSpacing: .2 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 12px', background: '#f6f8fb', fontSize: 10, fontWeight: 800, color: '#8a8ab0', letterSpacing: .2 }}>
                   <span style={{ flex: 1 }}>QRUP</span>
                   <span style={{ width: 62, textAlign: 'right' }}>NAMİZƏD</span>
                   <span style={{ width: 96, textAlign: 'right' }}>KƏNARDA QALIR</span>
@@ -1284,7 +1284,7 @@ function BalanceModal({ tree, instUsers, onClose, onQuotaMode, onGenderConfig }:
                 </div>
                 {hasConf && (
                   <div style={{ border: '1px solid #ffe7ba', borderRadius: 10, marginBottom: 8, overflow: 'hidden' }}>
-                    <div style={{ padding: '6px 12px', background: '#fffbf0', fontSize: 10, fontWeight: 800, color: '#ad6800' }}>KƏSİŞMƏLƏR</div>
+                    <div style={{ padding: '6px 12px', background: '#f6f8fb', fontSize: 10, fontWeight: 800, color: '#ad6800' }}>KƏSİŞMƏLƏR</div>
                     {gbk.conflicts.map((c, i) => (
                       <div key={i} style={{ borderTop: '1px solid #fff1d6', padding: '6px 12px', fontSize: 11.5, color: '#3a4560' }}>
                         <b>{srcTxt(c.source)}</b> <span style={{ fontSize: 10, fontWeight: 800, color: '#d46b08' }}>[QRUP]</span>: «{c.a.label}» ↔ «{c.b.label}» — <b>{c.shared}</b> nəfər hər ikisinə gedə bilir
@@ -1602,7 +1602,7 @@ function GenderModal({ node, path, instUsers, treeNodes, onSave, onClose }: {
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>
         <div className="modal-body">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, padding: '10px 14px', background: '#f4f7ff', borderRadius: 10, border: '1.5px solid #f3e3b8' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, padding: '10px 14px', background: '#f4f7ff', borderRadius: 10, border: '1.5px solid #dfe6ef' }}>
             <span style={{ fontSize: 20 }}>🎯</span>
             <div>
               <div style={{ fontWeight: 700, fontSize: 13 }}>Ümumi kvota: <span style={{ color: 'var(--blue)' }}>{quota}</span></div>
@@ -1646,7 +1646,7 @@ function GenderModal({ node, path, instUsers, treeNodes, onSave, onClose }: {
 
           <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
             <button onClick={save} disabled={!valid}
-              style={{ flex: 1, padding: '10px', borderRadius: 9, border: 'none', background: valid ? 'linear-gradient(135deg,#c9962a,#b8860b)' : '#ccc', color: '#fff', fontWeight: 700, fontSize: 13, cursor: valid ? 'pointer' : 'not-allowed' }}>
+              style={{ flex: 1, padding: '10px', borderRadius: 9, border: 'none', background: valid ? 'linear-gradient(135deg,#1f3f6b,#4a6f8f)' : '#ccc', color: '#fff', fontWeight: 700, fontSize: 13, cursor: valid ? 'pointer' : 'not-allowed' }}>
               Yadda saxla
             </button>
             <button onClick={() => onSave(null)}
@@ -1739,7 +1739,7 @@ function NodeRow({ node, depth, ancestors, treeNodes, onAdd, onEdit, onDelete, o
                 background: node.quotaMode === 'manual'
                   ? 'linear-gradient(135deg,#fff0f6,#fce8ff)'
                   : 'linear-gradient(135deg,#eef1ff,#e8f0ff)',
-                color: node.quotaMode === 'manual' ? '#c41d7f' : '#c9962a',
+                color: node.quotaMode === 'manual' ? '#c41d7f' : '#1f3f6b',
                 boxShadow: '0 1px 4px #0001',
               }}
               title="Kvota bölgüsünü düzəlt"
@@ -2323,8 +2323,8 @@ export default function Specialties() {
               <div style={{
                 display: 'flex', alignItems: 'center', gap: 8,
                 padding: '11px 14px', borderRadius: 10,
-                background: '#fbf1d6', border: '1.5px solid #c5d0ff',
-                fontWeight: 700, fontSize: 14, color: '#c9962a',
+                background: '#eef2f7', border: '1.5px solid #c5d0ff',
+                fontWeight: 700, fontSize: 14, color: '#1f3f6b',
               }}>
                 {(() => {
                   const inst = (insts as any[]).find((i: any) => i.id === modal.instId)
@@ -2542,7 +2542,7 @@ export default function Specialties() {
                     display: 'flex', alignItems: 'center', gap: 14,
                     padding: '15px 20px', cursor: 'pointer', userSelect: 'none',
                     background: isOpen ? '#f4f7ff' : '#fff',
-                    borderBottom: isOpen ? '1.5px solid #f3e3b8' : 'none',
+                    borderBottom: isOpen ? '1.5px solid #dfe6ef' : 'none',
                     transition: 'background .15s',
                   }}
                   onMouseEnter={e => { if (!isOpen) (e.currentTarget as HTMLElement).style.background = '#fafbff' }}
@@ -2561,7 +2561,7 @@ export default function Specialties() {
                   {/* Logo */}
                   <div style={{
                     width: 42, height: 42, borderRadius: 10, flexShrink: 0, overflow: 'hidden',
-                    background: '#fff', border: '1.5px solid #efe1bd',
+                    background: '#fff', border: '1.5px solid #d5dde8',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     fontSize: 22, transition: 'all .15s',
                   }}>
@@ -2578,7 +2578,7 @@ export default function Specialties() {
                       {t.year && (
                         <span style={{
                           fontSize: 11, fontWeight: 800,
-                          color: isOpen ? '#c9962a' : '#9a7b1e',
+                          color: isOpen ? '#1f3f6b' : '#3b5a7d',
                           background: isOpen
                             ? 'linear-gradient(145deg,#e8eeff,#d4dcff)'
                             : 'linear-gradient(145deg,#f0f3ff,#e4eaff)',
@@ -2792,7 +2792,7 @@ export default function Specialties() {
                       {/* Sliding toggle */}
                       <div style={{
                         width: 32, height: 18, borderRadius: 9, position: 'relative',
-                        background: t.sourceProportional ? 'linear-gradient(135deg,#7b5ea7,#c9962a)' : '#d0d5e8',
+                        background: t.sourceProportional ? 'linear-gradient(135deg,#7b5ea7,#1f3f6b)' : '#d0d5e8',
                         transition: 'background .2s', flexShrink: 0,
                         boxShadow: t.sourceProportional ? '0 0 6px #7b5ea755' : 'none',
                       }}>
@@ -2815,12 +2815,12 @@ export default function Specialties() {
                     {can('tree.delete') && (
                     <button
                       className="btn btn-sm"
-                      style={{ background: '#f0f2fa', color: '#9a7b1e', border: '1.5px solid #d0d4f0' }}
+                      style={{ background: '#f0f2fa', color: '#3b5a7d', border: '1.5px solid #d0d4f0' }}
                       onClick={() => showAppConfirm({
-                        icon: '🗄️', iconBg: '#f0f2fa', iconColor: '#9a7b1e',
+                        icon: '🗄️', iconBg: '#f0f2fa', iconColor: '#3b5a7d',
                         title: 'Strukturu arxivlə',
                         message: `"${t.name}" ixtisas strukturu və ona bağlı bütün seçimlər arxivə köçürüləcək. Heç nə silinmir — nəticələr və təhsilalanlar olduğu kimi qalır, bərpa edəndə hər şey geri qayıdır.`,
-                        confirmLabel: 'Arxivlə', confirmColor: '#9a7b1e',
+                        confirmLabel: 'Arxivlə', confirmColor: '#3b5a7d',
                         onConfirm: async () => {
                           try {
                             await treeDb.archive(t.id)

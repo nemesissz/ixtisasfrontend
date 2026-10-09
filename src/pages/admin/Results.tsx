@@ -428,7 +428,7 @@ export default function Results() {
   }
 
   const KPIS = [
-    { label: 'Ümumi təhsilalan', val: stats.total, icon: '👥', color: '#c9962a' },
+    { label: 'Ümumi təhsilalan', val: stats.total, icon: '👥', color: '#1f3f6b' },
     { label: 'Yerləşdi', val: stats.placed, sub: `${stats.rate}%`, icon: '✅', color: '#52c41a' },
     { label: 'Yerləşməyib', val: stats.unplaced, icon: '⏳', color: '#fa8c16' },
     { label: '1-ci seçim', val: stats.placed ? `${stats.sat}%` : '—', icon: '🏆', color: '#722ed1' },
@@ -622,7 +622,7 @@ export default function Results() {
                     <td style={{ textAlign: 'center' }}>
                       {ranking.length > 0 ? (
                         <button onClick={() => toggleExpand(u.id)}
-                          style={{ padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700, cursor: 'pointer', border: `1px solid ${isOpen ? '#c9962a' : '#c5d0ff'}`, background: isOpen ? '#c9962a' : '#fbf1d6', color: isOpen ? '#fff' : '#c9962a', whiteSpace: 'nowrap' }}>
+                          style={{ padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700, cursor: 'pointer', border: `1px solid ${isOpen ? '#1f3f6b' : '#c5d0ff'}`, background: isOpen ? '#1f3f6b' : '#eef2f7', color: isOpen ? '#fff' : '#1f3f6b', whiteSpace: 'nowrap' }}>
                           {ranking.length} seçim {isOpen ? '▲' : '▼'}
                         </button>
                       ) : <span style={{ color: '#ccc' }}>—</span>}

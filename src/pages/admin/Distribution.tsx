@@ -123,7 +123,7 @@ const SPEED_LABEL: Record<number, string>   = { 0: '0.5×', 1: '1×', 3: '3×', 
 
 // Paket rəngləri
 const PACK_COLORS = [
-  { bg: 'linear-gradient(135deg,#c9962a,#b8860b)', shadow: '#c9962a44', light: '#fbf1d6', text: '#c9962a' },
+  { bg: 'linear-gradient(135deg,#1f3f6b,#4a6f8f)', shadow: '#1f3f6b44', light: '#eef2f7', text: '#1f3f6b' },
   { bg: 'linear-gradient(135deg,#52c41a,#237804)', shadow: '#52c41a44', light: '#f0fff4', text: '#237804' },
   { bg: 'linear-gradient(135deg,#f5a623,#d46b08)', shadow: '#f5a62344', light: '#fff8e6', text: '#d46b08' },
   { bg: 'linear-gradient(135deg,#ff4d4f,#cf1322)', shadow: '#ff4d4f44', light: '#fff0f0', text: '#cf1322' },
@@ -149,7 +149,7 @@ function tieTraceText(trace: TieStep[] | undefined, winner: string, me = 'bu tə
 }
 
 function TieTraceView({ trace, winner }: { trace: TieStep[]; winner: string }) {
-  const B = { color: '#5a4a12' }
+  const B = { color: '#152c4d' }
   if (!trace.length) return <> Bu ixtisas üçün prioritet meyarı təyin edilməyib — sıra siyahıdakı ardıcıllıqla müəyyənləşdi, bu təhsilalan həmin ixtisasa yerləşdirilmədi.</>
   const last = trace[trace.length - 1]
   return (
@@ -161,7 +161,7 @@ function TieTraceView({ trace, winner }: { trace: TieStep[]; winner: string }) {
             <b style={B}>{t.label}</b>:{' '}
             {t.decided
               ? <><b style={B}>{winner}</b> <b style={{ color: '#237804' }}>{critNum(t.w)}</b>, bu təhsilalan <b style={{ color: '#cf1322' }}>{critNum(t.l)}</b> — <b style={B}>fərq buradadır</b></>
-              : <>{critNum(t.w)} = {critNum(t.l)} <span style={{ color: '#a08a4a' }}>(bərabər, növbəti meyara keçildi)</span></>}
+              : <>{critNum(t.w)} = {critNum(t.l)} <span style={{ color: '#4a6f8f' }}>(bərabər, növbəti meyara keçildi)</span></>}
           </li>
         ))}
       </ol>
@@ -477,12 +477,12 @@ function StorySim({ students, packets, subs, tree, poolUsers, preAssignLevel, fi
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 600, background: "#eef1f5 url('/background.jpeg') center center / cover no-repeat fixed", display: 'flex', flexDirection: 'column' }}>
-      <style>{`@keyframes simFlash { 0%, 100% { background: #fff; box-shadow: 0 0 0 0 transparent } 50% { background: #fff1b8; box-shadow: 0 0 0 2px #e0a92e } }
+      <style>{`@keyframes simFlash { 0%, 100% { background: #fff; box-shadow: 0 0 0 0 transparent } 50% { background: #fff1b8; box-shadow: 0 0 0 2px #1f3f6b } }
         .sim-flash { animation: simFlash .6s ease-in-out 6 }`}</style>
       {/* Üst: idarə paneli (tam eni tutur) */}
       <div style={{ padding: '12px 20px', background: '#fff', borderBottom: '1px solid #e7eaf0', boxShadow: '0 2px 10px #1a1f3c0a', display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
         {data.multiPacket && (
-          <span style={{ fontSize: 12, fontWeight: 800, padding: '4px 12px', borderRadius: 20, background: '#fffdf5', color: '#9a7b1e', border: '1px solid #e0a92e', whiteSpace: 'nowrap' }}>
+          <span style={{ fontSize: 12, fontWeight: 800, padding: '4px 12px', borderRadius: 20, background: '#f6f8fb', color: '#3b5a7d', border: '1px solid #1f3f6b', whiteSpace: 'nowrap' }}>
             📦 Paket {curPk}/{data.pkMeta.length}{curMeta ? ` · bal ${curMeta.minScore.toFixed(0)}–${curMeta.maxScore.toFixed(0)}` : ''}
           </span>
         )}
@@ -490,7 +490,7 @@ function StorySim({ students, packets, subs, tree, poolUsers, preAssignLevel, fi
         <button onClick={() => { setPlaying(false); setIdx(i => Math.max(i - 1, -1)) }} disabled={idx < 0}
           style={{ padding: '8px 16px', borderRadius: 9, border: '1.5px solid #e0e4f0', background: '#fff', color: '#5a6070', fontWeight: 700, fontSize: 13, cursor: idx < 0 ? 'not-allowed' : 'pointer', opacity: idx < 0 ? .4 : 1 }}>◀ Əvvəlki</button>
         <button onClick={() => { setPlaying(false); setIdx(i => Math.min(i + 1, total - 1)) }} disabled={idx >= total - 1}
-          style={{ padding: '8px 16px', borderRadius: 9, border: 'none', background: '#e0a92e', color: '#fff', fontWeight: 800, fontSize: 13, boxShadow: '0 4px 14px #e0a92e55', cursor: idx >= total - 1 ? 'not-allowed' : 'pointer', opacity: idx >= total - 1 ? .4 : 1 }}>Növbəti addım ▶</button>
+          style={{ padding: '8px 16px', borderRadius: 9, border: 'none', background: '#1f3f6b', color: '#fff', fontWeight: 800, fontSize: 13, boxShadow: '0 4px 14px #1f3f6b55', cursor: idx >= total - 1 ? 'not-allowed' : 'pointer', opacity: idx >= total - 1 ? .4 : 1 }}>Növbəti addım ▶</button>
         <button onClick={() => setPlaying(p => !p)} disabled={idx >= total - 1}
           style={{ padding: '8px 16px', borderRadius: 9, border: '1.5px solid #e0e4f0', background: playing ? '#f5a623' : '#fff', color: playing ? '#fff' : '#5a6070', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>{playing ? '⏸ Dayandır' : '⏵ Avtomatik'}</button>
         <button onClick={() => setSpeed(s => s === 1200 ? 500 : s === 500 ? 150 : s === 150 ? 60 : 1200)} title="Sürət"
@@ -522,7 +522,7 @@ function StorySim({ students, packets, subs, tree, poolUsers, preAssignLevel, fi
                         onClick={() => goToStudent(s)}
                         title={ok ? 'İxtisasını aç' : 'Bu təhsilalan yerləşməyib'}
                         style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 12px', border: 'none', borderBottom: '1px solid #f4f5fb', background: '#fff', textAlign: 'left', cursor: ok ? 'pointer' : 'not-allowed', opacity: ok ? 1 : .5 }}
-                        onMouseEnter={e => { if (ok) e.currentTarget.style.background = '#fffdf5' }}
+                        onMouseEnter={e => { if (ok) e.currentTarget.style.background = '#f6f8fb' }}
                         onMouseLeave={e => { e.currentTarget.style.background = '#fff' }}>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontSize: 13, fontWeight: 700, color: '#1a1a2e', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.u.name}</div>
@@ -530,7 +530,7 @@ function StorySim({ students, packets, subs, tree, poolUsers, preAssignLevel, fi
                             {ok ? `→ ${data.leafName[s.finalSpec]}${data.multiPacket ? ` · Paket ${s.packetNum}` : ''}` : 'yerləşməyib'}
                           </div>
                         </div>
-                        <span style={{ fontSize: 12, fontWeight: 800, color: '#c9962a' }}>{Number(s.u.score).toFixed(1)}</span>
+                        <span style={{ fontSize: 12, fontWeight: 800, color: '#1f3f6b' }}>{Number(s.u.score).toFixed(1)}</span>
                       </button>
                     )
                   })}
@@ -543,8 +543,8 @@ function StorySim({ students, packets, subs, tree, poolUsers, preAssignLevel, fi
           {([['left', '📚', 'İxtisaslar'], ['center', '👤', 'Təhsilalan'], ['right', '📦', 'Paket/Növbə']] as const).map(([k, ic, lbl]) => (
             <button key={k} onClick={() => setFocusCol(focusCol === k ? null : k)} title={lbl}
               style={{ width: 32, height: 32, borderRadius: 8, fontSize: 14, cursor: 'pointer',
-                border: `1.5px solid ${focusCol === k ? '#e0a92e' : '#e0e4f0'}`,
-                background: focusCol === k ? '#fffdf5' : '#fff', color: focusCol === k ? '#9a7b1e' : '#8a909c' }}>{ic}</button>
+                border: `1.5px solid ${focusCol === k ? '#1f3f6b' : '#e0e4f0'}`,
+                background: focusCol === k ? '#f6f8fb' : '#fff', color: focusCol === k ? '#3b5a7d' : '#8a909c' }}>{ic}</button>
           ))}
         </div>
         <button onClick={onClose} style={{ width: 36, height: 36, borderRadius: 9, border: '1.5px solid #e0e4f0', background: '#fff', color: '#8a909c', fontSize: 17, cursor: 'pointer' }}>✕</button>
@@ -563,7 +563,7 @@ function StorySim({ students, packets, subs, tree, poolUsers, preAssignLevel, fi
             const justPlaced = cur?.placed === id
             return (
               <div key={id} onClick={() => setSelLeaf(id)} title="Yerləşən təhsilalanları gör"
-                style={{ marginBottom: 10, padding: 8, borderRadius: 10, cursor: 'pointer', background: justPlaced ? '#fffdf5' : '#fff', border: justPlaced ? '1px solid #e0a92e' : '1px solid #eef0f5', transition: 'all .2s' }}
+                style={{ marginBottom: 10, padding: 8, borderRadius: 10, cursor: 'pointer', background: justPlaced ? '#f6f8fb' : '#fff', border: justPlaced ? '1px solid #1f3f6b' : '1px solid #eef0f5', transition: 'all .2s' }}
                 onMouseEnter={e => { if (!justPlaced) (e.currentTarget as HTMLElement).style.background = '#f7f8fc' }}
                 onMouseLeave={e => { if (!justPlaced) (e.currentTarget as HTMLElement).style.background = '#fff' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 5 }}>
@@ -571,8 +571,8 @@ function StorySim({ students, packets, subs, tree, poolUsers, preAssignLevel, fi
                   <span style={{ color: isFull ? '#237804' : '#8a909c', fontWeight: 700 }}>{f}/{q}{isFull ? ' ✓' : ''}</span>
                 </div>
                 {q <= 26
-                  ? <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>{Array.from({ length: q }, (_, k) => <Seat key={k} on={k < f} color={isFull ? '#52c41a' : '#e0a92e'} />)}</div>
-                  : <div style={{ height: 8, borderRadius: 8, background: '#f0ead2', overflow: 'hidden' }}><div style={{ width: `${q ? (f / q) * 100 : 0}%`, height: '100%', background: isFull ? '#52c41a' : '#e0a92e', transition: 'width .25s' }} /></div>}
+                  ? <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>{Array.from({ length: q }, (_, k) => <Seat key={k} on={k < f} color={isFull ? '#52c41a' : '#1f3f6b'} />)}</div>
+                  : <div style={{ height: 8, borderRadius: 8, background: '#eef2f7', overflow: 'hidden' }}><div style={{ width: `${q ? (f / q) * 100 : 0}%`, height: '100%', background: isFull ? '#52c41a' : '#1f3f6b', transition: 'width .25s' }} /></div>}
                 {f > 0 && (
                   <div style={{ marginTop: 5, fontSize: 10.5, fontWeight: 700, color: isFull ? '#237804' : '#8a909c', display: 'flex', alignItems: 'center', gap: 4 }}>
                     {isFull ? '🔒 keçid balı:' : 'ən aşağı:'} <span style={{ color: isFull ? '#237804' : '#5a6070' }}>{cutoff[id].toFixed(2)}</span>
@@ -588,17 +588,17 @@ function StorySim({ students, packets, subs, tree, poolUsers, preAssignLevel, fi
           {cur ? (
             <div style={{ background: '#fff', borderRadius: 16, padding: 18, border: '1px solid #e7eaf0', boxShadow: '0 10px 40px #1a1f3c12' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
-                <div style={{ width: 46, height: 46, borderRadius: '50%', background: '#fbf1d6', color: '#b8860b', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 16 }}>{(cur.u.name || '?').split(' ').map((x: string) => x[0]).slice(0, 2).join('')}</div>
+                <div style={{ width: 46, height: 46, borderRadius: '50%', background: '#eef2f7', color: '#152c4d', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 16 }}>{(cur.u.name || '?').split(' ').map((x: string) => x[0]).slice(0, 2).join('')}</div>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 16, fontWeight: 800, color: '#1a1a2e' }}>{cur.u.name}</div>
                   <div style={{ fontSize: 12, color: '#8892b0', fontFamily: 'monospace' }}>FİN: {cur.u.fin || '—'}</div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: 24, fontWeight: 900, color: '#c9962a' }}>{Number(cur.u.score).toFixed(1)}</div>
+                  <div style={{ fontSize: 24, fontWeight: 900, color: '#1f3f6b' }}>{Number(cur.u.score).toFixed(1)}</div>
                   <div style={{ fontSize: 10, color: '#8892b0' }}>bal</div>
                 </div>
               </div>
-              <div style={{ fontSize: 10, fontWeight: 700, color: '#8892b0', textTransform: 'uppercase', letterSpacing: .5, marginBottom: 7 }}>Seçim sırası <span style={{ color: '#c9962a' }}>({cur.ranking.length})</span></div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: '#8892b0', textTransform: 'uppercase', letterSpacing: .5, marginBottom: 7 }}>Seçim sırası <span style={{ color: '#1f3f6b' }}>({cur.ranking.length})</span></div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 5, maxHeight: 320, overflowY: 'auto', paddingRight: 4 }}>
                 {cur.ranking.map((rid: string, k: number) => {
                   const tried = cur.attempts.find(a => a.id === rid)
@@ -639,31 +639,31 @@ function StorySim({ students, packets, subs, tree, poolUsers, preAssignLevel, fi
           {cur && cur.tieRivals.length > 0 && (
             <div style={{ background: '#fff7e6', border: '1px solid #ffd591', borderRadius: 10, padding: '12px 16px', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
               <span style={{ fontSize: 18 }}>⚖️</span>
-              <div style={{ fontSize: 13, color: '#8a6d1b', lineHeight: 1.55 }}>
-                <b style={{ color: '#5a4a12' }}>Bərabər bal toqquşması:</b> “{data.leafName[cur.tieRivals[0].id]}” üçün <b style={{ color: '#5a4a12' }}>{cur.tieRivals[0].rival}</b> ilə hər ikisinin ümumi balı <b style={{ color: '#5a4a12' }}>{cur.tieRivals[0].score.toFixed(2)}</b> idi. Son yer bir nəfərə qalır.{cur.tieRivals[0].trace ? (<TieTraceView trace={cur.tieRivals[0].trace} winner={cur.tieRivals[0].rival} />) : cur.tieRivals[0].subject ? (<> —
-                  üstünlük meyarı <b style={{ color: '#5a4a12' }}>“{cur.tieRivals[0].subject}”</b> oldu: <b style={{ color: '#5a4a12' }}>{cur.tieRivals[0].rival}</b> = <b style={{ color: '#237804' }}>{critFmt(cur.tieRivals[0].rivalSubjScore)}</b>, bu təhsilalan = <b style={{ color: '#cf1322' }}>{critFmt(cur.tieRivals[0].mySubjScore)}</b> — {cur.tieRivals[0].rival} öndə olduğu üçün bu təhsilalan həmin ixtisasa yerləşdirilmədi.
+              <div style={{ fontSize: 13, color: '#3b5a7d', lineHeight: 1.55 }}>
+                <b style={{ color: '#152c4d' }}>Bərabər bal toqquşması:</b> “{data.leafName[cur.tieRivals[0].id]}” üçün <b style={{ color: '#152c4d' }}>{cur.tieRivals[0].rival}</b> ilə hər ikisinin ümumi balı <b style={{ color: '#152c4d' }}>{cur.tieRivals[0].score.toFixed(2)}</b> idi. Son yer bir nəfərə qalır.{cur.tieRivals[0].trace ? (<TieTraceView trace={cur.tieRivals[0].trace} winner={cur.tieRivals[0].rival} />) : cur.tieRivals[0].subject ? (<> —
+                  üstünlük meyarı <b style={{ color: '#152c4d' }}>“{cur.tieRivals[0].subject}”</b> oldu: <b style={{ color: '#152c4d' }}>{cur.tieRivals[0].rival}</b> = <b style={{ color: '#237804' }}>{critFmt(cur.tieRivals[0].rivalSubjScore)}</b>, bu təhsilalan = <b style={{ color: '#cf1322' }}>{critFmt(cur.tieRivals[0].mySubjScore)}</b> — {cur.tieRivals[0].rival} öndə olduğu üçün bu təhsilalan həmin ixtisasa yerləşdirilmədi.
                 </>) : (<> Bütün prioritet meyarları da eyni idi — sıra siyahıdakı ardıcıllıqla müəyyənləşdi, bu təhsilalan həmin ixtisasa yerləşdirilmədi.</>)}
               </div>
             </div>
           )}
 
           {/* İzah sətri */}
-          <div style={{ background: '#fffdf5', border: '1px solid #f1ead4', borderLeft: '3px solid #e0a92e', padding: '12px 16px', borderRadius: 6 }}>
-            <span style={{ fontSize: 13.5, color: '#6a5a2e', lineHeight: 1.6 }}><b style={{ color: '#2b2f3a' }}>İzah: </b>{narration}</span>
+          <div style={{ background: '#f6f8fb', border: '1px solid #eef2f7', borderLeft: '3px solid #1f3f6b', padding: '12px 16px', borderRadius: 6 }}>
+            <span style={{ fontSize: 13.5, color: '#3b5a7d', lineHeight: 1.6 }}><b style={{ color: '#2b2f3a' }}>İzah: </b>{narration}</span>
           </div>
         </div>
 
         {/* SAĞ: növbə + sayğaclar */}
         <div style={{ overflowY: 'auto', borderLeft: '1px solid #e7eaf0', padding: '12px 12px', display: 'flex', flexDirection: 'column', gap: 12 }}>
           {data.multiPacket && curMeta && (
-            <div style={{ background: '#fffdf5', borderRadius: 10, padding: '12px', border: '1px solid #e0a92e' }}>
-              <div style={{ fontSize: 10, fontWeight: 800, color: '#9a7b1e', textTransform: 'uppercase', letterSpacing: .5, marginBottom: 8 }}>📦 Cari paket {curPk}/{data.pkMeta.length}</div>
+            <div style={{ background: '#f6f8fb', borderRadius: 10, padding: '12px', border: '1px solid #1f3f6b' }}>
+              <div style={{ fontSize: 10, fontWeight: 800, color: '#3b5a7d', textTransform: 'uppercase', letterSpacing: .5, marginBottom: 8 }}>📦 Cari paket {curPk}/{data.pkMeta.length}</div>
               <div style={{ fontSize: 11, color: '#8a909c', marginBottom: 8 }}>Bal: {curMeta.minScore.toFixed(1)} – {curMeta.maxScore.toFixed(1)} · {pkTotal} təhsilalan · {pkQuota} kvota</div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, color: '#5a6070', marginBottom: 4 }}>
                 <span>İşlənən</span><b>{pkProcessed} / {pkTotal}</b>
               </div>
-              <div style={{ height: 8, borderRadius: 8, background: '#f0ead2', overflow: 'hidden', marginBottom: 8 }}>
-                <div style={{ width: `${pkTotal ? (pkProcessed / pkTotal) * 100 : 0}%`, height: '100%', background: '#e0a92e', transition: 'width .25s' }} />
+              <div style={{ height: 8, borderRadius: 8, background: '#eef2f7', overflow: 'hidden', marginBottom: 8 }}>
+                <div style={{ width: `${pkTotal ? (pkProcessed / pkTotal) * 100 : 0}%`, height: '100%', background: '#1f3f6b', transition: 'width .25s' }} />
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, color: '#237804' }}>
                 <span>Yerləşən</span><b style={{ color: '#237804' }}>{pkPlaced} / {pkQuota}</b>
@@ -673,17 +673,17 @@ function StorySim({ students, packets, subs, tree, poolUsers, preAssignLevel, fi
               </div>
               {pkProcessed >= pkTotal && pkTotal > 0 && <div style={{ fontSize: 11, fontWeight: 700, color: '#237804', marginTop: 8 }}>✅ Bu paket tamamlandı</div>}
               {/* Paketin təhsilalanları (adı ilə, status) */}
-              <div style={{ marginTop: 10, borderTop: '1px solid #f1ead4', paddingTop: 8, maxHeight: 260, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 3 }}>
+              <div style={{ marginTop: 10, borderTop: '1px solid #eef2f7', paddingTop: 8, maxHeight: 260, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 3 }}>
                 {pkSteps.map(({ s, i }) => {
                   const now = i === idx, done = i <= idx
                   const bg = now ? '#fff7e6' : 'transparent'
                   return (
-                    <div key={s.u.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 6px', borderRadius: 6, background: bg, border: now ? '1px solid #e0a92e' : '1px solid transparent' }}>
+                    <div key={s.u.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 6px', borderRadius: 6, background: bg, border: now ? '1px solid #1f3f6b' : '1px solid transparent' }}>
                       <span style={{ flex: 1, minWidth: 0, fontSize: 11.5, fontWeight: now ? 800 : 500, color: !done ? '#aab0bd' : '#2b2f3a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.u.name}</span>
                       {s.u.source && (
                         <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 10, whiteSpace: 'nowrap', flexShrink: 0,
-                          background: s.u.source === 'mülki' ? '#fbf1d6' : '#e8f3ee',
-                          color: s.u.source === 'mülki' ? '#b8860b' : '#2f8a5b',
+                          background: s.u.source === 'mülki' ? '#eef2f7' : '#e8f3ee',
+                          color: s.u.source === 'mülki' ? '#152c4d' : '#2f8a5b',
                           opacity: done ? 1 : .5 }}>{s.u.source === 'mülki' ? 'mülki' : 'lisey'}</span>
                       )}
                       <span style={{ fontSize: 11, fontWeight: 700, color: !done ? '#aab0bd' : '#8a909c' }}>{Number(s.u.score).toFixed(1)}</span>
@@ -713,17 +713,17 @@ function StorySim({ students, packets, subs, tree, poolUsers, preAssignLevel, fi
           </div>
           <div style={{ background: '#fff', border: '1px solid #e7eaf0', borderRadius: 10, padding: '12px' }}>
             <div style={{ fontSize: 11, color: '#8a909c' }}>1-ci seçiminə düşən</div>
-            <div style={{ fontSize: 24, fontWeight: 900, color: '#c9962a' }}>{placedTotal ? Math.round((firstChoice / placedTotal) * 100) : 0}%</div>
+            <div style={{ fontSize: 24, fontWeight: 900, color: '#1f3f6b' }}>{placedTotal ? Math.round((firstChoice / placedTotal) * 100) : 0}%</div>
           </div>
           {idx >= total - 1 && total > 0 && data.rebalanced.length > 0 && (
-            <div style={{ background: '#fffdf5', borderRadius: 10, padding: '12px', border: '1px solid #e0a92e' }}>
-              <div style={{ fontSize: 12, fontWeight: 800, color: '#9a7b1e' }}>⚖️ Tarazlama mərhələsi</div>
-              <div style={{ fontSize: 11, color: '#8a6d1b', marginTop: 4, lineHeight: 1.5 }}>
+            <div style={{ background: '#f6f8fb', borderRadius: 10, padding: '12px', border: '1px solid #1f3f6b' }}>
+              <div style={{ fontSize: 12, fontWeight: 800, color: '#3b5a7d' }}>⚖️ Tarazlama mərhələsi</div>
+              <div style={{ fontSize: 11, color: '#3b5a7d', marginTop: 4, lineHeight: 1.5 }}>
                 İlkin yerləşdirmədən sonra boş yerlər qalmışdı. Bal sıralaması pozulmadan <b>{data.rebalanced.length} təhsilalan</b> köçürülərək boş yerlər dolduruldu və yer çatmayanlara yer açıldı:
               </div>
               <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 3, maxHeight: 140, overflowY: 'auto' }}>
                 {data.rebalanced.map((r, k) => (
-                  <div key={k} style={{ fontSize: 10.5, color: '#5a4a12' }}>
+                  <div key={k} style={{ fontSize: 10.5, color: '#152c4d' }}>
                     • {r.name} ({r.score.toFixed(1)}): {r.fromSpec ? `${data.leafName[r.fromSpec]} → ` : 'yerləşmədi → '}<b>{data.leafName[r.toSpec]}</b>
                   </div>
                 ))}
@@ -787,7 +787,7 @@ function StorySim({ students, packets, subs, tree, poolUsers, preAssignLevel, fi
           <div onClick={() => setSelLeaf(null)} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10, padding: 24 }}>
             <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 18, width: 660, maxWidth: '95%', maxHeight: '88%', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 24px 70px #000b' }}>
               {/* Başlıq */}
-              <div style={{ background: 'linear-gradient(135deg,#b8860b,#e0a92e)', padding: '20px 24px', color: '#fff', flexShrink: 0 }}>
+              <div style={{ background: 'linear-gradient(135deg,#1f3f6b,#4a6f8f)', padding: '20px 24px', color: '#fff', flexShrink: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 11, color: '#ffffff99', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>İxtisasa yerləşənlər{data.multiPacket ? (showAll ? ' · Bütün paketlər' : ` · Paket ${curPk}`) : ''}</div>
@@ -810,7 +810,7 @@ function StorySim({ students, packets, subs, tree, poolUsers, preAssignLevel, fi
                 <div style={{ display: 'flex', gap: 10, padding: '14px 24px 4px', flexShrink: 0 }}>
                   {stat('Yerləşən', String(list.length), '#1a1a2e')}
                   {splitPass ? passStat() : stat('Keçid balı', minS.toFixed(2), isFull ? '#237804' : '#722ed1')}
-                  {stat('Orta bal', avgS.toFixed(2), '#c9962a')}
+                  {stat('Orta bal', avgS.toFixed(2), '#1f3f6b')}
                   {stat('Ən yüksək', maxS.toFixed(2), '#d46b08')}
                 </div>
               )}
@@ -833,15 +833,15 @@ function StorySim({ students, packets, subs, tree, poolUsers, preAssignLevel, fi
                   <div data-sim-uid={it.u.id} className={flashId === it.u.id ? 'sim-flash' : undefined}
                     style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 10px', borderRadius: 10, background: i % 2 ? '#fafbff' : '#fff', borderBottom: '1px solid #f4f5fb' }}>
                     <span style={{ width: 26, color: '#aab', fontWeight: 800, fontSize: 13, textAlign: 'center', flexShrink: 0 }}>{i + 1}</span>
-                    <div style={{ width: 38, height: 38, borderRadius: '50%', background: '#fbf1d6', color: '#b8860b', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 13, flexShrink: 0 }}>{(it.u.name || '?').split(' ').map((x: string) => x[0]).slice(0, 2).join('')}</div>
+                    <div style={{ width: 38, height: 38, borderRadius: '50%', background: '#eef2f7', color: '#152c4d', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 13, flexShrink: 0 }}>{(it.u.name || '?').split(' ').map((x: string) => x[0]).slice(0, 2).join('')}</div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 14, fontWeight: 700, color: '#1a1a2e', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.u.name}</div>
                       <div style={{ fontSize: 11, color: '#8892b0', fontFamily: 'monospace' }}>{it.u.fin || '—'}</div>
                     </div>
                     {flashId === it.u.id && <span style={{ fontSize: 11.5, fontWeight: 800, color: '#ad6800', background: '#fff1b8', border: '1px solid #ffd666', padding: '3px 10px', borderRadius: 14, whiteSpace: 'nowrap', flexShrink: 0 }}>📍 Axtarılan</span>}
                     {showAll && <span title="Paket" style={{ fontSize: 11.5, fontWeight: 800, color: '#4a5fc1', background: '#eef1ff', border: '1px solid #d0d8f8', padding: '3px 10px', borderRadius: 14, whiteSpace: 'nowrap', flexShrink: 0 }}>📦 Paket {it.packetNum}</span>}
-                    <span style={{ fontSize: 11.5, fontWeight: 700, color: it.choiceNum === 1 ? '#237804' : '#b8860b', background: it.choiceNum === 1 ? '#f6ffed' : '#fbf1d6', border: `1px solid ${it.choiceNum === 1 ? '#b7eb8f' : '#ecd9a0'}`, padding: '3px 10px', borderRadius: 14, whiteSpace: 'nowrap', flexShrink: 0 }}>{ord(it.choiceNum)} seçim</span>
-                    <span style={{ fontSize: 15, fontWeight: 900, color: '#c9962a', minWidth: 52, textAlign: 'right', flexShrink: 0 }}>{Number(it.u.score).toFixed(2)}</span>
+                    <span style={{ fontSize: 11.5, fontWeight: 700, color: it.choiceNum === 1 ? '#237804' : '#152c4d', background: it.choiceNum === 1 ? '#f6ffed' : '#eef2f7', border: `1px solid ${it.choiceNum === 1 ? '#b7eb8f' : '#c9d4e2'}`, padding: '3px 10px', borderRadius: 14, whiteSpace: 'nowrap', flexShrink: 0 }}>{ord(it.choiceNum)} seçim</span>
+                    <span style={{ fontSize: 15, fontWeight: 900, color: '#1f3f6b', minWidth: 52, textAlign: 'right', flexShrink: 0 }}>{Number(it.u.score).toFixed(2)}</span>
                   </div>
                   </Fragment>
                 ))}
@@ -1515,7 +1515,7 @@ export default function Distribution() {
             </div>
             <div style={{ padding: '20px 26px', borderBottom: '1.5px solid #f0f2fa' }}>
               {[
-                { label: 'Ümumi təhsilalan',    val: submittedUsers.length, color: '#c9962a' },
+                { label: 'Ümumi təhsilalan',    val: submittedUsers.length, color: '#1f3f6b' },
                 { label: 'Yerləşdirilib',    val: placedCount,           color: '#52c41a' },
                 { label: 'Yerləşdirilməyib', val: unplacedCount,         color: '#ff4d4f' },
               ].map(s => (
@@ -1553,7 +1553,7 @@ export default function Distribution() {
                 {[
                   { label:'Seçim',        val: snap.selName,                                       color:'#1a1f3c' },
                   { label:'Tarix',         val: dateStr,                                             color:'#8a909c' },
-                  { label:'Yerləşdirilmiş', val: `${snap.placedCount} təhsilalan`,                    color:'#c9962a' },
+                  { label:'Yerləşdirilmiş', val: `${snap.placedCount} təhsilalan`,                    color:'#1f3f6b' },
                   { label:'Metod',         val: snap.method === 'packet' ? '📦 Paket' : '📋 Sadə', color:'#8a909c' },
                 ].map(s => (
                   <div key={s.label} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
@@ -1609,7 +1609,7 @@ export default function Distribution() {
                           {dateStr} · {snap.method === 'packet' ? '📦 Paket' : '📋 Sadə'} · {snap.algorithm === 'gale-shapley' ? '🔬 Gale-Shapley' : '⚡ Greedy'}
                         </div>
                       </div>
-                      <span style={{ padding:'4px 12px', borderRadius:8, background:'#fbf1d6', color:'#c9962a', fontWeight:800, fontSize:13 }}>{snap.placedCount} yerləşdi</span>
+                      <span style={{ padding:'4px 12px', borderRadius:8, background:'#eef2f7', color:'#1f3f6b', fontWeight:800, fontSize:13 }}>{snap.placedCount} yerləşdi</span>
                     </div>
                     <button onClick={() => setRollbackTarget(snap)}
                       style={{ width:'100%', padding:'9px', borderRadius:9, border:'1.5px solid #ff4d4f55', background:'#fff0f0', color:'#cf1322', fontWeight:700, fontSize:12, cursor:'pointer' }}>
@@ -1717,8 +1717,8 @@ export default function Distribution() {
                     </div>
                     {u.source && (
                       <span style={{ padding: '2px 10px', borderRadius: 12, fontWeight: 700, fontSize: 11, flexShrink: 0,
-                        background: u.source === 'mülki' ? '#fbf1d6' : '#e8f3ee',
-                        color: u.source === 'mülki' ? '#b8860b' : '#2f8a5b' }}>
+                        background: u.source === 'mülki' ? '#eef2f7' : '#e8f3ee',
+                        color: u.source === 'mülki' ? '#152c4d' : '#2f8a5b' }}>
                         {u.source === 'mülki' ? 'mülki' : 'lisey'}
                       </span>
                     )}
@@ -1817,7 +1817,7 @@ export default function Distribution() {
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(43,47,58,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000 }}>
           <div style={{ background: '#fff', borderRadius: 16, width: 420, maxWidth: '92vw', overflow: 'hidden', boxShadow: '0 16px 50px rgba(0,0,0,.3)' }}>
             {/* Başlıq */}
-            <div style={{ background: done ? 'linear-gradient(135deg,#389e0d,#52c41a)' : 'linear-gradient(135deg,#b8860b,#e0a92e)', padding: '16px 22px', display: 'flex', alignItems: 'center', gap: 12, transition: 'background .4s' }}>
+            <div style={{ background: done ? 'linear-gradient(135deg,#389e0d,#52c41a)' : 'linear-gradient(135deg,#1f3f6b,#4a6f8f)', padding: '16px 22px', display: 'flex', alignItems: 'center', gap: 12, transition: 'background .4s' }}>
               {done
                 ? <div style={{ width: 30, height: 30, borderRadius: '50%', background: '#ffffff2e', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 17, flexShrink: 0 }}>✅</div>
                 : <div style={{ width: 30, height: 30, border: '3px solid #ffffff55', borderTopColor: '#fff', borderRadius: '50%', animation: 'distrib-spin 0.8s linear infinite', flexShrink: 0 }} />}
@@ -1851,8 +1851,8 @@ export default function Distribution() {
             </div>
             {/* Progress bar */}
             <div style={{ padding: '12px 22px 18px' }}>
-              <div style={{ height: 8, background: '#f0e3bd', borderRadius: 5, overflow: 'hidden' }}>
-                <div style={{ height: '100%', background: done ? 'linear-gradient(90deg,#389e0d,#52c41a)' : 'linear-gradient(90deg,#b8860b,#e0a92e)', borderRadius: 5, animationName: 'distrib-fill', animationDuration: `${runDur}ms`, animationTimingFunction: 'linear', animationFillMode: 'forwards', transition: 'background .4s' }} />
+              <div style={{ height: 8, background: '#d5dde8', borderRadius: 5, overflow: 'hidden' }}>
+                <div style={{ height: '100%', background: done ? 'linear-gradient(90deg,#389e0d,#52c41a)' : 'linear-gradient(90deg,#1f3f6b,#4a6f8f)', borderRadius: 5, animationName: 'distrib-fill', animationDuration: `${runDur}ms`, animationTimingFunction: 'linear', animationFillMode: 'forwards', transition: 'background .4s' }} />
               </div>
             </div>
             {/* Bağla düyməsi — yalnız uğur mesajından sonra */}
@@ -1929,7 +1929,7 @@ export default function Distribution() {
                 borderRadius: 16, padding: '28px 20px', cursor: okS ? 'pointer' : 'not-allowed',
                 transition: 'all .2s', textAlign: 'center', opacity: okS ? 1 : 0.55,
               }}
-              onMouseEnter={e => { if (!okS) return; (e.currentTarget as HTMLElement).style.background = '#c9962a22'; (e.currentTarget as HTMLElement).style.borderColor = '#c9962a' }}
+              onMouseEnter={e => { if (!okS) return; (e.currentTarget as HTMLElement).style.background = '#1f3f6b22'; (e.currentTarget as HTMLElement).style.borderColor = '#1f3f6b' }}
               onMouseLeave={e => { if (!okS) return; (e.currentTarget as HTMLElement).style.background = '#ffffff'; (e.currentTarget as HTMLElement).style.borderColor = '#e7eaf0' }}
             >
               <div style={{ fontSize: 40, marginBottom: 14 }}>📋</div>
@@ -1937,7 +1937,7 @@ export default function Distribution() {
               <div style={{ fontSize: 12, color: '#8a909c', lineHeight: 1.6 }}>
                 Bütün təhsilalanlar eyni anda bala görə ixtisaslara yerləşdirilir
               </div>
-              <div style={{ marginTop: 18, display: 'inline-block', padding: '8px 20px', borderRadius: 8, background: okS ? '#c9962a' : '#c2c7d6', color: '#fff', fontWeight: 700, fontSize: 12 }}>
+              <div style={{ marginTop: 18, display: 'inline-block', padding: '8px 20px', borderRadius: 8, background: okS ? '#1f3f6b' : '#c2c7d6', color: '#fff', fontWeight: 700, fontSize: 12 }}>
                 {okS ? 'Seç →' : '🔒 İcazə yoxdur'}
               </div>
             </div>
@@ -2014,8 +2014,8 @@ export default function Distribution() {
               <div style={{ display: 'flex', gap: 8 }}>
                 <button onClick={() => setStoryOpen(true)} disabled={submittedUsers.length === 0}
                   title="Addım-addım, izahlı simulyasiya — texniki bilməyənlər üçün"
-                  style={{ padding: '10px 20px', borderRadius: 10, border: '1.5px solid #e0a92e', fontWeight: 800, fontSize: 13, cursor: 'pointer',
-                    background: '#e0a92e', color: '#fff',
+                  style={{ padding: '10px 20px', borderRadius: 10, border: '1.5px solid #1f3f6b', fontWeight: 800, fontSize: 13, cursor: 'pointer',
+                    background: '#1f3f6b', color: '#fff',
                     opacity: submittedUsers.length === 0 ? 0.4 : 1 }}>
                   📖 İzahlı simulyasiya
                 </button>
@@ -2143,8 +2143,8 @@ export default function Distribution() {
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button onClick={() => setStoryOpen(true)} disabled={submittedUsers.length === 0}
                     title="Addım-addım, izahlı simulyasiya (paket-paket)"
-                    style={{ padding: '10px 20px', borderRadius: 10, border: '1.5px solid #e0a92e', fontWeight: 800, fontSize: 13,
-                      cursor: submittedUsers.length === 0 ? 'not-allowed' : 'pointer', background: '#e0a92e', color: '#fff',
+                    style={{ padding: '10px 20px', borderRadius: 10, border: '1.5px solid #1f3f6b', fontWeight: 800, fontSize: 13,
+                      cursor: submittedUsers.length === 0 ? 'not-allowed' : 'pointer', background: '#1f3f6b', color: '#fff',
                       opacity: submittedUsers.length === 0 ? 0.4 : 1 }}>
                     📖 İzahlı simulyasiya
                   </button>
@@ -2320,7 +2320,7 @@ function PlacementResult({ mode, saved, placement, submittedUsers, studentRows,
             <div className="card-body">
               <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))', gap:10, marginBottom:16 }}>
                 {[
-                  { label:'Seçim edib',       val:`${totalSub}`,                  color:'#c9962a',  bg:'#fbf1d6' },
+                  { label:'Seçim edib',       val:`${totalSub}`,                  color:'#1f3f6b',  bg:'#eef2f7' },
                   { label:'Yerləşdirilib',     val:`${totalPlaced} (${placedPct}%)`, color:'#52c41a', bg:'#f0fff4' },
                   { label:'Yerləşdirilməyib', val:`${totalUnplaced}`,              color: totalUnplaced > 0 ? '#ff4d4f' : '#52c41a', bg: totalUnplaced > 0 ? '#fff0f0' : '#f0fff4' },
                   { label:'Orta seçim sırası', val: avgChoice > 0 ? avgChoice.toFixed(2) : '—', color:'#722ed1', bg:'#f9f0ff' },
@@ -2338,7 +2338,7 @@ function PlacementResult({ mode, saved, placement, submittedUsers, studentRows,
                   <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
                     {[
                       { label:'1-ci seçim', count: firstChoice,  color:'#52c41a', bg:'#f0fff4' },
-                      { label:'2-ci seçim', count: secondChoice, color:'#c9962a', bg:'#fbf1d6' },
+                      { label:'2-ci seçim', count: secondChoice, color:'#1f3f6b', bg:'#eef2f7' },
                       { label:'3+ seçim',   count: thirdPlus,    color:'#f5a623', bg:'#fff8e6' },
                     ].filter(x => x.count > 0).map(x => (
                       <div key={x.label} style={{ display:'flex', alignItems:'center', gap:8, padding:'7px 14px', borderRadius:9, background:x.bg }}>
@@ -2354,7 +2354,7 @@ function PlacementResult({ mode, saved, placement, submittedUsers, studentRows,
                 {[
                   { label:`${fullSpecs} ixtisas tam dolu`,  color:'#52c41a', icon:'✅' },
                   ...(emptySpecs > 0 ? [{ label:`${emptySpecs} ixtisas boş qaldı`, color:'#ff4d4f', icon:'⚠️' }] : []),
-                  { label:`${specStatQ.length} ixtisas cəmi`, color:'#c9962a', icon:'📚' },
+                  { label:`${specStatQ.length} ixtisas cəmi`, color:'#1f3f6b', icon:'📚' },
                 ].map(x => (
                   <span key={x.label} style={{ padding:'4px 12px', borderRadius:6, background:'#f4f7ff', fontSize:11, fontWeight:700, color:x.color }}>
                     {x.icon} {x.label}
@@ -2399,7 +2399,7 @@ function PlacementResult({ mode, saved, placement, submittedUsers, studentRows,
             {specStats.map((r, i) => {
               const mPct  = r.cnt > 0 ? r.mülki / r.cnt * 100 : 0
               const lPct  = r.cnt > 0 ? r.lisey / r.cnt * 100 : 0
-              const fillColor = r.fillPct >= 90 ? '#52c41a' : r.fillPct >= 60 ? '#c9962a' : r.fillPct >= 30 ? '#fa8c16' : '#ff4d4f'
+              const fillColor = r.fillPct >= 90 ? '#52c41a' : r.fillPct >= 60 ? '#1f3f6b' : r.fillPct >= 30 ? '#fa8c16' : '#ff4d4f'
               return (
                 <div key={r.sid} style={{
                   display: 'grid',
@@ -2429,7 +2429,7 @@ function PlacementResult({ mode, saved, placement, submittedUsers, studentRows,
                     <div style={{ height: 6, borderRadius: 3, background: '#f0f2fa', overflow: 'hidden', display: 'flex' }}>
                       {hasSrc && r.cnt > 0
                         ? <>
-                            <div style={{ width: `${mPct}%`, background: 'linear-gradient(90deg,#c9962a,#9a7b1e)' }} />
+                            <div style={{ width: `${mPct}%`, background: 'linear-gradient(90deg,#1f3f6b,#3b5a7d)' }} />
                             <div style={{ width: `${lPct}%`, background: 'linear-gradient(90deg,#722ed1,#b37feb)' }} />
                           </>
                         : <div style={{ width: `${r.fillPct}%`, background: fillColor, borderRadius: 3 }} />
@@ -2447,7 +2447,7 @@ function PlacementResult({ mode, saved, placement, submittedUsers, studentRows,
               gridTemplateColumns: hasSrc ? '28px 1fr 60px 60px 50px 60px 60px 140px' : '28px 1fr 60px 60px 50px 140px',
               gap: 8, padding: '10px 16px',
               background: 'linear-gradient(135deg,#f0f4ff,#f4f0ff)',
-              borderTop: '2px solid #f3e3b8',
+              borderTop: '2px solid #dfe6ef',
               alignItems: 'center',
             }}>
               <span />
@@ -2464,7 +2464,7 @@ function PlacementResult({ mode, saved, placement, submittedUsers, studentRows,
               <div style={{ height: 6, borderRadius: 3, background: '#f0f2fa', overflow: 'hidden', display: 'flex' }}>
                 {hasSrc && totFilled > 0
                   ? <>
-                      <div style={{ width: `${totFilled > 0 ? totMülkiSpec/totFilled*100 : 0}%`, background: 'linear-gradient(90deg,#c9962a,#9a7b1e)' }} />
+                      <div style={{ width: `${totFilled > 0 ? totMülkiSpec/totFilled*100 : 0}%`, background: 'linear-gradient(90deg,#1f3f6b,#3b5a7d)' }} />
                       <div style={{ width: `${totFilled > 0 ? totLiseySpec/totFilled*100 : 0}%`, background: 'linear-gradient(90deg,#722ed1,#b37feb)' }} />
                     </>
                   : <div style={{ width: `${totQuota > 0 ? totFilled/totQuota*100 : 0}%`, background: '#52c41a' }} />

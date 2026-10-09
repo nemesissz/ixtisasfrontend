@@ -488,7 +488,7 @@ const EXTRA_COLS = [
 ]
 
 const SUBJ_COLORS = [
-  '#c9962a','#52c41a','#f5a623','#ff4d4f',
+  '#1f3f6b','#52c41a','#f5a623','#ff4d4f',
   '#722ed1','#13c2c2','#c41d7f','#1677ff','#d46b08','#389e0d',
 ]
 
@@ -851,7 +851,7 @@ function ImportModal({ instId, instLabel, cohortId, cohortLabel, institutions, c
               const allTemplateCols = [...BASE_COLS, ...extraCols, ...subjectCols, ...DEFAULT_ALWAYS_COLS]
               const customOnly = extraCols.filter(c => !predefCols.find(x => x.col === c))
               return (
-                <div style={{ background: '#f4f7ff', border: '1.5px solid #f3e3b8', borderRadius: 12, padding: '14px 16px', marginBottom: 16 }}>
+                <div style={{ background: '#f4f7ff', border: '1.5px solid #dfe6ef', borderRadius: 12, padding: '14px 16px', marginBottom: 16 }}>
                   <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 12 }}>📋 Excel şablon sütunları</div>
 
                   {/* ── Canlı ön izləmə ── */}
@@ -860,7 +860,7 @@ function ImportModal({ instId, instLabel, cohortId, cohortLabel, institutions, c
                     <div style={{
                       overflowX: 'auto', borderRadius: 8,
                       border: '1.5px solid #c5d0ff', background: '#fff',
-                      boxShadow: '0 2px 8px #c9962a18',
+                      boxShadow: '0 2px 8px #1f3f6b18',
                     }}>
                       <table style={{ borderCollapse: 'collapse', minWidth: '100%', fontSize: 11 }}>
                         <thead>
@@ -872,7 +872,7 @@ function ImportModal({ instId, instLabel, cohortId, cohortLabel, institutions, c
                               const isSubj    = subjIdx >= 0
                               const subjClr   = isSubj ? SUBJ_COLORS[subjIdx % SUBJ_COLORS.length] : ''
                               const isCustom  = !predefCols.find(x => x.col === col) && !isBase && !isAlways && !isSubj
-                              const accent    = isBase ? '#c9962a' : isAlways ? '#f5a623' : isSubj ? subjClr : isCustom ? '#c41d7f' : '#52c41a'
+                              const accent    = isBase ? '#1f3f6b' : isAlways ? '#f5a623' : isSubj ? subjClr : isCustom ? '#c41d7f' : '#52c41a'
                               const bgHead    = isBase ? '#eef1ff' : isAlways ? '#fff8e6' : isSubj ? `${subjClr}14` : isCustom ? '#fff0f6' : '#f0fff4'
                               return (
                                 <th key={col}
@@ -932,7 +932,7 @@ function ImportModal({ instId, instLabel, cohortId, cohortLabel, institutions, c
                         <div key={col} style={{
                           display: 'inline-flex', alignItems: 'center', gap: 5,
                           padding: '5px 13px', borderRadius: 20, fontSize: 11, fontWeight: 700,
-                          background: '#e8f0ff', color: '#c9962a',
+                          background: '#e8f0ff', color: '#1f3f6b',
                           border: '1.5px solid #bfd0ff',
                           userSelect: 'none',
                         }}>
@@ -955,7 +955,7 @@ function ImportModal({ instId, instLabel, cohortId, cohortLabel, institutions, c
                               cursor: 'pointer',
                               border: `1.5px solid ${active ? '#52c41a' : '#c5d0ff'}`,
                               background: active ? '#f0fff4' : '#fff',
-                              color: active ? '#237804' : '#9a7b1e',
+                              color: active ? '#237804' : '#3b5a7d',
                               transition: 'all .15s',
                             }}>
                             <span style={{ fontSize: 13, lineHeight: 1 }}>{active ? '☑' : '☐'}</span>
@@ -1007,7 +1007,7 @@ function ImportModal({ instId, instLabel, cohortId, cohortLabel, institutions, c
                           cursor: 'pointer',
                           border: `1.5px solid ${subjectCols.length > 0 ? '#f5a623' : '#c5d0ff'}`,
                           background: subjectCols.length > 0 ? '#fff8e6' : '#fff',
-                          color: subjectCols.length > 0 ? '#d46b08' : '#9a7b1e',
+                          color: subjectCols.length > 0 ? '#d46b08' : '#3b5a7d',
                           transition: 'all .15s',
                         }}>
                         🎯 Prioritet{subjectCols.length > 0 ? ` (${subjectCols.length})` : ''}
@@ -1156,9 +1156,9 @@ function ImportModal({ instId, instLabel, cohortId, cohortLabel, institutions, c
                     XLSX.writeFile(wb, `${instLabel}_Şablon.xlsx`)
                   }} style={{
                     padding: '9px 20px', borderRadius: 9, border: 'none',
-                    background: 'linear-gradient(135deg, #c9962a, #7b5ea7)',
+                    background: 'linear-gradient(135deg, #1f3f6b, #7b5ea7)',
                     color: '#fff', fontWeight: 700, fontSize: 12, cursor: 'pointer',
-                    width: '100%', boxShadow: '0 2px 10px #c9962a33',
+                    width: '100%', boxShadow: '0 2px 10px #1f3f6b33',
                     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                   }}>
                     <span>⬇</span>
@@ -1218,7 +1218,7 @@ function ImportModal({ instId, instLabel, cohortId, cohortLabel, institutions, c
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                 <div style={{ fontWeight: 700, fontSize: 13, color: '#237804' }}>
                   ✓ {preview.length} təhsilalan ·{' '}
-                  <span style={{ color: '#b8860b', fontWeight: 700 }}>
+                  <span style={{ color: '#152c4d', fontWeight: 700 }}>
                     📅 {selectedYear || '—'}
                   </span>
                 </div>
@@ -1671,7 +1671,7 @@ function NewInstModal({ onClose, onCreated }: { onClose: () => void; onCreated: 
                   flex: 1, padding: '7px 0', borderRadius: 8, border: 'none', cursor: 'pointer',
                   fontWeight: 700, fontSize: 12, transition: 'all .15s',
                   background: tab === t ? '#fff' : 'transparent',
-                  color:      tab === t ? '#c9962a' : '#9090a8',
+                  color:      tab === t ? '#1f3f6b' : '#9090a8',
                   boxShadow:  tab === t ? '0 1px 6px #0001' : 'none',
                 }}>
                   {t === 'emoji' ? '😀 Emoji seç' : '🖼 Şəkil yüklə'}
@@ -1685,7 +1685,7 @@ function NewInstModal({ onClose, onCreated }: { onClose: () => void; onCreated: 
                 {ICONS.map(ic => (
                   <button key={ic} onClick={() => { setIcon(ic); setImgPreview(null) }} style={{
                     width: 44, height: 44, borderRadius: 10, fontSize: 22, border: 'none',
-                    background: icon === ic && !imgPreview ? '#c9962a' : '#f0f2fa',
+                    background: icon === ic && !imgPreview ? '#1f3f6b' : '#f0f2fa',
                     cursor: 'pointer', transition: 'background .15s',
                   }}>{ic}</button>
                 ))}
@@ -1861,7 +1861,7 @@ function EditInstModal({ inst, onClose, onSaved }: { inst: any; onClose: () => v
                   flex: 1, padding: '7px 0', borderRadius: 8, border: 'none', cursor: 'pointer',
                   fontWeight: 700, fontSize: 12, transition: 'all .15s',
                   background: tab === t ? '#fff' : 'transparent',
-                  color:      tab === t ? '#c9962a' : '#9090a8',
+                  color:      tab === t ? '#1f3f6b' : '#9090a8',
                   boxShadow:  tab === t ? '0 1px 6px #0001' : 'none',
                 }}>
                   {t === 'emoji' ? '😀 Emoji seç' : '🖼 Şəkil yüklə'}
@@ -1874,7 +1874,7 @@ function EditInstModal({ inst, onClose, onSaved }: { inst: any; onClose: () => v
                 {ICONS.map(ic => (
                   <button key={ic} onClick={() => { setIcon(ic); setImgPreview(null) }} style={{
                     width: 44, height: 44, borderRadius: 10, fontSize: 22, border: 'none',
-                    background: icon === ic && !imgPreview ? '#c9962a' : '#f0f2fa',
+                    background: icon === ic && !imgPreview ? '#1f3f6b' : '#f0f2fa',
                     cursor: 'pointer', transition: 'background .15s',
                   }}>{ic}</button>
                 ))}
@@ -1967,7 +1967,7 @@ function BulkCohortModal({ count, cohorts, currentId, busy, warnDone, onClose, o
   const apply = () => { if (ok) onApply(mode === 'existing' ? pick : mode, label) }
   const opt = (key: typeof mode, title: string, disabled = false) => (
     <label style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '10px 12px', borderRadius: 10, cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.5 : 1,
-      border: `1.5px solid ${mode === key ? '#c9962a' : '#e6e9f5'}`, background: mode === key ? '#fffbf0' : '#fff' }}>
+      border: `1.5px solid ${mode === key ? '#1f3f6b' : '#e6e9f5'}`, background: mode === key ? '#f6f8fb' : '#fff' }}>
       <input type="radio" checked={mode === key} disabled={disabled} onChange={() => setMode(key)} />
       <span style={{ fontWeight: 700, fontSize: 13.5 }}>{title}</span>
     </label>
@@ -1994,7 +1994,7 @@ function BulkCohortModal({ count, cohorts, currentId, busy, warnDone, onClose, o
           )}
           {opt('none', 'Qrupdan çıxar (qrupsuz)', currentId === 'none')}
           {warnDone > 0 && (
-            <div style={{ fontSize: 12, color: '#8a6d1b', background: '#fff7e6', border: '1px solid #ffd591', borderRadius: 8, padding: '8px 10px' }}>
+            <div style={{ fontSize: 12, color: '#3b5a7d', background: '#fff7e6', border: '1px solid #ffd591', borderRadius: 8, padding: '8px 10px' }}>
               Seçilmişlərdən {warnDone} nəfər artıq seçim göndərib və ya yerləşdirilib — onların nəticələri köhnə qrupun seçiminə aid olaraq qalacaq.
             </div>
           )}
@@ -2018,10 +2018,10 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
     if (!instUsers.length) return
     const scope = cohortLabel ? `${instLabel} → ${cohortLabel}` : instLabel
     showConfirm({
-      icon: '🗄️', iconBg: '#f0f2fa', iconColor: '#9a7b1e',
+      icon: '🗄️', iconBg: '#f0f2fa', iconColor: '#3b5a7d',
       title: 'Təhsilalanları arxivlə',
       message: `${scope} üçün ${instUsers.length} təhsilalanın siyahısı arxivlənəcək. Arxiv bölməsindən baxıla bilər.`,
-      confirmLabel: 'Arxivlə', confirmColor: '#9a7b1e',
+      confirmLabel: 'Arxivlə', confirmColor: '#3b5a7d',
       onConfirm: async () => {
         // Təhsilalan silinəndə onun göndərdiyi seçim (Submission) Cascade ilə bazadan silinir.
         // Ona görə seçimlər də arxivə yazılır — yoxsa bərpada nəticələr itir.
@@ -2089,7 +2089,7 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
   }
   const sortIcon  = (key: string) => sortKey !== key ? '⇅' : sortDir === 'asc' ? '▲' : '▼'
   // default → göy · çoxdan aza (▼) → yaşıl · azdan çoxa (▲) → qırmızı
-  const sortColor = (key: string) => sortKey !== key ? '#c9962a' : sortDir === 'desc' ? '#23a55a' : '#ff4d4f'
+  const sortColor = (key: string) => sortKey !== key ? '#1f3f6b' : sortDir === 'desc' ? '#23a55a' : '#ff4d4f'
   const [showImport, setShowImport] = useState(false)
   const [showExport, setShowExport] = useState(false)
   const [excludedCols, setExcludedCols] = useState<Set<string>>(new Set())   // export-da çıxarılan sütunlar
@@ -2275,10 +2275,10 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
     if (!selIds.length) return
     const label = status === 'printed' ? 'Çap edilib' : 'Çap edilməyib'
     showConfirm({
-      icon: '🖨️', iconBg: '#f4f7ff', iconColor: '#c9962a',
+      icon: '🖨️', iconBg: '#f4f7ff', iconColor: '#1f3f6b',
       title: 'Çap statusunu dəyiş',
       message: `Seçilmiş ${selIds.length} təhsilalanın çap statusu «${label}» olacaq.`,
-      confirmLabel: 'Dəyiş', confirmColor: '#c9962a',
+      confirmLabel: 'Dəyiş', confirmColor: '#1f3f6b',
       onConfirm: () => runBulk(async () => {
         await userDb.bulkStatus(selIds, { printStatus: status })
         addLog('user', 'info', `Toplu çap statusu → ${label}: ${selIds.length} təhsilalan`, `Müəssisə: ${instLabel}`)
@@ -2380,8 +2380,8 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
               <button className="modal-close" onClick={() => setPrintUser(null)}>✕</button>
             </div>
             <div className="modal-body">
-              <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px', borderRadius: 12, background: '#f4f7ff', border: '1.5px solid #f3e3b8', marginBottom: 16 }}>
-                <div style={{ width: 44, height: 44, borderRadius: 12, flexShrink: 0, background: 'linear-gradient(135deg,#c9962a,#b8860b)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }}>👤</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px', borderRadius: 12, background: '#f4f7ff', border: '1.5px solid #dfe6ef', marginBottom: 16 }}>
+                <div style={{ width: 44, height: 44, borderRadius: 12, flexShrink: 0, background: 'linear-gradient(135deg,#1f3f6b,#4a6f8f)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }}>👤</div>
                 <div>
                   <div style={{ fontWeight: 800, fontSize: 15 }}>{printUser.name}</div>
                   <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>FİN: {printUser.fin || '—'} · Bal: {Number(printUser.score || 0).toFixed(2)}</div>
@@ -2404,7 +2404,7 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
               )}
               <div style={{ display: 'flex', gap: 10 }}>
                 <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => setPrintUser(null)}>Ləğv et</button>
-                <button onClick={confirmPrint} style={{ flex: 1, padding: '11px 0', borderRadius: 12, border: 'none', background: 'linear-gradient(135deg,#c9962a,#b8860b)', color: '#fff', fontWeight: 700, fontSize: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                <button onClick={confirmPrint} style={{ flex: 1, padding: '11px 0', borderRadius: 12, border: 'none', background: 'linear-gradient(135deg,#1f3f6b,#4a6f8f)', color: '#fff', fontWeight: 700, fontSize: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
                   🖨️ Çap et
                 </button>
               </div>
@@ -2454,9 +2454,9 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
               {/* Sütun seçimi */}
               <div style={{ marginBottom: 16, padding: '12px 14px', borderRadius: 12, background: '#f8f9fd', border: '1.5px solid #eef0fa' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                  <div style={{ fontSize: 11, fontWeight: 800, color: '#9a7b1e', textTransform: 'uppercase', letterSpacing: .5 }}>📋 Çap olunacaq sütunlar</div>
+                  <div style={{ fontSize: 11, fontWeight: 800, color: '#3b5a7d', textTransform: 'uppercase', letterSpacing: .5 }}>📋 Çap olunacaq sütunlar</div>
                   <div style={{ display: 'flex', gap: 8 }}>
-                    <button onClick={() => setExcludedCols(new Set())} style={{ fontSize: 11, fontWeight: 700, color: '#c9962a', background: 'none', border: 'none', cursor: 'pointer' }}>Hamısı</button>
+                    <button onClick={() => setExcludedCols(new Set())} style={{ fontSize: 11, fontWeight: 700, color: '#1f3f6b', background: 'none', border: 'none', cursor: 'pointer' }}>Hamısı</button>
                     <button onClick={() => setExcludedCols(new Set(exportCols))} style={{ fontSize: 11, fontWeight: 700, color: '#999', background: 'none', border: 'none', cursor: 'pointer' }}>Heç biri</button>
                   </div>
                 </div>
@@ -2467,12 +2467,12 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
                       <label key={c} onClick={() => toggleCol(c)} style={{
                         display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 9, cursor: 'pointer',
                         fontSize: 12, fontWeight: 600, userSelect: 'none', overflow: 'hidden',
-                        background: checked ? '#fbf1d6' : '#fff',
+                        background: checked ? '#eef2f7' : '#fff',
                         border: `1.5px solid ${checked ? '#bcceff' : '#e6e8f2'}`,
                         color: checked ? '#3a4cad' : '#9aa0b4',
                         transition: 'all .12s',
                       }}>
-                        <span style={{ fontSize: 14, color: checked ? '#c9962a' : '#c2c7d6', flexShrink: 0, lineHeight: 1 }}>{checked ? '☑' : '☐'}</span>
+                        <span style={{ fontSize: 14, color: checked ? '#1f3f6b' : '#c2c7d6', flexShrink: 0, lineHeight: 1 }}>{checked ? '☑' : '☐'}</span>
                         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c}</span>
                       </label>
                     )
@@ -2498,9 +2498,9 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
                 {/* Versiya 2 — səviyyələrə bölünmüş */}
                 <button
                   onClick={async () => { await exportToExcelV2(sorted, instLabel, instId, subCountMap, includedCols); addLog('user', 'info', `Excel ixrac (Versiya 2): ${sorted.length} təhsilalan`, `Müəssisə: ${instLabel}`); setShowExport(false) }}
-                  style={{ textAlign: 'left', padding: '16px 18px', borderRadius: 14, border: '1.5px solid #ecd9a0', background: '#fbf1d6', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 14 }}
+                  style={{ textAlign: 'left', padding: '16px 18px', borderRadius: 14, border: '1.5px solid #c9d4e2', background: '#eef2f7', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 14 }}
                 >
-                  <div style={{ width: 42, height: 42, borderRadius: 11, background: '#c9962a', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>2</div>
+                  <div style={{ width: 42, height: 42, borderRadius: 11, background: '#1f3f6b', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>2</div>
                   <div>
                     <div style={{ fontWeight: 800, fontSize: 14, color: '#1a1a2e' }}>Versiya 2 — Səviyyələrə bölünmüş</div>
                     <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 2 }}>
@@ -2513,7 +2513,7 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
                   onClick={async () => { await exportToExcelV3(sorted, instLabel, instId, subCountMap, includedCols); addLog('user', 'info', `Excel ixrac (Versiya 3): ${sorted.length} təhsilalan`, `Müəssisə: ${instLabel}`); setShowExport(false) }}
                   style={{ textAlign: 'left', padding: '16px 18px', borderRadius: 14, border: '1.5px solid #ddd0ff', background: '#f6f2ff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 14 }}
                 >
-                  <div style={{ width: 42, height: 42, borderRadius: 11, background: '#b8860b', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>3</div>
+                  <div style={{ width: 42, height: 42, borderRadius: 11, background: '#152c4d', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>3</div>
                   <div>
                     <div style={{ fontWeight: 800, fontSize: 14, color: '#1a1a2e' }}>Versiya 3 — Qarışıq</div>
                     <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 2 }}>
@@ -2544,14 +2544,14 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
             <button onClick={() => handleArchiveUsers(instUsers, cohorts.find((c: any) => c.id === cohFilter)?.label)} disabled={instUsers.length === 0}
               title="Arxivlə"
               style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 16px', borderRadius: 10, cursor: instUsers.length ? 'pointer' : 'not-allowed',
-                border: archiveDone ? '1.5px solid #52c41a' : '1.5px solid #ecd9a0', background: archiveDone ? '#f0fff4' : '#fffdf5',
-                color: archiveDone ? '#237804' : '#9a7b1e', fontWeight: 800, fontSize: 13, boxShadow: '0 2px 8px #1a1f3c14', opacity: instUsers.length === 0 ? 0.4 : 1 }}>
+                border: archiveDone ? '1.5px solid #52c41a' : '1.5px solid #c9d4e2', background: archiveDone ? '#f0fff4' : '#f6f8fb',
+                color: archiveDone ? '#237804' : '#3b5a7d', fontWeight: 800, fontSize: 13, boxShadow: '0 2px 8px #1a1f3c14', opacity: instUsers.length === 0 ? 0.4 : 1 }}>
               {archiveDone ? '✅' : '🗄️'} {archiveDone ? 'Arxivləndi' : 'Arxivlə'}
             </button>
             )}
             {can('users.import') && (
             <button onClick={() => setShowImport(true)} title="Excel ilə əlavə et"
-              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 16px', borderRadius: 10, border: '1.5px solid var(--blue)', background: '#fff', color: 'var(--blue)', fontWeight: 800, fontSize: 13, boxShadow: '0 2px 8px #e0a92e22', cursor: 'pointer' }}>
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 16px', borderRadius: 10, border: '1.5px solid var(--blue)', background: '#fff', color: 'var(--blue)', fontWeight: 800, fontSize: 13, boxShadow: '0 2px 8px #1f3f6b22', cursor: 'pointer' }}>
               📤 Əlavə et
             </button>
             )}
@@ -2774,7 +2774,7 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
                       >🔒</button>
                       ) : (
                       <button onClick={() => setEditUser(u)} title="Redaktə et"
-                        style={{ width: 26, height: 26, borderRadius: 7, border: '1.5px solid #c5d0ff', background: '#f4f7ff', color: '#c9962a', cursor: 'pointer', fontSize: 12, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', transition: 'all .15s' }}
+                        style={{ width: 26, height: 26, borderRadius: 7, border: '1.5px solid #c5d0ff', background: '#f4f7ff', color: '#1f3f6b', cursor: 'pointer', fontSize: 12, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', transition: 'all .15s' }}
                         onMouseEnter={e => { (e.currentTarget.style.background = '#e8f0ff'); (e.currentTarget.style.borderColor = 'var(--blue)') }}
                         onMouseLeave={e => { (e.currentTarget.style.background = '#f4f7ff'); (e.currentTarget.style.borderColor = '#c5d0ff') }}
                       >✏️</button>
@@ -2801,11 +2801,11 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
                                 border: 'none',
                                 background: isPrinted
                                   ? 'linear-gradient(135deg,#52c41a,#237804)'
-                                  : 'linear-gradient(135deg,#c9962a,#b8860b)',
+                                  : 'linear-gradient(135deg,#1f3f6b,#4a6f8f)',
                                 cursor: 'pointer',
                                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                                 padding: 0,
-                                boxShadow: isPrinted ? '0 2px 6px #52c41a66' : '0 2px 6px #c9962a66',
+                                boxShadow: isPrinted ? '0 2px 6px #52c41a66' : '0 2px 6px #1f3f6b66',
                               }}
                             >
                               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -2835,7 +2835,7 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
                     </td>
                     <td style={{ textAlign: 'center' }}>
                       {u.year
-                        ? <span className="cell-badge" style={{ background: 'linear-gradient(145deg,#f0f3ff,#e4eaff)', color: '#9a7b1e', border: '1px solid #d0d8f8' }}>{u.year}</span>
+                        ? <span className="cell-badge" style={{ background: 'linear-gradient(145deg,#f0f3ff,#e4eaff)', color: '#3b5a7d', border: '1px solid #d0d8f8' }}>{u.year}</span>
                         : <span style={{ color: 'var(--muted)' }}>—</span>
                       }
                     </td>

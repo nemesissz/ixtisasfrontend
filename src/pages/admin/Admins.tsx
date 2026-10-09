@@ -80,7 +80,7 @@ function InstSelector({
   return (
     <div style={{ border: "1.5px solid #e8eaf5", borderRadius: 12, overflow: "hidden", marginTop: 14 }}>
       <div style={{ padding: "9px 14px", background: "#f8f9fd", borderBottom: "1.5px solid #eef0f8", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span style={{ fontSize: 11, fontWeight: 800, color: "#9a7b1e", textTransform: "uppercase", letterSpacing: 0.5 }}>
+        <span style={{ fontSize: 11, fontWeight: 800, color: "#3b5a7d", textTransform: "uppercase", letterSpacing: 0.5 }}>
           🏛️ Müəssisə əhatəsi {value.length > 0 ? `(${value.length})` : "(hamısı)"}
         </span>
         <button type="button" onClick={() => onChange([])}
@@ -94,7 +94,7 @@ function InstSelector({
         </div>
         {institutions.map((inst) => (
           <label key={inst.id} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 12.5, color: value.includes(inst.id) ? "#3a4cad" : "#555" }}>
-            <input type="checkbox" checked={value.includes(inst.id)} onChange={() => toggle(inst.id)} style={{ accentColor: "#c9962a" }} />
+            <input type="checkbox" checked={value.includes(inst.id)} onChange={() => toggle(inst.id)} style={{ accentColor: "#1f3f6b" }} />
             {inst.label}
           </label>
         ))}
@@ -148,7 +148,7 @@ function PermSelector({
           style={{
             fontSize: 11,
             fontWeight: 800,
-            color: "#9a7b1e",
+            color: "#3b5a7d",
             textTransform: "uppercase",
             letterSpacing: 0.5,
           }}
@@ -162,7 +162,7 @@ function PermSelector({
             style={{
               fontSize: 11,
               fontWeight: 700,
-              color: "#c9962a",
+              color: "#1f3f6b",
               background: "none",
               border: "none",
               cursor: "pointer",
@@ -220,10 +220,10 @@ function PermSelector({
                   type="checkbox"
                   checked={allOn}
                   onChange={() => toggleGroup(codes)}
-                  style={{ accentColor: "#c9962a" }}
+                  style={{ accentColor: "#1f3f6b" }}
                 />
                 <span
-                  style={{ fontSize: 12.5, fontWeight: 800, color: "#5a4a12" }}
+                  style={{ fontSize: 12.5, fontWeight: 800, color: "#152c4d" }}
                 >
                   {g.icon} {g.group}
                 </span>
@@ -253,7 +253,7 @@ function PermSelector({
                       type="checkbox"
                       checked={value.includes(p.code)}
                       onChange={() => toggle(p.code)}
-                      style={{ accentColor: "#c9962a" }}
+                      style={{ accentColor: "#1f3f6b" }}
                     />
                     {p.label}
                   </label>
@@ -932,7 +932,7 @@ export default function Admins() {
                           height: 34,
                           borderRadius: 10,
                           flexShrink: 0,
-                          background: "linear-gradient(135deg,#c9962a,#b8860b)",
+                          background: "linear-gradient(135deg,#1f3f6b,#4a6f8f)",
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
@@ -976,7 +976,7 @@ export default function Admins() {
                           title="Şifrəni dəyiş"
                           onClick={() => openPwModal(a)}
                           style={{
-                            color: "#c9962a",
+                            color: "#1f3f6b",
                             border: "1.5px solid #c5d0ff",
                             borderRadius: 8,
                             padding: "4px 10px",
@@ -993,7 +993,7 @@ export default function Admins() {
                             title="İcazələr"
                             onClick={() => openPerms(a)}
                             style={{
-                              color: "#b8860b",
+                              color: "#152c4d",
                               border: "1.5px solid #d5c5ff",
                               borderRadius: 8,
                               padding: "4px 10px",

@@ -10,11 +10,11 @@ function css(n: number) {
 .dd-wrap{position:relative;width:100%;height:${n * STEP + 10}px;animation:dd-fade 6s infinite}
 .dd-row{position:absolute;left:0;right:0;height:30px;display:flex;align-items:center;gap:6px;
   padding:0 8px;background:#fff;border:1.5px solid #e6e8f0;border-radius:8px;font-size:12px;font-weight:700;color:#2b2f3a}
-.dd-head{display:flex;align-items:center;gap:6px;padding:5px 9.5px;margin-bottom:2px;background:#f3e3b8;
-  border:1.5px solid #ecd9a0;border-radius:8px;font-size:10px;font-weight:800;color:#5a4a12;text-transform:uppercase;letter-spacing:.4px}
+.dd-head{display:flex;align-items:center;gap:6px;padding:5px 9.5px;margin-bottom:2px;background:#dfe6ef;
+  border:1.5px solid #c9d4e2;border-radius:8px;font-size:10px;font-weight:800;color:#152c4d;text-transform:uppercase;letter-spacing:.4px}
 .dd-head .c:first-child,.dd-row .c:first-child{flex:0 0 74px}
 .dd-head .c{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.dd-head .c+.c{padding-left:6px;border-left:1px solid #ecd9a0}
+.dd-head .c+.c{padding-left:6px;border-left:1px solid #c9d4e2}
 .dd-head .h{padding:0 5px;border:1px solid transparent;font-size:12px}
 .dd-row .c{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .dd-row .c+.c{border-left:1px solid #eceef4;padding-left:6px;font-weight:600;color:#4a5060}
@@ -26,8 +26,8 @@ function css(n: number) {
 @keyframes dd-down{0%,30%{transform:none}55%,100%{transform:translateY(${STEP}px)}}
 @keyframes dd-up{
   0%,18%{transform:none;box-shadow:none;border-color:#e6e8f0}
-  25%{transform:scale(1.03);box-shadow:0 6px 16px rgba(0,0,0,.15);border-color:#e0a92e}
-  55%{transform:translateY(-${up}px) scale(1.03);box-shadow:0 6px 16px rgba(0,0,0,.15);border-color:#e0a92e}
+  25%{transform:scale(1.03);box-shadow:0 6px 16px rgba(0,0,0,.15);border-color:#1f3f6b}
+  55%{transform:translateY(-${up}px) scale(1.03);box-shadow:0 6px 16px rgba(0,0,0,.15);border-color:#1f3f6b}
   65%,100%{transform:translateY(-${up}px);box-shadow:none;border-color:#34a36b}}
 @keyframes dd-cur{
   0%{transform:translate(20px,30px);opacity:0}

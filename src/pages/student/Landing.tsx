@@ -98,7 +98,7 @@ export default function Landing() {
     }
   }
 
-  const GOLD = '#e0a92e'
+  const GOLD = '#1f3f6b'
   const inputStyle: React.CSSProperties = {
     width: '100%', boxSizing: 'border-box', padding: '13px 16px',
     borderRadius: 8, border: '1.5px solid #d9dde6', background: '#fdfdfe',
@@ -206,7 +206,7 @@ export default function Landing() {
               onClick={login} disabled={loading}
               style={{
                 padding: '12px 28px', borderRadius: 8, border: 'none',
-                background: loading ? '#e8d39a' : GOLD, color: '#fff',
+                background: loading ? '#c9d4e2' : GOLD, color: '#fff',
                 fontWeight: 800, fontSize: 15, cursor: loading ? 'default' : 'pointer',
                 boxShadow: loading ? 'none' : `0 4px 14px ${GOLD}55`, transition: 'all .2s',
               }}

@@ -124,10 +124,10 @@ export function FlatView({ flat, onChange, submitted = false, levelNames }: {
     ? '40px minmax(0,1fr) minmax(0,1fr) 44px'
     : '40px minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) 44px'
   const headCells: Array<[string, string, string, string]> = oneLevel
-    ? [['№','center','#f3e3b8','#5a4a12'], [lv[0] || 'Səviyyə 1','left','#fff4ef','#8c3a1f'], ['','center','#f3e3b8','#5a4a12']]
+    ? [['№','center','#dfe6ef','#152c4d'], [lv[0] || 'Səviyyə 1','left','#fff4ef','#8c3a1f'], ['','center','#dfe6ef','#152c4d']]
     : twoLevel
-    ? [['№','center','#f3e3b8','#5a4a12'], [lv[0] || 'Səviyyə 1','left','#f3e3b8','#5a4a12'], [lv[1] || 'Səviyyə 2','left','#fff4ef','#8c3a1f'], ['','center','#f3e3b8','#5a4a12']]
-    : [['№','center','#f3e3b8','#5a4a12'], [lv[0] || 'Səviyyə 1','left','#f3e3b8','#5a4a12'], [lv[1] || 'Səviyyə 2','left','#f7eccf','#6a4a12'], [lv[2] || 'Səviyyə 3','left','#fff4ef','#8c3a1f'], ['','center','#f3e3b8','#5a4a12']]
+    ? [['№','center','#dfe6ef','#152c4d'], [lv[0] || 'Səviyyə 1','left','#dfe6ef','#152c4d'], [lv[1] || 'Səviyyə 2','left','#fff4ef','#8c3a1f'], ['','center','#dfe6ef','#152c4d']]
+    : [['№','center','#dfe6ef','#152c4d'], [lv[0] || 'Səviyyə 1','left','#dfe6ef','#152c4d'], [lv[1] || 'Səviyyə 2','left','#eef2f7','#152c4d'], [lv[2] || 'Səviyyə 3','left','#fff4ef','#8c3a1f'], ['','center','#dfe6ef','#152c4d']]
 
   // Siçanla sürükləmə pointer hadisələri ilə aparılır: brauzerin öz (HTML5) sürükləməsində
   // kursoru dəyişmək mümkün deyil, burada isə bütün müddət "sıxılmış əl" (grabbing) görünür.
@@ -191,21 +191,21 @@ export function FlatView({ flat, onChange, submitted = false, levelNames }: {
       {/* Başlıq sətiri */}
       <div style={{
         display: 'grid', gridTemplateColumns: gridCols,
-        background: '#f3e3b8', border: '2px solid #ecd9a0',
+        background: '#dfe6ef', border: '2px solid #c9d4e2',
         borderRadius: '12px 12px 0 0', overflow: 'hidden',
       }}>
         {headCells.map(([h, align, bg, color], i) => (
           <div key={i} style={{
             padding: '10px 14px', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5,
             minWidth: 0, overflowWrap: 'anywhere', wordBreak: 'break-word',
-            borderRight: i < headCells.length - 1 ? '2px solid #ecd9a0' : 'none', textAlign: align as any,
+            borderRight: i < headCells.length - 1 ? '2px solid #c9d4e2' : 'none', textAlign: align as any,
             background: bg, color,
           }}>{h}</div>
         ))}
       </div>
 
       {/* Sətirler */}
-      <div style={{ border: '2px solid #ecd9a0', borderTop: 'none', borderRadius: '0 0 12px 12px', overflow: 'hidden', marginBottom: 10 }}>
+      <div style={{ border: '2px solid #c9d4e2', borderTop: 'none', borderRadius: '0 0 12px 12px', overflow: 'hidden', marginBottom: 10 }}>
         {flat.map((row, i) => {
           const isDrag  = dragging === i
           const isOver  = overIdx === i
@@ -226,7 +226,7 @@ export function FlatView({ flat, onChange, submitted = false, levelNames }: {
                 display: 'grid', gridTemplateColumns: gridCols,
                 alignItems: 'stretch',
                 borderBottom: i < flat.length - 1 ? '1.5px solid #eef0f8' : 'none',
-                background: isFlash ? '#fffbe6' : isDrag ? '#fbeec4' : '#fff',
+                background: isFlash ? '#fffbe6' : isDrag ? '#e6ecf4' : '#fff',
                 opacity: 1,
                 position: 'relative',
                 zIndex: isDrag ? 2 : undefined,
@@ -239,25 +239,25 @@ export function FlatView({ flat, onChange, submitted = false, levelNames }: {
               {(isFlash || isDrag || isOver) && <div style={{
                 position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 1,
                 boxShadow: isFlash ? 'inset 0 0 0 2px #f5a623'
-                  : isDrag ? 'inset 0 0 0 2px #c9962a'
-                  : 'inset 0 2px 0 #c9962a, inset 0 -2px 0 #c9962a',
+                  : isDrag ? 'inset 0 0 0 2px #1f3f6b'
+                  : 'inset 0 2px 0 #1f3f6b, inset 0 -2px 0 #1f3f6b',
               }} />}
               {/* Sıra # */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#c9962a', color: '#fff', fontWeight: 800, fontSize: 12, borderRight: '2px solid #ecd9a0' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#1f3f6b', color: '#fff', fontWeight: 800, fontSize: 12, borderRight: '2px solid #c9d4e2' }}>
                 {i + 1}
               </div>
               {/* Ana Qrup — 1 səviyyəli rejimdə gizlidir */}
-              {!oneLevel && <div style={{ padding: '9px 12px', display: 'flex', alignItems: 'center', minWidth: 0, overflowWrap: 'anywhere', wordBreak: 'break-word', fontSize: 12, fontWeight: 500, color: '#5a4a12', background: hl ? 'transparent' : '#f8f9ff', borderRight: '2px solid #dde2f5' }}>
+              {!oneLevel && <div style={{ padding: '9px 12px', display: 'flex', alignItems: 'center', minWidth: 0, overflowWrap: 'anywhere', wordBreak: 'break-word', fontSize: 12, fontWeight: 500, color: '#152c4d', background: hl ? 'transparent' : '#f8f9ff', borderRight: '2px solid #dde2f5' }}>
                 {row.groupName}
               </div>}
               {/* Alt Qrup — 2 səviyyəli rejimdə gizlidir */}
               {!twoLevel && (
-                <div style={{ padding: '9px 12px', display: 'flex', alignItems: 'center', minWidth: 0, overflowWrap: 'anywhere', wordBreak: 'break-word', fontSize: 12, fontWeight: 500, color: '#5a4a12', background: hl ? 'transparent' : '#faf8ff', borderRight: '1.5px solid #ece8ff' }}>
+                <div style={{ padding: '9px 12px', display: 'flex', alignItems: 'center', minWidth: 0, overflowWrap: 'anywhere', wordBreak: 'break-word', fontSize: 12, fontWeight: 500, color: '#152c4d', background: hl ? 'transparent' : '#faf8ff', borderRight: '1.5px solid #ece8ff' }}>
                   {row.subName}
                 </div>
               )}
               {/* İxtisas */}
-              <div style={{ padding: '9px 12px', display: 'flex', alignItems: 'center', minWidth: 0, overflowWrap: 'anywhere', wordBreak: 'break-word', fontSize: 12, fontWeight: 500, color: '#5a4a12' }}>
+              <div style={{ padding: '9px 12px', display: 'flex', alignItems: 'center', minWidth: 0, overflowWrap: 'anywhere', wordBreak: 'break-word', fontSize: 12, fontWeight: 500, color: '#152c4d' }}>
                 {row.specName}
               </div>
               {/* Sürükləmə tutacağı */}
@@ -375,17 +375,17 @@ export function NestedView({ nested, onChange, submitted = false }: {
               style={{
                 width: 180, flexShrink: 0, display: 'flex', alignItems: 'stretch',
                 background: isFG ? '#fffbe6' : isOG ? '#e8eeff' : '#eef1ff',
-                border: `2px solid ${isFG ? '#f5a623' : isOG ? '#c9962a' : '#ecd9a0'}`,
+                border: `2px solid ${isFG ? '#f5a623' : isOG ? '#1f3f6b' : '#c9d4e2'}`,
                 borderRadius: 12, overflow: 'hidden',
                 cursor: interactive ? 'grab' : 'default',
                 opacity: 1,
-                boxShadow: isFG ? '0 0 0 3px #f5a62330' : isDG ? '0 8px 18px rgba(201,150,42,.5), 0 0 0 2px #c9962a' : isOG ? '0 0 0 3px #c9962a28' : 'none',
+                boxShadow: isFG ? '0 0 0 3px #f5a62330' : isDG ? '0 8px 18px rgba(31,63,107,.5), 0 0 0 2px #1f3f6b' : isOG ? '0 0 0 3px #1f3f6b28' : 'none',
                 userSelect: 'none',
                 transition: isFG ? 'background 1.8s ease, border-color 1.8s ease' : 'border-color .1s',
               }}
             >
-              <div style={{ minWidth: 38, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#c9962a', fontSize: 14, fontWeight: 800, color: '#fff' }}>{gn}</div>
-              <div style={{ flex: 1, padding: '14px 10px', fontSize: 12, fontWeight: 700, color: '#5a4a12', lineHeight: 1.4 }}>{group.groupName}</div>
+              <div style={{ minWidth: 38, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#1f3f6b', fontSize: 14, fontWeight: 800, color: '#fff' }}>{gn}</div>
+              <div style={{ flex: 1, padding: '14px 10px', fontSize: 12, fontWeight: 700, color: '#152c4d', lineHeight: 1.4 }}>{group.groupName}</div>
               {interactive && <div style={{ display: 'flex', alignItems: 'center', padding: '0 8px', color: '#bbc', fontSize: 15 }}>⠿</div>}
             </div>
 
@@ -414,17 +414,17 @@ export function NestedView({ nested, onChange, submitted = false }: {
                       style={{
                         width: 160, flexShrink: 0, display: 'flex', alignItems: 'stretch',
                         background: isFS ? '#fffbe6' : isOS ? '#e8d8ff' : '#f4f0ff',
-                        border: `2px solid ${isFS ? '#f5a623' : isOS ? '#b8860b' : '#f3e9cf'}`,
+                        border: `2px solid ${isFS ? '#f5a623' : isOS ? '#152c4d' : '#eef2f7'}`,
                         borderRadius: 8, overflow: 'hidden',
                         cursor: interactive ? 'grab' : 'default',
                         opacity: 1,
-                        boxShadow: isFS ? '0 0 0 2px #f5a62330' : isDS ? '0 8px 18px rgba(184,134,11,.5), 0 0 0 2px #b8860b' : isOS ? '0 0 0 2px #b8860b28' : 'none',
+                        boxShadow: isFS ? '0 0 0 2px #f5a62330' : isDS ? '0 8px 18px rgba(21,44,77,.5), 0 0 0 2px #152c4d' : isOS ? '0 0 0 2px #152c4d28' : 'none',
                         userSelect: 'none',
                         transition: isFS ? 'background 1.8s ease, border-color 1.8s ease' : 'border-color .1s',
                       }}
                     >
-                      <div style={{ minWidth: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#b8860b', fontSize: 11, fontWeight: 700, color: '#fff' }}>{sn}</div>
-                      <div style={{ flex: 1, padding: 9, fontSize: 11, fontWeight: 600, color: '#6a4a12', lineHeight: 1.3 }}>{sub.subName}</div>
+                      <div style={{ minWidth: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#152c4d', fontSize: 11, fontWeight: 700, color: '#fff' }}>{sn}</div>
+                      <div style={{ flex: 1, padding: 9, fontSize: 11, fontWeight: 600, color: '#152c4d', lineHeight: 1.3 }}>{sub.subName}</div>
                       {interactive && <div style={{ display: 'flex', alignItems: 'center', padding: '0 6px', color: '#ccc', fontSize: 13 }}>⠿</div>}
                     </div>
                     )}

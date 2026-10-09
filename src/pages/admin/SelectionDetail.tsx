@@ -63,10 +63,10 @@ function PreviewOverlay({ sel, tree, onClose, onSaveView }: {
                   onClick={() => { setView(v); setSaved(false) }}
                   style={{
                     padding: '8px 20px', borderRadius: 8, border: 'none',
-                    background: view === v ? '#c9962a' : 'transparent',
+                    background: view === v ? '#1f3f6b' : 'transparent',
                     color: view === v ? '#fff' : '#8a909c',
                     fontWeight: 700, fontSize: 13, cursor: 'pointer',
-                    boxShadow: view === v ? '0 2px 8px #c9962a44' : 'none',
+                    boxShadow: view === v ? '0 2px 8px #1f3f6b44' : 'none',
                     transition: 'all .15s', display: 'flex', alignItems: 'center', gap: 6,
                   }}
                 >
@@ -90,7 +90,7 @@ function PreviewOverlay({ sel, tree, onClose, onSaveView }: {
                 disabled={savedView === view}
                 style={{
                   padding: '8px 20px', borderRadius: 9, border: 'none',
-                  background: savedView === view ? '#e7eaf0' : saved ? '#237804' : '#c9962a',
+                  background: savedView === view ? '#e7eaf0' : saved ? '#237804' : '#1f3f6b',
                   color: savedView === view ? '#aab' : '#fff',
                   fontWeight: 800, fontSize: 13,
                   cursor: savedView === view ? 'default' : 'pointer',
@@ -481,16 +481,16 @@ export default function SelectionDetail() {
                             onClick={() => setEditForm(f => f ? { ...f, viewMode: opt.v } : f)}
                             style={{
                               flex: 1, padding: '10px 14px', borderRadius: 10, cursor: 'pointer',
-                              border: `2px solid ${active ? '#c9962a' : '#e0e4f0'}`,
-                              background: active ? '#fbf1d6' : '#fff',
+                              border: `2px solid ${active ? '#1f3f6b' : '#e0e4f0'}`,
+                              background: active ? '#eef2f7' : '#fff',
                               fontWeight: 700, fontSize: 13,
-                              color: active ? '#c9962a' : 'var(--text)',
+                              color: active ? '#1f3f6b' : 'var(--text)',
                               display: 'flex', alignItems: 'center', gap: 8,
                               transition: 'all .15s',
                             }}
                           >
                             <span style={{ fontSize: 16 }}>{opt.icon}</span>{opt.label}
-                            {active && <span style={{ marginLeft: 'auto', background: '#c9962a', color: '#fff', fontSize: 9, fontWeight: 800, padding: '2px 7px', borderRadius: 6 }}>SEÇİLİB</span>}
+                            {active && <span style={{ marginLeft: 'auto', background: '#1f3f6b', color: '#fff', fontSize: 9, fontWeight: 800, padding: '2px 7px', borderRadius: 6 }}>SEÇİLİB</span>}
                           </button>
                         )
                       })}

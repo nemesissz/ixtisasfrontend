@@ -42,10 +42,10 @@ export default function Selections() {
   function handleArchive(id: string, e: React.MouseEvent) {
     e.stopPropagation()
     showConfirm({
-      icon: '🗄️', iconBg: '#f0f2fa', iconColor: '#9a7b1e',
+      icon: '🗄️', iconBg: '#f0f2fa', iconColor: '#3b5a7d',
       title: 'Seçimi arxivlə',
       message: 'Bu seçim arxivlənəcək. Arxiv bölməsindən istənilən vaxt bərpa edə bilərsiniz.',
-      confirmLabel: 'Arxivlə', confirmColor: '#9a7b1e',
+      confirmLabel: 'Arxivlə', confirmColor: '#3b5a7d',
       onConfirm: async () => { await selectionDb.archive(id); await refresh(); addLog('selection', 'info', `Seçim arxivləndi`, `id: ${id}`) },
     })
   }
@@ -175,7 +175,7 @@ export default function Selections() {
               <button
                 className="btn btn-sm"
                 onClick={e => handleArchive(s.id, e)}
-                style={{ background: '#f0f2fa', color: '#9a7b1e', border: '1.5px solid #d0d4f0' }}
+                style={{ background: '#f0f2fa', color: '#3b5a7d', border: '1.5px solid #d0d4f0' }}
               >
                 🗄️ Arxivlə
               </button>

@@ -49,8 +49,8 @@ export default function AdminLogin() {
       position: 'relative', overflow: 'hidden',
     }}>
       {/* Arxa fon dairələri */}
-      <div style={{ position:'absolute', top:'10%', left:'8%', width:320, height:320, borderRadius:'50%', background:'radial-gradient(circle,#e0a92e1f 0%,transparent 70%)', pointerEvents:'none' }} />
-      <div style={{ position:'absolute', bottom:'10%', right:'8%', width:280, height:280, borderRadius:'50%', background:'radial-gradient(circle,#b8860b1a 0%,transparent 70%)', pointerEvents:'none' }} />
+      <div style={{ position:'absolute', top:'10%', left:'8%', width:320, height:320, borderRadius:'50%', background:'radial-gradient(circle,#1f3f6b1f 0%,transparent 70%)', pointerEvents:'none' }} />
+      <div style={{ position:'absolute', bottom:'10%', right:'8%', width:280, height:280, borderRadius:'50%', background:'radial-gradient(circle,#152c4d1a 0%,transparent 70%)', pointerEvents:'none' }} />
 
       {/* Kart */}
       <div style={{
@@ -88,7 +88,7 @@ export default function AdminLogin() {
                 color: '#2b2f3a', outline: 'none', boxSizing: 'border-box',
                 transition: 'border-color .2s',
               }}
-              onFocus={e => e.currentTarget.style.borderColor = '#e0a92e'}
+              onFocus={e => e.currentTarget.style.borderColor = '#1f3f6b'}
               onBlur={e => e.currentTarget.style.borderColor = error ? '#ff4d4f88' : '#e0e4f0'}
             />
           </div>
@@ -109,7 +109,7 @@ export default function AdminLogin() {
                   color: '#2b2f3a', outline: 'none', boxSizing: 'border-box',
                   transition: 'border-color .2s',
                 }}
-                onFocus={e => e.currentTarget.style.borderColor = '#e0a92e'}
+                onFocus={e => e.currentTarget.style.borderColor = '#1f3f6b'}
                 onBlur={e => e.currentTarget.style.borderColor = error ? '#ff4d4f88' : '#e0e4f0'}
               />
               <button type="button" onClick={() => setShowPw(v => !v)} title={showPw ? 'Gizlət' : 'Göstər'}
@@ -132,9 +132,9 @@ export default function AdminLogin() {
           <button type="submit" disabled={loading}
             style={{
               width: '100%', padding: '14px', borderRadius: 12, border: 'none',
-              background: loading ? '#cfd2da' : 'linear-gradient(135deg,#b8860b,#e0a92e)',
+              background: loading ? '#cfd2da' : 'linear-gradient(135deg,#1f3f6b,#4a6f8f)',
               color: '#fff', fontWeight: 800, fontSize: 15, cursor: loading ? 'not-allowed' : 'pointer',
-              boxShadow: loading ? 'none' : '0 6px 20px #e0a92e55',
+              boxShadow: loading ? 'none' : '0 6px 20px #1f3f6b55',
               transition: 'all .2s', letterSpacing: 0.3,
             }}>
             {loading ? '⏳ Yoxlanılır...' : '→ Daxil ol'}
@@ -143,7 +143,7 @@ export default function AdminLogin() {
 
         <div style={{ textAlign:'center', marginTop: 22 }}>
           <button onClick={() => navigate('/student')}
-            style={{ background:'none', border:'none', cursor:'pointer', color:'#9a7b1e', fontSize: 12.5, fontWeight: 700 }}>
+            style={{ background:'none', border:'none', cursor:'pointer', color:'#3b5a7d', fontSize: 12.5, fontWeight: 700 }}>
             🎓 Təhsilalan girişi →
           </button>
         </div>

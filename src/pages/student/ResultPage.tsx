@@ -60,7 +60,7 @@ export default function ResultPage() {
       {/* Şəxsi məlumat + yerləşdirmə kartı */}
       <div className="card" style={{ padding: '18px 22px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: student.placedSpecialty || student.institution ? 16 : 0 }}>
-          <div style={{ width: 44, height: 44, borderRadius: 12, background: '#fbf1d6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>👤</div>
+          <div style={{ width: 44, height: 44, borderRadius: 12, background: '#eef2f7', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>👤</div>
           <div>
             <div style={{ fontWeight: 800, fontSize: 15 }}>{student.name}</div>
             <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
@@ -77,7 +77,7 @@ export default function ResultPage() {
             <div style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 600 }}>Müəssisə</div>
             <span style={{
               display: 'inline-flex', alignItems: 'center', gap: 7, padding: '6px 16px', borderRadius: 10,
-              background: '#fbf1d6', color: '#b8860b',
+              background: '#eef2f7', color: '#152c4d',
               fontWeight: 800, fontSize: 14, width: 'fit-content',
             }}><InstIcon icon={inst?.icon} size={17} />{instLabel}</span>
 
