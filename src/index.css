@@ -558,3 +558,7 @@ html[data-theme="dark"] iframe {
    kartları çərçivələr ayırır. */
 html[data-theme="dark"] *:not(:focus-visible) { box-shadow: none !important; }
 html[data-theme="dark"] *, html[data-theme="dark"] *::before, html[data-theme="dark"] *::after { text-shadow: none !important; }
+
+/* ── Yalnız açıq rejim (tünd və köhnə rejimə təsir etmir) ────────────────── */
+/* Statistika kartlarının başlıqları bir ölçü böyük (14px → 15px) */
+html:not([data-theme="dark"]):not([data-palette="old"]) .dash-card-title { font-size: 15px !important; }

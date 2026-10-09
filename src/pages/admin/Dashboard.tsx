@@ -288,7 +288,7 @@ function buildStatsReportHtml(A: any, instLabel: string, selName: string): strin
 function Card({ title, children, span }: { title: string; children: React.ReactNode; span?: number }) {
   return (
     <div style={{ background: '#fff', border: '1.5px solid var(--border)', borderRadius: 16, padding: '18px 20px', gridColumn: span ? `span ${span}` : undefined, minWidth: 0 }}>
-      <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--text)', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+      <div className="dash-card-title" style={{ fontSize: 14, fontWeight: 800, color: 'var(--text)', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
         {title}
       </div>
       {children}
