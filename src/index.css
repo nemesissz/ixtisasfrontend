@@ -504,9 +504,8 @@ html[data-theme="dark"] {
   filter: invert(1) hue-rotate(180deg) contrast(0.88);
   background: #fff;
 }
-/* Fon şəkli tünddə çevrilib bulanıq görünürdü — sadə açıq fonla əvəz olunur
-   (çevrilmədən sonra tünd göy-boz olur). */
-html[data-theme="dark"] body { background: #eef1f5; }
+/* Fon şəkli (background.jpeg) tünddə də qalır: çevrilmədən sonra giriş
+   səhifəsindəki kimi tünd, diaqonal zolaqlı fon olur — bütün səhifələrdə eyni. */
 html[data-theme="dark"] img,
 html[data-theme="dark"] video,
 html[data-theme="dark"] picture,
