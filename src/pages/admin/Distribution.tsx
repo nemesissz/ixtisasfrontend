@@ -492,7 +492,7 @@ function StorySim({ students, packets, subs, tree, poolUsers, preAssignLevel, fi
         <button onClick={() => { setPlaying(false); setIdx(i => Math.min(i + 1, total - 1)) }} disabled={idx >= total - 1}
           style={{ padding: '8px 16px', borderRadius: 9, border: 'none', background: '#1f3f6b', color: '#fff', fontWeight: 800, fontSize: 13, boxShadow: '0 4px 14px #1f3f6b55', cursor: idx >= total - 1 ? 'not-allowed' : 'pointer', opacity: idx >= total - 1 ? .4 : 1 }}>Növbəti addım ▶</button>
         <button onClick={() => setPlaying(p => !p)} disabled={idx >= total - 1}
-          style={{ padding: '8px 16px', borderRadius: 9, border: '1.5px solid #e0e4f0', background: playing ? '#f5a623' : '#fff', color: playing ? '#fff' : '#5a6070', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>{playing ? '⏸ Dayandır' : '⏵ Avtomatik'}</button>
+          style={{ padding: '8px 16px', borderRadius: 9, border: playing ? '1.5px solid #4a6f8f' : '1.5px solid #e0e4f0', background: playing ? '#4a6f8f' : '#fff', color: playing ? '#fff' : '#5a6070', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>{playing ? '⏸ Dayandır' : '⏵ Avtomatik'}</button>
         <button onClick={() => setSpeed(s => s === 1200 ? 500 : s === 500 ? 150 : s === 150 ? 60 : 1200)} title="Sürət"
           style={{ padding: '8px 12px', borderRadius: 9, border: '1.5px solid #e0e4f0', background: '#fff', color: '#8a909c', fontSize: 12, cursor: 'pointer' }}>{speed === 1200 ? '1×' : speed === 500 ? '2×' : speed === 150 ? '5×' : '10×'}</button>
         <button onClick={() => { setPlaying(false); setIdx(total - 1) }} disabled={idx >= total - 1}
@@ -1953,7 +1953,7 @@ export default function Distribution() {
                 borderRadius: 16, padding: '28px 20px', cursor: okP ? 'pointer' : 'not-allowed',
                 transition: 'all .2s', textAlign: 'center', opacity: okP ? 1 : 0.55,
               }}
-              onMouseEnter={e => { if (!okP) return; (e.currentTarget as HTMLElement).style.background = '#f5a62322'; (e.currentTarget as HTMLElement).style.borderColor = '#f5a623' }}
+              onMouseEnter={e => { if (!okP) return; (e.currentTarget as HTMLElement).style.background = '#1f3f6b22'; (e.currentTarget as HTMLElement).style.borderColor = '#1f3f6b' }}
               onMouseLeave={e => { if (!okP) return; (e.currentTarget as HTMLElement).style.background = '#ffffff'; (e.currentTarget as HTMLElement).style.borderColor = '#e7eaf0' }}
             >
               <div style={{ fontSize: 40, marginBottom: 14 }}>📦</div>
@@ -1961,7 +1961,7 @@ export default function Distribution() {
               <div style={{ fontSize: 12, color: '#8a909c', lineHeight: 1.6 }}>
                 Təhsilalanlar bala görə paketlərə bölünür, hər paket ayrıca idarə edilir
               </div>
-              <div style={{ marginTop: 18, display: 'inline-block', padding: '8px 20px', borderRadius: 8, background: okP ? '#f5a623' : '#c2c7d6', color: '#fff', fontWeight: 700, fontSize: 12 }}>
+              <div style={{ marginTop: 18, display: 'inline-block', padding: '8px 20px', borderRadius: 8, background: okP ? '#1f3f6b' : '#c2c7d6', color: '#fff', fontWeight: 700, fontSize: 12 }}>
                 {okP ? 'Seç →' : '🔒 İcazə yoxdur'}
               </div>
             </div>
