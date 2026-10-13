@@ -139,19 +139,19 @@ type TieStep = { label: string; w: number; l: number; decided: boolean }
 /** Prioritet müqayisəsinin oxunaqlı izahı: "1) Riyaziyyat: 52 = 52 · 2) ..." */
 function tieTraceText(trace: TieStep[] | undefined, winner: string, me = 'bu təhsilalan') {
   if (!trace) return ''
-  if (!trace.length) return ' Bu ixtisas üçün prioritet meyarı təyin edilməyib — sıra siyahıdakı ardıcıllıqla müəyyənləşdi.'
+  if (!trace.length) return ' Bu ixtisas üçün prioritet meyarı təyin edilməyib — bərabərlik həll olunmur, ona görə «Yerləşdir» bu halda dayandırılır.'
   const parts = trace.map((t, i) => t.decided
     ? `${i + 1}) ${t.label}: ${winner} ${critNum(t.w)}, ${me} ${critNum(t.l)} — fərq buradadır`
     : `${i + 1}) ${t.label}: ${critNum(t.w)} = ${critNum(t.l)} (bərabər)`)
   const last = trace[trace.length - 1]
   return ` Prioritet meyarları sıra ilə müqayisə olundu: ${parts.join('; ')}.` + (last.decided
     ? ` ${winner} öndə olduğu üçün yer ona çatdı.`
-    : ` Bütün meyarlar eyni çıxdı — sıra siyahıdakı ardıcıllıqla müəyyənləşdi.`)
+    : ` Bütün meyarlar eyni çıxdı — bu bərabərliyi heç bir meyar həll etmir, ona görə «Yerləşdir» bu halda dayandırılır.`)
 }
 
 function TieTraceView({ trace, winner }: { trace: TieStep[]; winner: string }) {
   const B = { color: `${O(P.navyDk, '#5a4a12')}` }
-  if (!trace.length) return <> Bu ixtisas üçün prioritet meyarı təyin edilməyib — sıra siyahıdakı ardıcıllıqla müəyyənləşdi, bu təhsilalan həmin ixtisasa yerləşdirilmədi.</>
+  if (!trace.length) return <> Bu ixtisas üçün prioritet meyarı təyin edilməyib — <b style={{ color: '#cf1322' }}>bərabərlik həll olunmur, ona görə «Yerləşdir» bu halda dayandırılır.</b></>
   const last = trace[trace.length - 1]
   return (
     <>
@@ -168,7 +168,7 @@ function TieTraceView({ trace, winner }: { trace: TieStep[]; winner: string }) {
       </ol>
       {last.decided
         ? <><b style={B}>{winner}</b> öndə olduğu üçün bu təhsilalan həmin ixtisasa yerləşdirilmədi.</>
-        : <>Bütün meyarlar eyni çıxdı — sıra siyahıdakı ardıcıllıqla müəyyənləşdi, bu təhsilalan həmin ixtisasa yerləşdirilmədi.</>}
+        : <><b style={{ color: '#cf1322' }}>Bütün meyarlar eyni çıxdı — bu bərabərliyi heç bir meyar həll etmir, ona görə «Yerləşdir» bu halda dayandırılır.</b></>}
     </>
   )
 }
@@ -466,7 +466,7 @@ function StorySim({ students, packets, subs, tree, poolUsers, preAssignLevel, fi
     const tieDecide = tr0?.trace ? tieTraceText(tr0.trace, tr0.rival)
       : tr0 && tr0.subject
       ? ` Üstünlük meyarı “${tr0.subject}” oldu: ${tr0.rival}-ın balı ${critFmt(tr0.rivalSubjScore)}, bu təhsilalanınkı ${critFmt(tr0.mySubjScore)} — ${tr0.rival} öndə olduğu üçün oraya yerləşdirildi.`
-      : tr0 ? ` Bütün prioritet meyarları da eyni idi — sıra siyahıdakı ardıcıllıqla müəyyənləşdi.` : ''
+      : tr0 ? ` Bütün prioritet meyarları da eyni idi — bu bərabərlik həll olunmur, ona görə «Yerləşdir» bu halda dayandırılır.` : ''
     const tieNote = cur.tieRivals.length
       ? ` ⚖️ Bərabər bal: “${data.leafName[tr0.id]}” üçün ${tr0.rival} ilə ${sc} bal eyni idi.${tieDecide} Ona görə bu təhsilalan oraya yerləşdirilmədi.`
       : ''
@@ -643,7 +643,7 @@ function StorySim({ students, packets, subs, tree, poolUsers, preAssignLevel, fi
               <div style={{ fontSize: 13, color: `${O(P.ink, '#8a6d1b')}`, lineHeight: 1.55 }}>
                 <b style={{ color: `${O(P.navyDk, '#5a4a12')}` }}>Bərabər bal toqquşması:</b> “{data.leafName[cur.tieRivals[0].id]}” üçün <b style={{ color: `${O(P.navyDk, '#5a4a12')}` }}>{cur.tieRivals[0].rival}</b> ilə hər ikisinin ümumi balı <b style={{ color: `${O(P.navyDk, '#5a4a12')}` }}>{cur.tieRivals[0].score.toFixed(2)}</b> idi. Son yer bir nəfərə qalır.{cur.tieRivals[0].trace ? (<TieTraceView trace={cur.tieRivals[0].trace} winner={cur.tieRivals[0].rival} />) : cur.tieRivals[0].subject ? (<> —
                   üstünlük meyarı <b style={{ color: `${O(P.navyDk, '#5a4a12')}` }}>“{cur.tieRivals[0].subject}”</b> oldu: <b style={{ color: `${O(P.navyDk, '#5a4a12')}` }}>{cur.tieRivals[0].rival}</b> = <b style={{ color: '#237804' }}>{critFmt(cur.tieRivals[0].rivalSubjScore)}</b>, bu təhsilalan = <b style={{ color: '#cf1322' }}>{critFmt(cur.tieRivals[0].mySubjScore)}</b> — {cur.tieRivals[0].rival} öndə olduğu üçün bu təhsilalan həmin ixtisasa yerləşdirilmədi.
-                </>) : (<> Bütün prioritet meyarları da eyni idi — sıra siyahıdakı ardıcıllıqla müəyyənləşdi, bu təhsilalan həmin ixtisasa yerləşdirilmədi.</>)}
+                </>) : (<> <b style={{ color: '#cf1322' }}>Bütün prioritet meyarları da eyni idi — bu bərabərlik həll olunmur, ona görə «Yerləşdir» bu halda dayandırılır.</b></>)}
               </div>
             </div>
           )}
@@ -1230,6 +1230,49 @@ export default function Distribution() {
   }, [placement, allStudentRows, method, sels, submittedUsers])
   collisionRef.current = collisionMap
 
+  // ── Həll olunmayan bərabərliklər: ümumi bal da, BÜTÜN prioritet meyarları da eyni
+  //    olan iki nəfərdən biri istədiyi ixtisası alıb, digəri ala bilməyib. Bu halda
+  //    kimin yerləşəcəyini heç bir qayda müəyyən etmir (sıra təsadüfi ardıcıllıqdan
+  //    asılı olur) — ona görə "Yerləşdir" dayandırılır və izah verilir.
+  const unresolvedTies = useMemo(() => {
+    const out: { specName: string; score: number; winner: any; loser: any; trace: TieStep[]; got: string; gotChoice: number | null }[] = []
+    if (!placement) return out
+    const pm = placement.pathMap, asg = placement.assignments
+    const rankingOf: Record<string, string[]> = {}
+    for (const s of sels) rankingOf[s.userId] = (s.ranking || []).filter((id: string) => !!pm[id])
+    // Paket üsulunda yalnız eyni paketdəkilər eyni yerlər üçün yarışır
+    const pkOf: Record<string, number> = {}
+    if (method === 'packet') (packets as any[]).forEach((p: any, i: number) => (p.students || []).forEach((u: any) => { pkOf[u.id] = i }))
+    const leafOf = (sid: string) => { const p = pm[sid] || []; return p[p.length - 1] }
+    const groups = new Map<number, any[]>()
+    for (const u of submittedUsers) { const k = u.score || 0; const g = groups.get(k); if (g) g.push(u); else groups.set(k, [u]) }
+    for (const [score, grp] of groups) {
+      if (grp.length < 2) continue
+      for (const l of grp) {
+        const r = rankingOf[l.id] || []
+        const got = asg[l.id]?.specId
+        const gotIdx = got ? r.indexOf(got) : r.length
+        // Yalnız indiki nəticədən DAHA ÜSTÜN tutduğu ixtisaslar
+        for (let k = 0; k < gotIdx; k++) {
+          const sid = r[k]
+          if (!genderAllowed(leafOf(sid), l.gender)) continue
+          for (const w of grp) {
+            if (w.id === l.id || asg[w.id]?.specId !== sid) continue
+            if (method === 'packet' && pkOf[w.id] !== pkOf[l.id]) continue
+            const tb = pairTiebreaker(w, l, (rankingOf[w.id] || [])[0] || '', r[0] || '', pm)
+            if (decidingCriterion(w, l, tb)) continue
+            out.push({
+              specName: leafOf(sid)?.name || sid, score, winner: w, loser: l, trace: tieTrace(w, l, tb),
+              got: got ? (leafOf(got)?.name || got) : 'Yerləşmədi', gotChoice: asg[l.id]?.choiceNum ?? null,
+            })
+          }
+        }
+      }
+    }
+    return out
+  }, [placement, sels, method, packets, submittedUsers, defaultTbKey])
+  const [tieBlockOpen, setTieBlockOpen] = useState(false)
+
   const studentRows = useMemo(() => {
     if (!placement) return []
     return submittedUsers
@@ -1313,6 +1356,13 @@ export default function Distribution() {
   // ── Yerləşdir ──────────────────────────────────────────────────────────────
   function handleDistribute() {
     if (running) return
+    // Tam bərabərlik (bal + bütün prioritet meyarları eyni) varsa yerləşdirmə aparılmır
+    if (unresolvedTies.length) {
+      setMode(null); setTieBlockOpen(true)
+      addLog('distribution', 'warning', 'Yerləşdirmə dayandırıldı: həll olunmayan bərabərlik',
+        `Seçim: ${sel?.name} · ${unresolvedTies.length} hal · ${unresolvedTies.slice(0, 3).map(t => `${t.winner.name} / ${t.loser.name} (${t.specName})`).join('; ')}`)
+      return
+    }
     // Dinamik müddət: hər 100 nəfərə 1.5 saniyə (minimum 3s)
     const total = Math.max(3000, Math.round(submittedUsers.length / 100 * 1500))
     // Paket üsulunda hər paket ayrı mərhələ, sadə üsulda 3 mərhələ
@@ -1330,6 +1380,7 @@ export default function Distribution() {
 
   async function handleConfirm() {
     if (!placement) return
+    if (unresolvedTies.length) { setShowConf(false); setTieBlockOpen(true); return }
     // Üsul-spesifik icazə: sadə → dist.simple, paket → dist.packet
     const needPerm = method === 'packet' ? 'dist.packet' : 'dist.simple'
     if (!can(needPerm)) {
@@ -1481,7 +1532,7 @@ export default function Distribution() {
                         : l.dec?.label
                           ? <>Meyar «{l.dec.label}»: qazanan <b>{critFmt(l.dec.w)}</b>, bu təhsilalan <b>{critFmt(l.dec.l)}</b></>
                           : <>Prioritet meyarı yoxdur</>}
-                      {l.dec?.none && l.dec.trace?.length > 0 && <> · hamısı eyni</>}
+                      {l.dec?.none && <b style={{ color: '#b91c1c' }}> · hamısı eyni — həll olunmur, «Yerləşdir» dayandırılacaq</b>}
                       {' · '}əvəzində: {l.got}{l.gotChoice ? ` (${ord(l.gotChoice)} seçimi)` : ''}
                     </div>
                   </div>
@@ -1496,6 +1547,57 @@ export default function Distribution() {
                 <button onClick={() => continueCollision(true)}
                   style={{ padding: '12px 16px', borderRadius: 12, border: '1.5px solid #e0e4f0', cursor: 'pointer', fontWeight: 700, fontSize: 12.5, background: '#fff', color: '#777' }}>
                   Hamısını ötür
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Həll olunmayan bərabərlik: yerləşdirmə dayandırıldı ── */}
+      {tieBlockOpen && unresolvedTies.length > 0 && (
+        <div style={{ position: 'fixed', inset: 0, background: '#0009', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1300, padding: 16 }}>
+          <div style={{ background: '#fff', borderRadius: 20, width: 600, maxWidth: '96vw', maxHeight: '90vh', overflow: 'auto', boxShadow: '0 24px 80px #0005' }}>
+            <div style={{ background: 'linear-gradient(135deg,#b91c1c,#ef4444)', padding: '20px 26px', color: '#fff' }}>
+              <div style={{ fontSize: 13, fontWeight: 700, opacity: .9, letterSpacing: .5 }}>⛔ YERLƏŞDİRMƏ DAYANDIRILDI</div>
+              <div style={{ fontSize: 19, fontWeight: 900, marginTop: 4 }}>⚖️ Həll olunmayan bərabərlik</div>
+              <div style={{ fontSize: 12.5, opacity: .95, marginTop: 6, lineHeight: 1.55 }}>
+                Aşağıdakı təhsilalanların ümumi balı da, <b>bütün prioritet meyarları</b> da eynidir. Lakin yer məhdud olduğu üçün
+                onlardan yalnız biri istədiyi ixtisasa düşə bilir. Kimin yerləşəcəyini heç bir meyar müəyyən etmir, ona görə
+                sistem ədalətli qərar verə bilmir və yerləşdirmə aparılmadı.
+              </div>
+            </div>
+            <div style={{ padding: '18px 26px' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#9090a8', textTransform: 'uppercase', letterSpacing: .5, marginBottom: 8 }}>
+                Bərabərlik halları ({unresolvedTies.length})
+              </div>
+              {unresolvedTies.slice(0, 30).map((t, i) => (
+                <div key={i} style={{ padding: '10px 14px', borderRadius: 12, background: '#fef2f2', border: '1px solid #fecaca', marginBottom: 8, fontSize: 12.5, color: '#7f1d1d', lineHeight: 1.55 }}>
+                  <div>
+                    «<b>{t.specName}</b>» · <b>{t.score}</b> bal: <b>{t.winner.name}</b> bu ixtisasa düşür, <b>{t.loser.name}</b> isə düşmür
+                    {' '}(əvəzində: {t.got}{t.gotChoice ? `, ${ord(t.gotChoice)} seçimi` : ''}).
+                  </div>
+                  <div style={{ fontSize: 11.5, color: '#991b1b', marginTop: 3 }}>
+                    {t.trace.length
+                      ? <>Prioritet meyarları: {t.trace.map((x, j) => <span key={j}>{j > 0 && ' · '}{x.label}: <b>{critNum(x.w)}</b> = <b>{critNum(x.l)}</b></span>)} — hamısı eyni</>
+                      : <>Bu ixtisas üçün prioritet meyarı təyin edilməyib</>}
+                  </div>
+                </div>
+              ))}
+              {unresolvedTies.length > 30 && <div style={{ fontSize: 12, color: '#9090a8', marginBottom: 8 }}>… və daha {unresolvedTies.length - 30} hal</div>}
+              <div style={{ marginTop: 12, padding: '12px 14px', borderRadius: 12, background: '#f5f7fb', border: '1px solid #e0e4f0', fontSize: 12.5, color: '#3a4256', lineHeight: 1.6 }}>
+                <b>Nə etmək olar:</b>
+                <ul style={{ margin: '4px 0 0', paddingLeft: 20 }}>
+                  <li>Strukturda (və ya ümumi ayarlarda) bərabər bal üçün <b>əlavə prioritet meyarı</b> (fənn) əlavə edin ki, bu təhsilalanlar ayrılsın;</li>
+                  <li>və ya həmin ixtisasın <b>kvotasını</b> artırın;</li>
+                  <li>və ya qərarı komissiya əl ilə versin və məlumatları (balları) düzəldin.</li>
+                </ul>
+                Dəyişiklikdən sonra «Yerləşdir»i yenidən basın. Ətraflı gedişatı «📖 İzahlı simulyasiya»da görmək olar.
+              </div>
+              <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+                <button onClick={() => setTieBlockOpen(false)}
+                  style={{ flex: 1, padding: '12px', borderRadius: 12, border: 'none', cursor: 'pointer', fontWeight: 800, fontSize: 14, background: '#2b2f3a', color: '#fff' }}>
+                  Bağla
                 </button>
               </div>
             </div>
