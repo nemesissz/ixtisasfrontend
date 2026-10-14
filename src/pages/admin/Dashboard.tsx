@@ -1068,23 +1068,23 @@ export default function Dashboard() {
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5, minWidth: A.hasSource ? 1040 : 800 }}>
                   <thead>
-                    <tr style={{ background: '#f8f9fd', color: 'var(--muted)', textAlign: 'left' }}>
-                      <th rowSpan={2} style={{ padding: '9px 12px', fontWeight: 700, verticalAlign: 'bottom' }}>İxtisas</th>
-                      <th rowSpan={2} style={{ padding: '9px 12px', fontWeight: 700, whiteSpace: 'nowrap', textAlign: 'center', verticalAlign: 'bottom' }}>Kvota</th>
-                      <th rowSpan={2} style={{ padding: '9px 12px', fontWeight: 700, whiteSpace: 'nowrap', textAlign: 'center', verticalAlign: 'bottom' }}>Yerləşən</th>
+                    <tr style={{ background: L('#eef1f8', '#f8f9fd'), color: L('#1f2a44', 'var(--muted)'), textAlign: 'left' }}>
+                      <th rowSpan={2} style={{ padding: '9px 12px', fontWeight: L(800, 700), color: L('#1f2a44', undefined), fontSize: L(13, undefined), verticalAlign: 'bottom' }}>İxtisas</th>
+                      <th rowSpan={2} style={{ padding: '9px 12px', fontWeight: L(800, 700), color: L('#1f2a44', undefined), fontSize: L(13, undefined), whiteSpace: 'nowrap', textAlign: 'center', verticalAlign: 'bottom' }}>Kvota</th>
+                      <th rowSpan={2} style={{ padding: '9px 12px', fontWeight: L(800, 700), color: L('#1f2a44', undefined), fontSize: L(13, undefined), whiteSpace: 'nowrap', textAlign: 'center', verticalAlign: 'bottom' }}>Yerləşən</th>
                       {A.hasSource
                         ? <>
-                            <th colSpan={3} style={{ padding: '7px 12px', fontWeight: 800, textAlign: 'center', borderLeft: '1px solid #e6e9f5', color: '#2f54eb' }}>Lisey</th>
-                            <th colSpan={3} style={{ padding: '7px 12px', fontWeight: 800, textAlign: 'center', borderLeft: '1px solid #e6e9f5', color: O(`${P.navy}`, '#c9962a') }}>Mülki</th>
+                            <th colSpan={3} style={{ padding: '7px 12px', fontWeight: 800, fontSize: L(13.5, undefined), textAlign: 'center', borderLeft: L('1px solid #cfd5e6', '1px solid #e6e9f5'), color: '#2f54eb' }}>Lisey</th>
+                            <th colSpan={3} style={{ padding: '7px 12px', fontWeight: 800, fontSize: L(13.5, undefined), textAlign: 'center', borderLeft: L('1px solid #cfd5e6', '1px solid #e6e9f5'), color: O(`${P.navy}`, '#c9962a') }}>Mülki</th>
                           </>
-                        : <th colSpan={3} style={{ padding: '7px 12px', fontWeight: 800, textAlign: 'center', borderLeft: '1px solid #e6e9f5' }}>Bal</th>}
+                        : <th colSpan={3} style={{ padding: '7px 12px', fontWeight: 800, fontSize: L(13.5, undefined), textAlign: 'center', borderLeft: L('1px solid #cfd5e6', '1px solid #e6e9f5'), color: L('#1f2a44', undefined) }}>Bal</th>}
                     </tr>
-                    <tr style={{ background: '#f8f9fd', color: 'var(--muted)' }}>
+                    <tr style={{ background: L('#eef1f8', '#f8f9fd'), color: L('#1f2a44', 'var(--muted)'), borderBottom: L(`2px solid ${P.navy}`, undefined) }}>
                       {(A.hasSource ? [0, 1] : [0]).map(g => (
                         <Fragment key={g}>
-                          <th style={{ padding: '7px 12px', fontWeight: 700, fontSize: 11, textAlign: 'center', whiteSpace: 'nowrap', borderLeft: '1px solid #e6e9f5' }}>ən aşağı bal</th>
-                          <th style={{ padding: '7px 12px', fontWeight: 700, fontSize: 11, textAlign: 'center', whiteSpace: 'nowrap' }}>orta bal</th>
-                          <th style={{ padding: '7px 12px', fontWeight: 700, fontSize: 11, textAlign: 'center', whiteSpace: 'nowrap' }}>ən yuxarı bal</th>
+                          <th style={{ padding: '7px 12px', fontWeight: L(800, 700), color: L('#1f2a44', undefined), fontSize: L(12, 11), textAlign: 'center', whiteSpace: 'nowrap', borderLeft: L('1px solid #cfd5e6', '1px solid #e6e9f5') }}>ən aşağı bal</th>
+                          <th style={{ padding: '7px 12px', fontWeight: L(800, 700), color: L('#1f2a44', undefined), fontSize: L(12, 11), textAlign: 'center', whiteSpace: 'nowrap' }}>orta bal</th>
+                          <th style={{ padding: '7px 12px', fontWeight: L(800, 700), color: L('#1f2a44', undefined), fontSize: L(12, 11), textAlign: 'center', whiteSpace: 'nowrap' }}>ən yuxarı bal</th>
                         </Fragment>
                       ))}
                     </tr>
