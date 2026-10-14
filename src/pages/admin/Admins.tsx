@@ -3,6 +3,7 @@ import InstIcon from "../../components/InstIcon";
 import {
   adminDb,
   institutionDb,
+  cohortDb,
   useLocalState,
   addLog,
   customRoleDb,
@@ -64,27 +65,46 @@ const EMPTY_FORM = {
   password: "",
   permissions: [] as string[],
   institutions: [] as string[],
+  cohorts: [] as string[],
 };
 
 // ── Müəssisə əhatəsi seçimi (checkbox-lar) ──
+// Müəssisə seçildikdən sonra onun qrupları da seçilə bilər: qrup seçilməsə
+// həmin müəssisənin bütün qrupları görünür, seçilsə yalnız işarələnənlər.
 function InstSelector({
   institutions,
   value,
   onChange,
+  cohorts = [],
+  cohortValue = [],
+  onCohortChange,
 }: {
   institutions: any[];
   value: string[];
   onChange: (v: string[]) => void;
+  cohorts?: any[];
+  cohortValue?: string[];
+  onCohortChange?: (v: string[]) => void;
 }) {
-  const toggle = (id: string) =>
-    onChange(value.includes(id) ? value.filter((c) => c !== id) : [...value, id]);
+  const cohortsOf = (instId: string) =>
+    cohorts.filter((c) => c.institution === instId && (!c.isArchived || cohortValue.includes(c.id)));
+  const toggle = (id: string) => {
+    if (value.includes(id)) {
+      onChange(value.filter((c) => c !== id));
+      // Müəssisə çıxarılanda onun qrup seçimləri də silinir
+      const drop = new Set(cohorts.filter((c) => c.institution === id).map((c) => c.id));
+      if (onCohortChange && cohortValue.some((c) => drop.has(c))) onCohortChange(cohortValue.filter((c) => !drop.has(c)));
+    } else onChange([...value, id]);
+  };
+  const toggleCohort = (id: string) =>
+    onCohortChange?.(cohortValue.includes(id) ? cohortValue.filter((c) => c !== id) : [...cohortValue, id]);
   return (
     <div style={{ border: "1.5px solid #e8eaf5", borderRadius: 12, overflow: "hidden", marginTop: 14 }}>
       <div style={{ padding: "9px 14px", background: "#f8f9fd", borderBottom: "1.5px solid #eef0f8", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <span style={{ fontSize: 11, fontWeight: 800, color: `${P.ink}`, textTransform: "uppercase", letterSpacing: 0.5 }}>
           🏛️ Müəssisə əhatəsi {value.length > 0 ? `(${value.length})` : "(hamısı)"}
         </span>
-        <button type="button" onClick={() => onChange([])}
+        <button type="button" onClick={() => { onChange([]); onCohortChange?.([]); }}
           style={{ fontSize: 11, fontWeight: 700, color: "#999", background: "none", border: "none", cursor: "pointer" }}>
           Hamısı
         </button>
@@ -92,13 +112,37 @@ function InstSelector({
       <div style={{ padding: "10px 14px", display: "flex", flexDirection: "column", gap: 6 }}>
         <div style={{ fontSize: 11, color: "#8892b0", marginBottom: 2 }}>
           Heç biri seçilməsə hesab BÜTÜN müəssisələri görür. Seçilsə yalnız işarələnənləri.
+          {onCohortChange && " Seçilmiş müəssisədə qrup da seçmək olar — qrup seçilməsə həmin müəssisənin bütün qrupları görünür."}
         </div>
-        {institutions.map((inst) => (
-          <label key={inst.id} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 12.5, color: value.includes(inst.id) ? "#3a4cad" : "#555" }}>
-            <input type="checkbox" checked={value.includes(inst.id)} onChange={() => toggle(inst.id)} style={{ accentColor: `${P.navy}` }} />
-            {inst.label}
-          </label>
-        ))}
+        {institutions.map((inst) => {
+          const on = value.includes(inst.id);
+          const list = on && onCohortChange ? cohortsOf(inst.id) : [];
+          const picked = list.filter((c) => cohortValue.includes(c.id)).length;
+          return (
+            <div key={inst.id}>
+              <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 12.5, color: on ? "#3a4cad" : "#555" }}>
+                <input type="checkbox" checked={on} onChange={() => toggle(inst.id)} style={{ accentColor: `${P.navy}` }} />
+                {inst.label}
+                {on && list.length > 0 && (
+                  <span style={{ fontSize: 10.5, fontWeight: 700, color: "#8892b0" }}>
+                    · {picked ? `${picked} qrup` : "bütün qruplar"}
+                  </span>
+                )}
+              </label>
+              {list.length > 0 && (
+                <div style={{ margin: "5px 0 4px 24px", padding: "6px 10px", borderLeft: `2px solid ${P.line3}`, display: "flex", flexDirection: "column", gap: 5 }}>
+                  <span style={{ fontSize: 10.5, fontWeight: 800, color: "#8892b0", textTransform: "uppercase", letterSpacing: 0.4 }}>Qruplar</span>
+                  {list.map((c) => (
+                    <label key={c.id} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 12, color: cohortValue.includes(c.id) ? "#3a4cad" : "#555" }}>
+                      <input type="checkbox" checked={cohortValue.includes(c.id)} onChange={() => toggleCohort(c.id)} style={{ accentColor: `${P.navy}` }} />
+                      {c.label}{c.year ? <span style={{ color: "#999" }}> ({c.year})</span> : null}
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
         {institutions.length === 0 && (
           <span style={{ fontSize: 12, color: "#999" }}>Müəssisə tapılmadı</span>
         )}
@@ -304,7 +348,9 @@ export default function Admins() {
   const [institutions, setInstitutions] = useState<any[]>([]);
   useEffect(() => {
     institutionDb.getAll().then(setInstitutions);
+    cohortDb.getAll().then(setCohorts).catch(() => setCohorts([]));
   }, []);
+  const [cohorts, setCohorts] = useState<any[]>([]);
 
   function openPwModal(a: any) {
     setPwTarget(a);
@@ -402,6 +448,7 @@ export default function Admins() {
       password: form.password,
       permissions: needsPerms ? form.permissions : undefined,
       institutions: needsPerms && form.institutions.length ? form.institutions : undefined,
+      cohorts: needsPerms && form.institutions.length && form.cohorts.length ? form.cohorts : undefined,
     });
     await addLog(
       "admin",
@@ -418,13 +465,19 @@ export default function Admins() {
   const [permTarget, setPermTarget] = useState<any>(null);
   const [permSel, setPermSel] = useState<string[]>([]);
   const [permInst, setPermInst] = useState<string[]>([]);
+  const [permCoh, setPermCoh] = useState<string[]>([]);
   function openPerms(a: any) {
     setPermTarget(a);
     setPermSel(a.permissions || []);
     setPermInst(a.institutions || []);
+    setPermCoh(a.cohorts || []);
   }
   async function savePerms() {
-    await adminDb.update(permTarget.id, { permissions: permSel, institutions: permInst.length ? permInst : null });
+    await adminDb.update(permTarget.id, {
+      permissions: permSel,
+      institutions: permInst.length ? permInst : null,
+      cohorts: permInst.length && permCoh.length ? permCoh : null,
+    });
     await addLog(
       "admin",
       "info",
@@ -681,7 +734,8 @@ export default function Admins() {
             </div>
             <div className="modal-body" style={{ maxHeight: "82vh" }}>
               <PermSelector value={permSel} onChange={setPermSel} />
-              <InstSelector institutions={institutions} value={permInst} onChange={setPermInst} />
+              <InstSelector institutions={institutions} value={permInst} onChange={setPermInst}
+                cohorts={cohorts} cohortValue={permCoh} onCohortChange={setPermCoh} />
             </div>
             <div className="modal-foot">
               <button
@@ -861,6 +915,9 @@ export default function Admins() {
                       institutions={institutions}
                       value={form.institutions}
                       onChange={(v) => setForm((f) => ({ ...f, institutions: v }))}
+                      cohorts={cohorts}
+                      cohortValue={form.cohorts}
+                      onCohortChange={(v) => setForm((f) => ({ ...f, cohorts: v }))}
                     />
                   </div>
                 )}

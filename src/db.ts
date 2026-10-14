@@ -91,6 +91,7 @@ function mapAdmin(a: any) {
     id: a.id, name: a.name, email: a.email, username: a.username,
     role: a.role, status: a.status, lastLogin: utc(a.lastLogin), permissions: a.permissions ?? undefined,
     institutions: a.institutions ?? undefined,
+    cohorts: a.cohorts ?? undefined,
   }
 }
 function mapSubmission(a: any) {
@@ -287,6 +288,7 @@ export const adminDb = {
       name: data.name, email: data.email ?? null, username: data.username,
       password: data.password, role: data.role, permissions: data.permissions ?? null,
       institutions: data.institutions ?? null,
+      cohorts: data.cohorts ?? null,
     })
     return mapAdmin(created)
   },
@@ -298,6 +300,7 @@ export const adminDb = {
       name: merged.name, email: merged.email ?? null,
       password: data.password || null, role: merged.role, status: merged.status,
       permissions: merged.permissions ?? null, institutions: merged.institutions ?? null,
+      cohorts: merged.cohorts ?? null,
     })
   },
   delete: async (id: string) => { await http.delete(`/api/admins/${id}`) },

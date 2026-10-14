@@ -15,6 +15,8 @@ export interface AdminSession {
   permissions?: string[] | null
   // Müəssisə əhatəsi: boş/yoxdursa = bütün müəssisələr; doludursa yalnız bunlar
   institutions?: string[] | null
+  // Qrup əhatəsi: seçilmiş müəssisələrdə yalnız bu qruplar (boşdursa hamısı)
+  cohorts?: string[] | null
 }
 
 export interface StudentSession {
