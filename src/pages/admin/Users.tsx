@@ -8,7 +8,7 @@ import InstTabs from '../../components/InstTabs'
 import { AppDialog, useDialog } from '../../components/AppDialog'
 import { readImageResized } from '../../imageResize'
 import { can } from '../../permissions'
-import { P, O } from '../../palette'
+import { P, O, IS_LIGHT_MODE } from '../../palette'
 
 // ── Tree-dən hər yarpaq üçün tam yol (node adları) ────────────────────────────
 function buildLeafPaths(nodes: any[], prefix: any[] = [], map: Record<string, any[]> = {}): Record<string, any[]> {
@@ -2081,6 +2081,16 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
   const [cohFilter,   setCohFilter]   = useState('all')   // 'all' | '<id>' | 'none'
   const [showCohMgr,  setShowCohMgr]  = useState(false)
   const [yearFilter,  setYearFilter]  = useState('all')
+  // ── Vahid filtr (açıq mod): bölmə → seçilmiş dəyərlər. Bölmə daxilində "və ya", bölmələr arası "və" ──
+  const [uf,          setUf]          = useState<Record<string, string[]>>({})
+  const [ufScore,     setUfScore]     = useState<{ min: string; max: string }>({ min: '', max: '' })
+  const [ufOpen,      setUfOpen]      = useState(false)
+  const toggleUf = (key: string, val: string) => setUf(prev => {
+    const cur = prev[key] || []
+    const next = cur.includes(val) ? cur.filter(v => v !== val) : [...cur, val]
+    const n = { ...prev }; if (next.length) n[key] = next; else delete n[key]; return n
+  })
+  const clearUf = () => { setUf({}); setUfScore({ min: '', max: '' }) }
   const [sortKey,     setSortKey]     = useState<string | null>(null)   // 'score' və ya fənn adı
   const [sortDir,     setSortDir]     = useState<'asc' | 'desc'>('desc')
   function toggleSort(key: string) {
@@ -2103,6 +2113,7 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
   const [bulkCohOpen,  setBulkCohOpen]  = useState(false)
   // Müəssisə və ya qrup sekməsi dəyişəndə seçim sıfırlanır — görünməyən sətirlər təsadüfən dəyişməsin
   useEffect(() => { setSelected(new Set()) }, [instId, cohFilter])
+  useEffect(() => { setUf({}); setUfScore({ min: '', max: '' }) }, [instId])
   const [nameMap,    setNameMap]    = useState<Record<string, string>>({})
 
   const [allSubs, setAllSubs] = useState<any[]>([])
@@ -2199,6 +2210,55 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
     const n = new Set(prev); n.has(c) ? n.delete(c) : n.add(c); return n
   })
 
+  // ── Vahid filtr bölmələri — datada olan məlumatlara görə dinamik qurulur ──
+  const ufSections: { key: string; label: string; options: { v: string; label: string }[]; get: (u: any) => string }[] = (() => {
+    const secs: { key: string; label: string; options: { v: string; label: string }[]; get: (u: any) => string }[] = [
+      { key: 'sub', label: 'Seçim statusu', get: (u: any) => subCountMap[u.id] > 0 ? 'submitted' : 'pending',
+        options: [{ v: 'submitted', label: 'Seçim etdi' }, { v: 'pending', label: 'Seçim etmədi' }] },
+      { key: 'print', label: 'Çap statusu', get: (u: any) => u.printStatus === 'printed' ? 'printed' : 'not_printed',
+        options: [{ v: 'printed', label: 'Çap edilib' }, { v: 'not_printed', label: 'Çap edilməyib' }] },
+    ]
+    if (hasGender) secs.push({ key: 'gender', label: 'Cins', get: (u: any) => u.gender || '',
+      options: [{ v: 'kişi', label: 'Kişi' }, { v: 'qadın', label: 'Qadın' }, ...(instUsers.some((u: any) => !u.gender) ? [{ v: '', label: 'Qeyd olunmayıb' }] : [])] })
+    if (hasGroups) secs.push({ key: 'group', label: 'Qrup', get: (u: any) => String(u.group || ''),
+      options: allGroups.map(g => ({ v: g, label: `Qrup ${g}` })) })
+    if (hasSources) {
+      const srcs = [...new Set(instUsers.map((u: any) => String(u.source || '')).filter(Boolean))].sort() as string[]
+      secs.push({ key: 'source', label: 'Mənbə', get: (u: any) => String(u.source || ''),
+        options: srcs.map(v => ({ v, label: v.charAt(0).toLocaleUpperCase('az') + v.slice(1) })) })
+    }
+    if (hasYears) secs.push({ key: 'year', label: 'Tədris ili', get: (u: any) => String(u.year || ''),
+      options: allYears.map(y => ({ v: y, label: y })) })
+    secs.push({ key: 'placed', label: 'Yerləşdirmə', get: (u: any) => u.placedSpecialty ? 'placed' : 'unplaced',
+      options: [{ v: 'placed', label: 'Yerləşib' }, { v: 'unplaced', label: 'Yerləşməyib' }] })
+    // Əvvəlcədən bölgü səviyyələri (məs. "Qoşun növü")
+    for (const lv of branchLevels) {
+      const vals = [...new Set(instUsers.map((u: any) => String(u.branchByLevel?.[lv] || '')).filter(Boolean))].sort() as string[]
+      if (vals.length > 1 && vals.length <= 30) secs.push({ key: `br_${lv}`, label: branchLevelName(lv), get: (u: any) => String(u.branchByLevel?.[lv] || ''),
+        options: vals.map(v => ({ v, label: v })) })
+    }
+    // Sərbəst mətn sahələri (məs. "Dil") — az sayda fərqli dəyəri olanlar
+    for (const k of allExtraKeys) {
+      const vals = [...new Set(instUsers.map((u: any) => String(u.extraFields?.[k] || '')).filter(Boolean))].sort() as string[]
+      if (vals.length > 1 && vals.length <= 30) secs.push({ key: `ex_${k}`, label: k, get: (u: any) => String(u.extraFields?.[k] || ''),
+        options: vals.map(v => ({ v, label: v })) })
+    }
+    return secs
+  })()
+  const ufMin = ufScore.min.trim() === '' ? null : Number(ufScore.min.replace(',', '.'))
+  const ufMax = ufScore.max.trim() === '' ? null : Number(ufScore.max.replace(',', '.'))
+  const ufActiveCount = ufSections.reduce((n, sec) => n + (uf[sec.key]?.length ? 1 : 0), 0) + (ufMin != null || ufMax != null ? 1 : 0)
+  const matchUnified = (u: any) => {
+    for (const sec of ufSections) {
+      const sel = uf[sec.key]
+      if (sel?.length && !sel.includes(sec.get(u))) return false
+    }
+    const sc = Number(u.score || 0)
+    if (ufMin != null && !isNaN(ufMin) && sc < ufMin) return false
+    if (ufMax != null && !isNaN(ufMax) && sc > ufMax) return false
+    return true
+  }
+
   const filtered = instUsers.filter((u: any) => {
     const q           = search.toLowerCase()
     const matchSearch = u.name.toLowerCase().includes(q) || (u.parentName || '').toLowerCase().includes(q) || (u.fin || '').toLowerCase().includes(q) || (u.workNumber || '').includes(q)
@@ -2207,7 +2267,7 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
     const matchPrint  = printFilter === 'all' || printFilter === 'both' || (printFilter === 'printed' && u.printStatus === 'printed') || (printFilter === 'not_printed' && u.printStatus !== 'printed')
     const matchGroup  = grpFilter === 'all' || String(u.group) === grpFilter
     const matchYear   = yearFilter === 'all' || u.year === yearFilter
-    return matchSearch && matchStatus && matchPrint && matchGroup && matchYear
+    return matchSearch && matchStatus && matchPrint && matchGroup && matchYear && matchUnified(u)
   })
 
   // ── Sıralama (fənn / ümumi bal üzrə) ──
@@ -2637,27 +2697,95 @@ function UserTable({ instId, instLabel, instIcon, onDelete, onReset }: { instId:
         <div className="search-row" style={{ flexShrink: 0, padding: '10px 16px' }}>
           <input className="search-input" placeholder="🔍  Ad, soyad, ata adı, FİN və ya iş nömrəsi ilə axtar..."
             value={search} onChange={e => setSearch(e.target.value)} />
-          <select className="filter-select" value={filter} onChange={e => setFilter(e.target.value)}>
-            <option value="all" disabled>Seçim statusu</option>
-            <option value="both">Hər ikisi</option>
-            <option value="submitted">Seçim etdi</option>
-            <option value="pending">Seçim etmədi</option>
-          </select>
-          <select className="filter-select" value={printFilter} onChange={e => setPrintFilter(e.target.value)}>
-            <option value="all" disabled>Çap statusu</option>
-            <option value="both">Hər ikisi</option>
-            <option value="printed">Çap edilib</option>
-            <option value="not_printed">Çap edilməyib</option>
-          </select>
-          {hasGroups && (
-            <select className="filter-select" value={grpFilter} onChange={e => setGrpFilter(e.target.value)}>
-              <option value="all">Bütün qruplar</option>
-              {allGroups.map(g => (
-                <option key={g} value={g}>Qrup {g}</option>
-              ))}
+          {IS_LIGHT_MODE ? (
+            <button type="button" onClick={() => setUfOpen(o => !o)}
+              style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '8px 14px', borderRadius: 10, cursor: 'pointer', whiteSpace: 'nowrap',
+                border: `1.5px solid ${ufOpen || ufActiveCount ? P.navy : 'var(--border)'}`, background: ufOpen ? '#eef2fb' : '#fff',
+                color: P.navy, fontWeight: 800, fontSize: 13 }}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 5h18l-7 8v6l-4 2v-8z" /></svg>
+              Filtr
+              {ufActiveCount > 0 && <span style={{ background: P.navy, color: '#fff', borderRadius: 20, padding: '1px 8px', fontSize: 11 }}>{ufActiveCount}</span>}
+              <span style={{ fontSize: 10, opacity: .7 }}>{ufOpen ? '▲' : '▼'}</span>
+            </button>
+          ) : <>
+            <select className="filter-select" value={filter} onChange={e => setFilter(e.target.value)}>
+              <option value="all" disabled>Seçim statusu</option>
+              <option value="both">Hər ikisi</option>
+              <option value="submitted">Seçim etdi</option>
+              <option value="pending">Seçim etmədi</option>
             </select>
-          )}
+            <select className="filter-select" value={printFilter} onChange={e => setPrintFilter(e.target.value)}>
+              <option value="all" disabled>Çap statusu</option>
+              <option value="both">Hər ikisi</option>
+              <option value="printed">Çap edilib</option>
+              <option value="not_printed">Çap edilməyib</option>
+            </select>
+            {hasGroups && (
+              <select className="filter-select" value={grpFilter} onChange={e => setGrpFilter(e.target.value)}>
+                <option value="all">Bütün qruplar</option>
+                {allGroups.map(g => (
+                  <option key={g} value={g}>Qrup {g}</option>
+                ))}
+              </select>
+            )}
+          </>}
         </div>
+
+        {/* ── Vahid filtr paneli (açıq mod) ── */}
+        {IS_LIGHT_MODE && ufOpen && (
+          <div style={{ flexShrink: 0, margin: '0 16px 10px', padding: '14px 16px', border: '1.5px solid #dfe4f0', borderRadius: 12, background: '#fbfcff',
+            display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '14px 20px', maxHeight: 320, overflowY: 'auto' }}>
+            {ufSections.map(sec => (
+              <div key={sec.key}>
+                <div style={{ fontSize: 11.5, fontWeight: 800, color: '#1f2a44', textTransform: 'uppercase', letterSpacing: .4, marginBottom: 7 }}>{sec.label}</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {sec.options.map(o => {
+                    const on = !!uf[sec.key]?.includes(o.v)
+                    const cnt = instUsers.filter((u: any) => sec.get(u) === o.v).length
+                    return (
+                      <button key={o.v} type="button" onClick={() => toggleUf(sec.key, o.v)}
+                        style={{ padding: '5px 10px', borderRadius: 8, cursor: 'pointer', fontSize: 12.5, fontWeight: on ? 800 : 600,
+                          border: `1.5px solid ${on ? P.navy : '#d9deea'}`, background: on ? P.navy : '#fff', color: on ? '#fff' : '#1f2a44' }}>
+                        {o.label} <span style={{ opacity: .65, fontWeight: 700 }}>{cnt}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            ))}
+            <div>
+              <div style={{ fontSize: 11.5, fontWeight: 800, color: '#1f2a44', textTransform: 'uppercase', letterSpacing: .4, marginBottom: 7 }}>Ümumi bal</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <input inputMode="decimal" placeholder="min" value={ufScore.min} onChange={e => setUfScore(v => ({ ...v, min: e.target.value }))}
+                  style={{ width: 80, padding: '6px 8px', borderRadius: 8, border: '1.5px solid #d9deea', fontSize: 12.5 }} />
+                <span style={{ color: 'var(--muted)' }}>—</span>
+                <input inputMode="decimal" placeholder="max" value={ufScore.max} onChange={e => setUfScore(v => ({ ...v, max: e.target.value }))}
+                  style={{ width: 80, padding: '6px 8px', borderRadius: 8, border: '1.5px solid #d9deea', fontSize: 12.5 }} />
+              </div>
+            </div>
+          </div>
+        )}
+        {IS_LIGHT_MODE && ufActiveCount > 0 && (
+          <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6, padding: '0 16px 10px' }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)' }}>{filtered.length} / {instUsers.length} göstərilir:</span>
+            {ufSections.flatMap(sec => (uf[sec.key] || []).map(v => (
+              <span key={sec.key + v} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 6px 3px 10px', borderRadius: 20, background: '#eef2fb', border: `1px solid ${P.navy}33`, fontSize: 12, color: '#1f2a44' }}>
+                <b style={{ fontWeight: 700, opacity: .7 }}>{sec.label}:</b> {sec.options.find(o => o.v === v)?.label ?? v}
+                <button type="button" onClick={() => toggleUf(sec.key, v)} title="Çıxar"
+                  style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: P.navy, fontWeight: 800, fontSize: 13, padding: '0 4px' }}>×</button>
+              </span>
+            )))}
+            {(ufMin != null || ufMax != null) && (
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 6px 3px 10px', borderRadius: 20, background: '#eef2fb', border: `1px solid ${P.navy}33`, fontSize: 12, color: '#1f2a44' }}>
+                <b style={{ fontWeight: 700, opacity: .7 }}>Bal:</b> {ufScore.min || '…'} – {ufScore.max || '…'}
+                <button type="button" onClick={() => setUfScore({ min: '', max: '' })} title="Çıxar"
+                  style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: P.navy, fontWeight: 800, fontSize: 13, padding: '0 4px' }}>×</button>
+              </span>
+            )}
+            <button type="button" onClick={clearUf}
+              style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#cf1322', fontWeight: 700, fontSize: 12, textDecoration: 'underline' }}>Hamısını təmizlə</button>
+          </div>
+        )}
 
         {/* ── Toplu əməliyyat paneli (yalnız seçim rejimində) ── */}
         {selectMode && (() => {
