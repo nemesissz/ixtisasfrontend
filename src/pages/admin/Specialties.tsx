@@ -2106,7 +2106,7 @@ export default function Specialties() {
     const cleanedLevels = Array.isArray(modal.levelNames) && modal.levelNames.length
       ? modal.levelNames.map((v: string, i: number) => (v || '').trim() || DEFAULT_LEVEL_NAMES[i] || `Səviyyə ${i + 1}`)
       : (t?.levelNames || [...DEFAULT_LEVEL_NAMES])
-    await treeDb.update(treeId, { ...t, name, year: modal.year?.trim() || '', icon: modal.icon ?? t.icon ?? '', institution: instId || t.institution || '', levelNames: cleanedLevels })
+    await treeDb.update(treeId, { ...t, name, year: modal.year?.trim() || '', icon: inst?.icon || modal.icon || t.icon || '', institution: instId || t.institution || '', levelNames: cleanedLevels })
     await addLog('admin', 'info', `İxtisas strukturu yeniləndi: "${name}"`, `Səviyyələr: ${cleanedLevels.join(' › ')}`)
     await refreshTrees(); setModal(null)
   }
@@ -2530,7 +2530,10 @@ export default function Specialties() {
             // Orta səviyyə (mülki ixtisas) sayı — root-ların birbaşa övladları
             const midCount  = (t.nodes || []).reduce((s: number, n: any) => s + (n.children?.length || 0), 0)
             const lvN       = t.levelNames?.length ? t.levelNames : DEFAULT_LEVEL_NAMES
-            const isImage   = t.icon?.startsWith('data:')
+            // Logo müəssisənin İNDİKİ loqosundan götürülür — struktur yaradılanda
+            // kopyalanan köhnə loqo müəssisə loqosu dəyişəndə yenilənmirdi.
+            const treeIcon  = ((insts as any[]).find((i: any) => i.id === t.institution)?.icon) || t.icon
+            const isImage   = isImageIcon(treeIcon)
 
             return (
               <div key={t.id} className="card" style={{ padding: 0, overflow: 'hidden' }}>
@@ -2566,8 +2569,8 @@ export default function Specialties() {
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     fontSize: 22, transition: 'all .15s',
                   }}>
-                    {t.icon
-                      ? (isImage ? <img src={t.icon} alt="logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} /> : <span>{t.icon}</span>)
+                    {treeIcon
+                      ? (isImage ? <img src={treeIcon} alt="logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} /> : <span>{treeIcon}</span>)
                       : <span>🏛️</span>
                     }
                   </div>
