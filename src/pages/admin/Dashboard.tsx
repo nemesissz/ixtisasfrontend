@@ -1082,9 +1082,9 @@ export default function Dashboard() {
                     <tr style={{ background: L('#eef1f8', '#f8f9fd'), color: L('#1f2a44', 'var(--muted)'), borderBottom: L(`2px solid ${P.navy}`, undefined) }}>
                       {(A.hasSource ? [0, 1] : [0]).map(g => (
                         <Fragment key={g}>
-                          <th style={{ padding: '7px 12px', fontWeight: L(800, 700), color: L('#1f2a44', undefined), fontSize: L(12, 11), textAlign: 'center', whiteSpace: 'nowrap', borderLeft: L('1px solid #cfd5e6', '1px solid #e6e9f5') }}>ən aşağı bal</th>
-                          <th style={{ padding: '7px 12px', fontWeight: L(800, 700), color: L('#1f2a44', undefined), fontSize: L(12, 11), textAlign: 'center', whiteSpace: 'nowrap' }}>orta bal</th>
-                          <th style={{ padding: '7px 12px', fontWeight: L(800, 700), color: L('#1f2a44', undefined), fontSize: L(12, 11), textAlign: 'center', whiteSpace: 'nowrap' }}>ən yuxarı bal</th>
+                          <th style={{ padding: '7px 12px', fontWeight: L(800, 700), color: L('#1f2a44', undefined), fontSize: L(12, 11), width: L(140, undefined), textAlign: 'center', whiteSpace: 'nowrap', borderLeft: L('1px solid #cfd5e6', '1px solid #e6e9f5') }}>ən aşağı bal</th>
+                          <th style={{ padding: '7px 12px', fontWeight: L(800, 700), color: L('#1f2a44', undefined), fontSize: L(12, 11), width: L(140, undefined), textAlign: 'center', whiteSpace: 'nowrap' }}>orta bal</th>
+                          <th style={{ padding: '7px 12px', fontWeight: L(800, 700), color: L('#1f2a44', undefined), fontSize: L(12, 11), width: L(140, undefined), textAlign: 'center', whiteSpace: 'nowrap' }}>ən yuxarı bal</th>
                         </Fragment>
                       ))}
                     </tr>
