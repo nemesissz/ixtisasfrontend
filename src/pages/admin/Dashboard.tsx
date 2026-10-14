@@ -228,9 +228,9 @@ function buildStatsReportHtml(A: any, instLabel: string, selName: string): strin
         <table class="t"><thead><tr><th>#</th><th>İxtisas</th><th>Tələb/Yer</th><th>Rəqabət</th></tr></thead>
         <tbody>${A.mostCompetitive.map((l: any, i: number) => `<tr><td class="c">${i + 1}</td><td>${esc(l.name)}</td><td class="c">${l.demand}/${l.quota}</td><td class="c">${l.comp.toFixed(1)}×</td></tr>`).join('')}</tbody></table>
       </div>
-      <div><h3>Ən az rəqabətli olan ixtisaslar</h3>
-        <table class="t"><thead><tr><th>#</th><th>İxtisas</th><th>Tələb/Yer</th><th>Rəqabət</th></tr></thead>
-        <tbody>${A.leastDemanded.map((l: any, i: number) => `<tr><td class="c">${i + 1}</td><td>${esc(l.name)}</td><td class="c">${l.demand}/${l.quota}</td><td class="c">${l.comp.toFixed(1)}×</td></tr>`).join('')}</tbody></table>
+      <div><h3>Ən az üstünlük verilən ixtisaslar (ən çox sonuncu seçilən)</h3>
+        <table class="t"><thead><tr><th>#</th><th>İxtisas</th><th>Sonuncu yazan</th><th>Payı</th></tr></thead>
+        <tbody>${A.leastDemanded.map((l: any, i: number) => `<tr><td class="c">${i + 1}</td><td>${esc(l.name)}</td><td class="c">${l.lastChoice}/${l.listed}</td><td class="c">${l.lastPct.toFixed(0)}%</td></tr>`).join('')}</tbody></table>
       </div>
     </div>` : ''
 
@@ -388,8 +388,14 @@ export default function Dashboard() {
     // ixtisası 1-ci seçim kimi yazanların sayı. (Əvvəl hər hansı sırada seçmək sayılırdı.)
     const firstChoice: Record<string, number> = {}
     const top3: Record<string, number> = {}
+    // Sonuncu seçim: ixtisası sıralamasının ən sonuna yazanların sayı (ən az üstünlük göstəricisi)
+    const lastChoice: Record<string, number> = {}
+    const listed: Record<string, number> = {}
     for (const s of subs) {
       const f = s.ranking?.[0]; if (f) firstChoice[f] = (firstChoice[f] || 0) + 1
+      const r = s.ranking || []
+      if (r.length > 1) { const l = r[r.length - 1]; lastChoice[l] = (lastChoice[l] || 0) + 1 }
+      for (const id of r) listed[id] = (listed[id] || 0) + 1
       for (const id of (s.ranking || []).slice(0, 3)) top3[id] = (top3[id] || 0) + 1
     }
 
@@ -428,6 +434,8 @@ export default function Dashboard() {
         mülkiMax: mülkiS.length ? Math.max(...mülkiS) : 0,
         demand: firstChoice[leaf.id] || 0,
         firstChoice: firstChoice[leaf.id] || 0,
+        lastChoice: lastChoice[leaf.id] || 0,
+        listed: listed[leaf.id] || 0,
       }
     })
 
@@ -539,7 +547,11 @@ export default function Dashboard() {
     const byComp = [...ranked].sort((a, b) => b.comp - a.comp)
     const half = Math.ceil(byComp.length / 2)
     const mostCompetitive = byComp.slice(0, half)
-    const leastDemanded = byComp.slice(half).reverse()
+    // Ən az üstünlük verilən — sıralamanın sonuna ən çox yazılan ixtisaslar
+    const leastDemanded = byLeaf.filter(l => l.lastChoice > 0)
+      .map(l => ({ ...l, lastPct: l.listed > 0 ? (l.lastChoice / l.listed) * 100 : 0 }))
+      .sort((a, b) => b.lastChoice - a.lastChoice || b.lastPct - a.lastPct)
+      .slice(0, Math.max(half, 10))
 
     // maraq sıralaması — 1-ci seçim sayına görə (rəqabətdən fərqli ölçü)
     const byInterest = [...byLeaf].sort((a, b) => b.demand - a.demand || b.top3 - a.top3)
@@ -665,8 +677,8 @@ export default function Dashboard() {
     // Rəqabət vərəqi (1-ci seçim üzrə)
     const comp: any[][] = [['ƏN RƏQABƏTLİ (1-ci seçim üzrə)'], ['#', 'İxtisas', 'Tələb', 'Yer', 'Rəqabət'],
       ...A.mostCompetitive.map((l: any, i: number) => [i + 1, l.name, l.demand, l.quota, +l.comp.toFixed(1)]),
-      [], ['ƏN AZ TƏLƏB OLUNAN'], ['#', 'İxtisas', 'Tələb', 'Yer', 'Rəqabət'],
-      ...A.leastDemanded.map((l: any, i: number) => [i + 1, l.name, l.demand, l.quota, +l.comp.toFixed(1)])]
+      [], ['ƏN AZ ÜSTÜNLÜK VERİLƏN (ən çox sonuncu seçilən)'], ['#', 'İxtisas', 'Sonuncu yazan', 'Sıralamada olan', 'Payı %'],
+      ...A.leastDemanded.map((l: any, i: number) => [i + 1, l.name, l.lastChoice, l.listed, +l.lastPct.toFixed(0)])]
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(comp), 'Rəqabət')
 
     // Maraq sıralaması vərəqi — kvotadan asılı olmayan xam tələb.
@@ -1124,14 +1136,18 @@ export default function Dashboard() {
                   ))}
                 </div>
               </Card>
-              <Card title="Ən az rəqabətli olan ixtisaslar">
+              <Card title="Ən az üstünlük verilən ixtisaslar">
+                <div style={{ color: 'var(--muted)', fontSize: 12, marginBottom: 10 }}>
+                  Seçim siyahısının ən sonuna ən çox yazılan ixtisaslar. Faiz — onu sıralayanların neçə faizinin sonuncu yazdığıdır.
+                </div>
+                {A.leastDemanded.length === 0 && <div style={{ color: 'var(--muted)', fontSize: 13 }}>Hələ göndərilmiş seçim yoxdur.</div>}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 9, maxHeight: 340, overflowY: 'auto' }}>
                   {A.leastDemanded.map((l: any, i: number) => (
                     <div key={l.id} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13 }}>
                       <span style={{ width: 22, height: 22, borderRadius: 7, background: '#f0f5ff', color: '#2f54eb', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, flexShrink: 0 }}>{i + 1}</span>
                       <span style={{ flex: 1, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.name}</span>
-                      <span style={{ color: 'var(--muted)', fontSize: 11 }}>{l.demand} tələb / {l.quota} yer</span>
-                      <b style={{ color: l.comp < 1 ? O(`${P.navyDk}`, '#237804') : O(`${P.navyDk}`, '#d46b08'), minWidth: 38, textAlign: 'right' }}>{l.comp.toFixed(1)}×</b>
+                      <span style={{ color: 'var(--muted)', fontSize: 11 }}>{l.lastChoice} nəfər sonuncu / {l.listed} sıralamada</span>
+                      <b style={{ color: O(`${P.navyDk}`, '#d46b08'), minWidth: 42, textAlign: 'right' }}>{l.lastPct.toFixed(0)}%</b>
                     </div>
                   ))}
                 </div>
