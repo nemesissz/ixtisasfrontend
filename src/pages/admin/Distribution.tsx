@@ -192,6 +192,8 @@ function PacketAllocWhy({ specId, explain, pkMeta, leafName, curPacket }: {
   const pkTotal = (src: string, i: number) => Object.values(explain.bySpec)
     .reduce((a, x) => a + (x.buckets.find(b => b.src === src)?.rows[i]?.given || 0), 0)
   const moves = explain.moves.filter(m => m.specId === specId || m.otherSpecId === specId)
+  const capMoves = (explain.capMoves || []).filter(m => m.specId === specId)
+  const gc = explain.genderCaps?.[specId]
   const range = (i: number) => {
     const m = pkMeta.find(x => x.num === i + 1)
     return m && m.maxScore > 0 ? `${m.minScore.toFixed(0)}–${m.maxScore.toFixed(0)}` : '—'
@@ -264,6 +266,23 @@ function PacketAllocWhy({ specId, explain, pkMeta, leafName, curPacket }: {
               </div>
             )
           })}
+          {gc && (['F', 'M'] as const).map(g => gc[g] && (
+            <div key={g} style={{ marginTop: 6, fontSize: 11.5, color: `${O(P.ink, '#6a5a2e')}`, lineHeight: 1.6 }}>
+              <b>{g === 'F' ? 'Qadın' : 'Kişi'} limiti — cəmi {gc[g]!.total}:</b>{' '}
+              {gc[g]!.caps.map((c, i) => `Paket ${i + 1}: ${c}`).join(' · ')}
+              {gc[g]!.caps.reduce((a, b) => a + b, 0) < gc[g]!.total ? ` · ehtiyatda ${gc[g]!.total - gc[g]!.caps.reduce((a, b) => a + b, 0)}` : ''}.
+              {' '}Limit bütün ixtisas üzrədir; paketlərə əvvəlcə bölgünün istifadə etdiyi qədər, qalanı həmin cinsdən namizəd sayına mütənasib bölünür.
+            </div>
+          ))}
+          {capMoves.length > 0 && (
+            <div style={{ marginTop: 6, fontSize: 11.5, color: `${O(P.ink, '#6a5a2e')}`, lineHeight: 1.6 }}>
+              <b>Real yerləşdirmə ilə yoxlama — cins limiti köçürmələri:</b>
+              {capMoves.map((m, k) => (
+                <div key={k}>• Paket {m.to + 1}-də <b>{m.student.name}</b> ({m.student.score.toFixed(1)} bal) boş yer olduğu halda paketin {m.gender === 'F' ? 'qadın' : 'kişi'} limiti dolu olduğu üçün yersiz qalırdı —
+                  {' '}limitin 1 vahidi {m.from == null ? 'ehtiyatdan' : `onu işlətməyən Paket ${m.from + 1}-dən`} Paket {m.to + 1}-ə keçirildi.</div>
+              ))}
+            </div>
+          )}
           {moves.length > 0 && (
             <div style={{ marginTop: 6, fontSize: 11.5, color: `${O(P.ink, '#6a5a2e')}`, lineHeight: 1.6 }}>
               <b>Real yerləşdirmə ilə yoxlama — yer dəyişmələri:</b>
@@ -318,6 +337,7 @@ function StorySim({ students, packets, subs, tree, poolUsers, preAssignLevel, fi
     leaves.forEach(({ leaf }) => { leafById[leaf.id] = leaf })
 
     const steps: any[] = []
+    const data_multi = pkts.length > 1
     const pkMeta: { num: number; specIds: string[]; quota: Record<string, number>; minScore: number; maxScore: number; count: number }[] = []
     const rebalanced: { name: string; score: number; fromSpec: string | null; toSpec: string; packetNum: number }[] = []
     for (const pk of pkts) {
@@ -393,7 +413,7 @@ function StorySim({ students, packets, subs, tree, poolUsers, preAssignLevel, fi
       for (const u of stage.pool) {
         if (assignments[u.id]) continue
         const ranking = (subs.find((s: any) => s.userId === u.id)?.ranking || []).filter((id: string) => quota[id] !== undefined)
-        const attempts: { id: string; full: boolean; tie?: boolean; rival?: string; blocked?: 'gender' | 'cap' }[] = []
+        const attempts: { id: string; full: boolean; tie?: boolean; rival?: string; blocked?: 'gender' | 'cap'; cap?: number; capPk?: boolean }[] = []
         let placed: string | null = null
         const tieRivals: { id: string; rival: string; score: number; trace?: TieStep[]; subject?: string; rivalSubjScore?: number; mySubjScore?: number }[] = []
         const sc = u.score || 0, g = u.gender
@@ -405,7 +425,10 @@ function StorySim({ students, packets, subs, tree, poolUsers, preAssignLevel, fi
             if (g === 'qadın') femP[sid] = (femP[sid] || 0) + 1; else if (g === 'kişi') malP[sid] = (malP[sid] || 0) + 1
             attempts.push({ id: sid, full: false }); lastInLeaf[sid] = { name: u.name, score: sc, user: u }; break
           } else if (av[sid] > 0) {
-            attempts.push({ id: sid, full: true, blocked: 'cap' })
+            // paket üsulunda limit paketə düşən paydır — izahda göstərilir
+            const own = g === 'qadın' ? leaf?.maxFemale : leaf?.maxMale
+            const orig = g === 'qadın' ? leafById[sid]?.maxFemale : leafById[sid]?.maxMale
+            attempts.push({ id: sid, full: true, blocked: 'cap', cap: own ?? undefined, capPk: data_multi && own !== orig })
           } else {
             const last = lastInLeaf[sid]
             const tie = !!last && Math.abs((last.score || 0) - sc) < 1e-9
@@ -724,7 +747,9 @@ function StorySim({ students, packets, subs, tree, poolUsers, preAssignLevel, fi
                       {isPlaced && <span style={{ fontSize: 11, fontWeight: 700, color: '#52c41a' }}>✓ yerləşdi</span>}
                       {isFull && <span style={{ fontSize: 11, color: '#cf1322', whiteSpace: 'nowrap' }}>{
                         tried?.blocked === 'gender' ? '🚫 cins məhdudiyyəti'
-                        : tried?.blocked === 'cap' ? '🚫 cins kvotası dolub'
+                        : tried?.blocked === 'cap' ? (tried.capPk
+                          ? `🚫 paketin ${cur.u.gender === 'qadın' ? 'qadın' : 'kişi'} limiti (${tried.cap}) dolub`
+                          : '🚫 cins kvotası dolub')
                         : `${tried?.tie ? '⚖️ bərabər bal · ' : ''}dolu${cutoff[rid] !== undefined ? ` · keçid ${cutoff[rid].toFixed(1)}` : ''}`
                       }</span>}
                     </div>

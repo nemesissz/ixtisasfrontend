@@ -60,8 +60,16 @@ export interface PacketAllocMove {
   src: string; specId: string; otherSpecId: string; from: number; to: number
   student: { name: string; score: number }
 }
+/** Cins limitinin bir vahidi paketlər arasında keçirildi (`from` null → ehtiyatdan) */
+export interface PacketAllocCapMove {
+  specId: string; gender: 'F' | 'M'; from: number | null; to: number
+  student: { name: string; score: number }
+}
 export interface PacketAllocExplain {
   sourceProportional: boolean
+  /** ixtisas → cins limitinin paketlər üzrə bölgüsü (yalnız limiti olan ixtisaslar) */
+  genderCaps: Record<string, { F?: { total: number; caps: number[] }; M?: { total: number; caps: number[] } }>
+  capMoves: PacketAllocCapMove[]
   bySpec: Record<string, { quota: number; buckets: PacketAllocBucket[] }>
   /** mənbə → paket üzrə tutum: seçim göndərənlər və göndərməyənlər */
   cap: Record<string, { sub: number; ns: number }[]>
@@ -134,7 +142,7 @@ export function allocatePacketSpecs(
 ): PacketAllocResult {
   const P = pkUsers.length
   const spActive = !!(tree?.sourceProportional)
-  const explain: PacketAllocExplain = { sourceProportional: spActive, bySpec: {}, cap: {}, moves: [], repairTimedOut: false }
+  const explain: PacketAllocExplain = { sourceProportional: spActive, genderCaps: {}, capMoves: [], bySpec: {}, cap: {}, moves: [], repairTimedOut: false }
   const specs: PacketSpec[][] = Array.from({ length: P }, () => [])
   if (leaves.length === 0 || P === 0) return { specs, explain }
 
@@ -281,16 +289,30 @@ export function allocatePacketSpecs(
     }
   }
 
-  // ── Paketlərin cins limiti: bölgünün istifadə etdiyi + qalan ehtiyat yuxarı paketlərə ──
-  const genderCaps = (j: number, g: 'F' | 'M') => {
+  // ── Paketlərin cins limiti ──
+  // Hər paketə əvvəlcə bölgünün həmin cinsdən istifadə etdiyi yer qədər limit düşür.
+  // Qalan ehtiyat paketlərə həmin cinsdən olan namizəd sayına mütənasib bölünür
+  // (əvvəl yuxarı paketlərə verilirdi — aşağı paketdə namizəd qadın limit 0 olduğu
+  // üçün yersiz qalır, yer isə boş qalırdı). Paylanmayan hissə ehtiyatda qalır və
+  // yoxlama zamanı ehtiyacı olan paketə verilir.
+  const capArr: Record<'F' | 'M', (number[] | null)[]> = { F: [], M: [] }
+  const capPool: Record<'F' | 'M', number[]> = { F: [], M: [] }
+  for (const g of ['F', 'M'] as const) for (let j = 0; j < J; j++) {
     const C = capOf(leaves[j].leaf, g)
-    if (C == null) return null
-    const base = g === 'F' ? Fbase[j] : Mbase[j]
-    const tot = Array.from({ length: P }, (_, i) => sources.reduce((a, s) => a + A[s][j][i], 0))
-    const caps = base.map((b, i) => Math.min(b, tot[i]))
-    let slack = Math.max(0, C - caps.reduce((a, b) => a + b, 0))
-    for (let i = 0; i < P && slack > 0; i++) { const add = Math.min(slack, tot[i] - caps[i]); caps[i] += add; slack -= add }
-    return caps
+    if (C == null) { capArr[g].push(null); capPool[g].push(0); continue }
+    const base = (g === 'F' ? Fbase[j] : Mbase[j]).map(b => b)
+    const demand = Array.from({ length: P }, (_, i) =>
+      Math.max(0, pkUsers[i].filter(u => { const inf = info.get(u.id)!; return inf.g === g && inf.set.includes(j) }).length - base[i]))
+    let slack = Math.max(0, C - base.reduce((a, b) => a + b, 0))
+    const dTot = demand.reduce((a, b) => a + b, 0)
+    if (slack > 0 && dTot > 0) {
+      const give = Math.min(slack, dTot)
+      const raw = demand.map(d => give * d / dTot), fl = raw.map(Math.floor)
+      let rest = give - fl.reduce((a, b) => a + b, 0)
+      raw.map((r, i) => [r - fl[i], i]).sort((a, b) => b[0] - a[0]).forEach(([, i]) => { if (rest > 0 && fl[i] < demand[i]) { fl[i]++; rest-- } })
+      fl.forEach((x, i) => { base[i] += x }); slack -= fl.reduce((a, b) => a + b, 0)
+    }
+    capArr[g].push(base); capPool[g].push(slack)
   }
   const buildSpecs = (i: number): PacketSpec[] => {
     const out: PacketSpec[] = []
@@ -300,7 +322,7 @@ export function allocatePacketSpecs(
       for (const s of sources) byS[s] = A[s][j][i]
       const q = sources.reduce((a, s) => a + byS[s], 0)
       if (q <= 0) continue
-      const fc = genderCaps(j, 'F'), mc = genderCaps(j, 'M')
+      const fc = capArr.F[j], mc = capArr.M[j]
       out.push({
         id: leaf.id, name: leaf.name, path, quota: q, origQuota: leaf.quota || 0,
         ...(spActive ? { mülkiQuota: byS.mülki, liseyQuota: byS.lisey } : {}),
@@ -331,7 +353,9 @@ export function allocatePacketSpecs(
         if (!spActive || src === 'other') return Math.max(0, free)
         return Math.max(0, Math.min(free, A[src][j][i] - mine))
       }
-      return { unplaced, empty }
+      // i paketində j ixtisasına yerləşən g cinsli
+      const gPlaced = (j: number, g: string) => pkUsers[i].filter(u => r.assignments[u.id]?.specId === leaves[j].leaf.id && gKey(u) === g).length
+      return { unplaced, empty, gPlaced }
     }
     const res = Array.from({ length: P }, (_, i) => sim(i))
     const deadline = Date.now() + 1200
@@ -343,6 +367,27 @@ export function allocatePacketSpecs(
           const empties = leaves.map((_, j) => j).filter(j => res[i].empty(src, j) > 0)
           if (!empties.length) continue
           const wants = (rankOf.get(u.id) || []).map(id => leafIdx.get(id)).filter((j): j is number => j != null && info.get(u.id)!.set.includes(j))
+          // 1) Cins limiti: seçdiyi ixtisasda boş yer var, amma paketin bu cins limiti
+          //    dolub → limitin bir vahidi ehtiyatdan və ya onu işlətməyən paketdən gəlir
+          const g = gKey(u)
+          if (g !== 'U') for (const j of wants) {
+            const caps = capArr[g][j]
+            if (!caps || res[i].empty(src, j) <= 0 || res[i].gPlaced(j, g) < caps[i]) continue
+            const donors: (number | null)[] = capPool[g][j] > 0 ? [null] : []
+            for (let k = 0; k < P; k++) if (k !== i && caps[k] > res[k].gPlaced(j, g)) donors.push(k)
+            for (const k of donors) {
+              if (Date.now() > deadline) { explain.repairTimedOut = true; break outer }
+              caps[i]++; if (k == null) capPool[g][j]--; else caps[k]--
+              const ri = sim(i)
+              const rk = ri.unplaced.length < res[i].unplaced.length && k != null ? sim(k) : null
+              if (ri.unplaced.length < res[i].unplaced.length && (k == null || ri.unplaced.length + rk!.unplaced.length < res[i].unplaced.length + res[k].unplaced.length)) {
+                res[i] = ri; if (k != null) res[k] = rk!
+                explain.capMoves.push({ specId: leaves[j].leaf.id, gender: g, from: k, to: i, student: { name: u.name, score: u.score || 0 } })
+                continue outer
+              }
+              caps[i]--; if (k == null) capPool[g][j]++; else caps[k]++
+            }
+          }
           // Əvvəl təhsilalanın öz seçimləri, sonra qalan ixtisaslar (zəncirvari sıxışdırma
           // ilə də yer aça bilər — məs. paketdəki başqa biri o ixtisasa keçib yer boşaldır)
           const ws = new Set(wants)
@@ -375,6 +420,12 @@ export function allocatePacketSpecs(
       b.rows.forEach((r, i) => { r.given = A[b.src][j][i] })
   }
 
+  for (let j = 0; j < J; j++) for (const g of ['F', 'M'] as const) {
+    const caps = capArr[g][j]
+    if (!caps) continue
+    const e = explain.genderCaps[leaves[j].leaf.id] ||= {}
+    e[g] = { total: capOf(leaves[j].leaf, g)!, caps: [...caps] }
+  }
   for (let i = 0; i < P; i++) specs[i] = buildSpecs(i)
   return { specs, explain }
 }
