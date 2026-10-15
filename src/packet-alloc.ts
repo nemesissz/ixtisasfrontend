@@ -57,7 +57,7 @@ export interface PacketAllocRow {
 export interface PacketAllocBucket { src: string; slots: number; rows: PacketAllocRow[] }
 /** Yoxlama zamanı edilən dəyişmə: `specId`-in bir yeri `from` → `to`, `otherSpecId`-in bir yeri `to` → `from` */
 export interface PacketAllocMove {
-  src: string; specId: string; otherSpecId: string; from: number; to: number
+  src: string; specId: string; otherSpecId?: string; from: number; to: number
   student: { name: string; score: number }
 }
 /** Cins limitinin bir vahidi paketlər arasında keçirildi (`from` null → ehtiyatdan) */
@@ -358,23 +358,46 @@ export function allocatePacketSpecs(
       return { unplaced, empty, gPlaced }
     }
     const res = Array.from({ length: P }, (_, i) => sim(i))
-    const deadline = Date.now() + 1200
+    // i paketində j ixtisasına g cinsli üçün limit doludursa bir vahid gətirir
+    // (ehtiyatdan, əvvəlcə `pref`, sonra onu işlətməyən digər paketlərdən).
+    // Qaytarır: geri alma funksiyası və mənbə; null → limit tapılmadı.
+    type Grab = { undo: () => void; from?: number | null }
+    const NOOP: Grab = { undo: () => {} }
+    const grabCap = (i: number, j: number, g: string, pref: number | null): Grab | null => {
+      if (g !== 'F' && g !== 'M') return NOOP
+      const caps = capArr[g][j]
+      if (!caps || res[i].gPlaced(j, g) < caps[i]) return NOOP
+      if (capPool[g][j] > 0) {
+        caps[i]++; capPool[g][j]--
+        return { undo: () => { caps[i]--; capPool[g][j]++ }, from: null }
+      }
+      const ks = Array.from({ length: P }, (_, k) => k).filter(k => k !== i && caps[k] > res[k].gPlaced(j, g))
+        .sort((a, b) => (b === pref ? 1 : 0) - (a === pref ? 1 : 0) || (caps[b] - res[b].gPlaced(j, g)) - (caps[a] - res[a].gPlaced(j, g)))
+      if (!ks.length) return null
+      const k = ks[0]
+      caps[i]++; caps[k]--
+      return { undo: () => { caps[i]--; caps[k]++ }, from: k }
+    }
+    const logCap = (gr: Grab, j: number, g: string, i: number, u: any) => {
+      if (gr.from !== undefined) explain.capMoves.push({ specId: leaves[j].leaf.id, gender: g as 'F' | 'M', from: gr.from, to: i, student: { name: u.name, score: u.score || 0 } })
+    }
+    const deadline = Date.now() + 2500
     let guard = 0
-    outer: while (guard++ < 60) {
-      for (let i = 0; i < P; i++) {
+    // Əvvəl hamı üçün paketlərin yer sayını saxlayan dəyişmələr (1–2), yalnız sonra 3
+    outer: while (guard++ < 100) {
+      for (const phase of [0, 1]) for (let i = 0; i < P; i++) {
         for (const u of res[i].unplaced) {
           const src = srcOf(u)
-          const empties = leaves.map((_, j) => j).filter(j => res[i].empty(src, j) > 0)
-          if (!empties.length) continue
-          const wants = (rankOf.get(u.id) || []).map(id => leafIdx.get(id)).filter((j): j is number => j != null && info.get(u.id)!.set.includes(j))
-          // 1) Cins limiti: seçdiyi ixtisasda boş yer var, amma paketin bu cins limiti
-          //    dolub → limitin bir vahidi ehtiyatdan və ya onu işlətməyən paketdən gəlir
           const g = gKey(u)
-          if (g !== 'U') for (const j of wants) {
+          const wants = (rankOf.get(u.id) || []).map(id => leafIdx.get(id)).filter((j): j is number => j != null && info.get(u.id)!.set.includes(j))
+          const others = Array.from({ length: P }, (_, k) => k).filter(k => k !== i).sort((a, b) => Math.abs(a - i) - Math.abs(b - i))
+          // 1) Cins limiti: seçdiyi ixtisasda öz paketində boş yer var, amma paketin bu
+          //    cins limiti dolub → limitin bir vahidi ehtiyatdan və ya digər paketdən gəlir
+          if (phase === 0 && (g === 'F' || g === 'M')) for (const j of wants) {
             const caps = capArr[g][j]
             if (!caps || res[i].empty(src, j) <= 0 || res[i].gPlaced(j, g) < caps[i]) continue
             const donors: (number | null)[] = capPool[g][j] > 0 ? [null] : []
-            for (let k = 0; k < P; k++) if (k !== i && caps[k] > res[k].gPlaced(j, g)) donors.push(k)
+            for (const k of others) if (caps[k] > res[k].gPlaced(j, g)) donors.push(k)
             for (const k of donors) {
               if (Date.now() > deadline) { explain.repairTimedOut = true; break outer }
               caps[i]++; if (k == null) capPool[g][j]--; else caps[k]--
@@ -388,27 +411,58 @@ export function allocatePacketSpecs(
               caps[i]--; if (k == null) capPool[g][j]++; else caps[k]++
             }
           }
-          // Əvvəl təhsilalanın öz seçimləri, sonra qalan ixtisaslar (zəncirvari sıxışdırma
-          // ilə də yer aça bilər — məs. paketdəki başqa biri o ixtisasa keçib yer boşaldır)
           const ws = new Set(wants)
+          // 2) Öz paketində boş yer var, amma seçdiyi ixtisaslarda yox → yerlər dəyişdirilir.
+          //    Əvvəl təhsilalanın öz seçimləri, sonra qalan ixtisaslar (zəncirvari sıxışdırma
+          //    ilə də yer aça bilər — məs. paketdəki başqa biri o ixtisasa keçib yer boşaldır)
+          const empties = leaves.map((_, j) => j).filter(j => res[i].empty(src, j) > 0)
           const cands = [...wants, ...leaves.map((_, j) => j).filter(j => !ws.has(j))]
-          // yaxın paketlər əvvəl
-          const others = Array.from({ length: P }, (_, k) => k).filter(k => k !== i).sort((a, b) => Math.abs(a - i) - Math.abs(b - i))
-          for (const t of cands) for (const k of others) {
+          if (phase === 0 && empties.length) for (const t of cands) for (const k of others) {
             if (A[src][t][k] <= 0) continue
             for (const ej of empties) {
               if (ej === t) continue
               if (Date.now() > deadline) { explain.repairTimedOut = true; break outer }
               A[src][ej][i]--; A[src][ej][k]++; A[src][t][k]--; A[src][t][i]++
-              // əvvəl yalnız bu paket — yaxşılaşmırsa digərini hesablamağa dəyməz
-              const ri = sim(i)
-              const rk = ri.unplaced.length < res[i].unplaced.length ? sim(k) : null
-              if (rk && ri.unplaced.length + rk.unplaced.length < res[i].unplaced.length + res[k].unplaced.length) {
-                res[i] = ri; res[k] = rk
-                explain.moves.push({ src, specId: leaves[ej].leaf.id, otherSpecId: leaves[t].leaf.id, from: i, to: k, student: { name: u.name, score: u.score || 0 } })
-                continue outer
+              const gr = ws.has(t) ? grabCap(i, t, g, k) : NOOP
+              if (gr) {
+                // əvvəl yalnız bu paket — yaxşılaşmırsa digərini hesablamağa dəyməz
+                const ri = sim(i)
+                const rk = ri.unplaced.length < res[i].unplaced.length ? sim(k) : null
+                if (rk && ri.unplaced.length + rk.unplaced.length < res[i].unplaced.length + res[k].unplaced.length) {
+                  res[i] = ri; res[k] = rk
+                  if (gr.from != null && gr.from !== k) res[gr.from] = sim(gr.from)
+                  logCap(gr, t, g, i, u)
+                  explain.moves.push({ src, specId: leaves[ej].leaf.id, otherSpecId: leaves[t].leaf.id, from: i, to: k, student: { name: u.name, score: u.score || 0 } })
+                  continue outer
+                }
+                gr.undo()
               }
               A[src][ej][i]++; A[src][ej][k]--; A[src][t][k]++; A[src][t][i]--
+            }
+          }
+          // 3) Seçdiyi ixtisasın yeri başqa paketdə boş qalır → həmin yer bu paketə keçir
+          //    (lazım olsa cins limitinin bir vahidi ilə birlikdə). Bu paketlərin yer sayını
+          //    dəyişdiyi üçün yer dəyişməsindən sonra sınanır.
+          if (phase === 1) for (const j of wants) {
+            if (res[i].empty(src, j) > 0) continue
+            for (const k of others) {
+              if (res[k].empty(src, j) <= 0) continue
+              if (Date.now() > deadline) { explain.repairTimedOut = true; break outer }
+              A[src][j][k]--; A[src][j][i]++
+              const gr = grabCap(i, j, g, k)
+              if (gr) {
+                const ri = sim(i)
+                const rk = ri.unplaced.length < res[i].unplaced.length ? sim(k) : null
+                if (rk && ri.unplaced.length + rk.unplaced.length < res[i].unplaced.length + res[k].unplaced.length) {
+                  res[i] = ri; res[k] = rk
+                  if (gr.from != null && gr.from !== k) res[gr.from] = sim(gr.from)
+                  logCap(gr, j, g, i, u)
+                  explain.moves.push({ src, specId: leaves[j].leaf.id, from: k, to: i, student: { name: u.name, score: u.score || 0 } })
+                  continue outer
+                }
+                gr.undo()
+              }
+              A[src][j][k]++; A[src][j][i]--
             }
           }
         }

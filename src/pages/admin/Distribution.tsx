@@ -286,9 +286,12 @@ function PacketAllocWhy({ specId, explain, pkMeta, leafName, curPacket }: {
           {moves.length > 0 && (
             <div style={{ marginTop: 6, fontSize: 11.5, color: `${O(P.ink, '#6a5a2e')}`, lineHeight: 1.6 }}>
               <b>Real yerləşdirmə ilə yoxlama — yer dəyişmələri:</b>
-              {moves.map((m, k) => (
+              {moves.map((m, k) => m.otherSpecId == null ? (
+                <div key={k}>• Paket {m.from + 1}-də «{leafName[m.specId]}» ixtisasının 1 yeri boş qalırdı, Paket {m.to + 1}-dəki <b>{m.student.name}</b> ({m.student.score.toFixed(1)} bal) isə bu ixtisası seçdiyi halda yersiz qalırdı.
+                  {' '}Boş yer Paket {m.to + 1}-ə keçirildi{SRC_LABEL[m.src] ? ` (${SRC_LABEL[m.src].toLowerCase()})` : ''}.</div>
+              ) : (
                 <div key={k}>• Paket {m.from + 1}-də «{leafName[m.specId]}» ixtisasının 1 yeri boş qalırdı (onu seçən yox idi), həmin paketdəki <b>{m.student.name}</b> ({m.student.score.toFixed(1)} bal) isə yersiz qalırdı.
-                  {' '}Boş yer Paket {m.to + 1}-ə verildi, əvəzində Paket {m.to + 1}-dən «{leafName[m.otherSpecId]}» ixtisasının 1 yeri Paket {m.from + 1}-ə keçdi{SRC_LABEL[m.src] ? ` (${SRC_LABEL[m.src].toLowerCase()})` : ''} — nəticədə hər iki paketdə yersiz qalan azaldı.</div>
+                  {' '}Boş yer Paket {m.to + 1}-ə verildi, əvəzində Paket {m.to + 1}-dən «{leafName[m.otherSpecId!]}» ixtisasının 1 yeri Paket {m.from + 1}-ə keçdi{SRC_LABEL[m.src] ? ` (${SRC_LABEL[m.src].toLowerCase()})` : ''} — nəticədə hər iki paketdə yersiz qalan azaldı.</div>
               ))}
             </div>
           )}
