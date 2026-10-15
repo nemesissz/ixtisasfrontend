@@ -65,11 +65,21 @@ export interface PacketAllocCapMove {
   specId: string; gender: 'F' | 'M'; from: number | null; to: number
   student: { name: string; score: number }
 }
+/** Cins limitini tutan `holder` daha üstün seçdiyi ixtisasa keçirildi ki, `student` yerləşsin:
+ *  `upSpecId`-in 1 yeri n → m, `emptySpecId`-in boş yeri m → n; m ≠ to olduqda limit m → to */
+export interface PacketAllocChainMove {
+  src: string; gender: 'F' | 'M'; specId: string; upSpecId: string; emptySpecId: string | null
+  /** u-nun paketinə j-nin boş yeri bu paketdən gəldi */
+  jFrom: number | null
+  holder: { name: string; score: number }; m: number; n: number; to: number
+  student: { name: string; score: number }
+}
 export interface PacketAllocExplain {
   sourceProportional: boolean
   /** ixtisas → cins limitinin paketlər üzrə bölgüsü (yalnız limiti olan ixtisaslar) */
   genderCaps: Record<string, { F?: { total: number; caps: number[] }; M?: { total: number; caps: number[] } }>
   capMoves: PacketAllocCapMove[]
+  chainMoves: PacketAllocChainMove[]
   bySpec: Record<string, { quota: number; buckets: PacketAllocBucket[] }>
   /** mənbə → paket üzrə tutum: seçim göndərənlər və göndərməyənlər */
   cap: Record<string, { sub: number; ns: number }[]>
@@ -142,7 +152,7 @@ export function allocatePacketSpecs(
 ): PacketAllocResult {
   const P = pkUsers.length
   const spActive = !!(tree?.sourceProportional)
-  const explain: PacketAllocExplain = { sourceProportional: spActive, genderCaps: {}, capMoves: [], bySpec: {}, cap: {}, moves: [], repairTimedOut: false }
+  const explain: PacketAllocExplain = { sourceProportional: spActive, genderCaps: {}, capMoves: [], chainMoves: [], bySpec: {}, cap: {}, moves: [], repairTimedOut: false }
   const specs: PacketSpec[][] = Array.from({ length: P }, () => [])
   if (leaves.length === 0 || P === 0) return { specs, explain }
 
@@ -355,7 +365,7 @@ export function allocatePacketSpecs(
       }
       // i paketində j ixtisasına yerləşən g cinsli
       const gPlaced = (j: number, g: string) => pkUsers[i].filter(u => r.assignments[u.id]?.specId === leaves[j].leaf.id && gKey(u) === g).length
-      return { unplaced, empty, gPlaced }
+      return { unplaced, empty, gPlaced, r }
     }
     const res = Array.from({ length: P }, (_, i) => sim(i))
     // i paketində j ixtisasına g cinsli üçün limit doludursa bir vahid gətirir
@@ -381,11 +391,11 @@ export function allocatePacketSpecs(
     const logCap = (gr: Grab, j: number, g: string, i: number, u: any) => {
       if (gr.from !== undefined) explain.capMoves.push({ specId: leaves[j].leaf.id, gender: g as 'F' | 'M', from: gr.from, to: i, student: { name: u.name, score: u.score || 0 } })
     }
-    const deadline = Date.now() + 2500
+    const deadline = Date.now() + 3000
     let guard = 0
     // Əvvəl hamı üçün paketlərin yer sayını saxlayan dəyişmələr (1–2), yalnız sonra 3
     outer: while (guard++ < 100) {
-      for (const phase of [0, 1]) for (let i = 0; i < P; i++) {
+      for (const phase of [0, 1, 2]) for (let i = 0; i < P; i++) {
         for (const u of res[i].unplaced) {
           const src = srcOf(u)
           const g = gKey(u)
@@ -463,6 +473,56 @@ export function allocatePacketSpecs(
                 gr.undo()
               }
               A[src][j][k]++; A[src][j][i]--
+            }
+          }
+          // 4) Cins limitini başqası tutur: j-yə yerləşən eyni cinsli y öz siyahısında daha
+          //    yuxarıda olan t ixtisasına keçə bilsə limit boşalır. y-nin paketinə (m) t-nin
+          //    1 yeri n paketindən gəlir, əvəzində m-in boş yeri n-ə keçir; m ≠ i olduqda
+          //    limitin 1 vahidi m-dən i-yə keçirilir.
+          if (phase === 2 && (g === 'F' || g === 'M')) for (const j of wants) {
+            const caps = capArr[g][j]
+            if (!caps || res[i].gPlaced(j, g) < caps[i]) continue
+            for (const m of [i, ...others]) {
+              const ys = pkUsers[m].filter(y => res[m].r.assignments[y.id]?.specId === leaves[j].leaf.id && gKey(y) === g)
+              for (const y of ys) {
+                const ysrc = srcOf(y)
+                const rk = (rankOf.get(y.id) || []).map(id => leafIdx.get(id))
+                const ups = rk.slice(0, Math.max(0, rk.indexOf(j))).filter((t): t is number => t != null && info.get(y.id)!.set.includes(t))
+                for (const t of ups) for (let n = 0; n < P; n++) {
+                  if (n === m || A[ysrc][t][n] <= 0) continue
+                  if (m !== i && caps[m] <= 0) continue
+                  // Əvəz: m-in boş yeri n-ə (u-nun paketinə gedirsə j üstünlüklü) və ya
+                  // əvəzsiz (n-in boş yeri varsa itkini o udur)
+                  const pj = n === i && ysrc === src
+                  const e = leaves.map((_, x) => x).filter(x => x !== t && res[m].empty(ysrc, x) > 0)
+                    .sort((a, b) => (pj && b === j ? 1 : 0) - (pj && a === j ? 1 : 0))[0]
+                  const comps: (number | null)[] = []
+                  if (e != null) comps.push(e)
+                  if (leaves.some((_, x) => res[n].empty(ysrc, x) > 0)) comps.push(null)
+                  for (const c of comps) {
+                    if (Date.now() > deadline) { explain.repairTimedOut = true; break outer }
+                    // u-nun paketində j-də boş yer yoxdursa, boş j yeri başqa paketdən gəlir
+                    const needJ = res[i].empty(src, j) <= 0 && !(pj && c === j)
+                    const jk = needJ ? [n, ...others].find(k => k !== i && res[k].empty(src, j) > 0) : undefined
+                    A[ysrc][t][n]--; A[ysrc][t][m]++
+                    if (c != null) { A[ysrc][c][m]--; A[ysrc][c][n]++ }
+                    if (jk != null) { A[src][j][jk]--; A[src][j][i]++ }
+                    if (m !== i) { caps[m]--; caps[i]++ }
+                    const inv = [...new Set([i, m, n, ...(jk != null ? [jk] : [])])]
+                    const nr = inv.map(x => sim(x))
+                    if (nr.reduce((a, x) => a + x.unplaced.length, 0) < inv.reduce((a, x) => a + res[x].unplaced.length, 0)) {
+                      inv.forEach((x, q) => { res[x] = nr[q] })
+                      explain.chainMoves.push({ src: ysrc, gender: g, specId: leaves[j].leaf.id, upSpecId: leaves[t].leaf.id, emptySpecId: c == null ? null : leaves[c].leaf.id,
+                        jFrom: jk ?? null, holder: { name: y.name, score: y.score || 0 }, m, n, to: i, student: { name: u.name, score: u.score || 0 } })
+                      continue outer
+                    }
+                    if (m !== i) { caps[m]++; caps[i]-- }
+                    if (jk != null) { A[src][j][jk]++; A[src][j][i]-- }
+                    if (c != null) { A[ysrc][c][m]++; A[ysrc][c][n]-- }
+                    A[ysrc][t][n]++; A[ysrc][t][m]--
+                  }
+                }
+              }
             }
           }
         }

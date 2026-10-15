@@ -193,6 +193,7 @@ function PacketAllocWhy({ specId, explain, pkMeta, leafName, curPacket }: {
     .reduce((a, x) => a + (x.buckets.find(b => b.src === src)?.rows[i]?.given || 0), 0)
   const moves = explain.moves.filter(m => m.specId === specId || m.otherSpecId === specId)
   const capMoves = (explain.capMoves || []).filter(m => m.specId === specId)
+  const chainMoves = (explain.chainMoves || []).filter(m => m.specId === specId || m.upSpecId === specId || m.emptySpecId === specId)
   const gc = explain.genderCaps?.[specId]
   const range = (i: number) => {
     const m = pkMeta.find(x => x.num === i + 1)
@@ -292,6 +293,20 @@ function PacketAllocWhy({ specId, explain, pkMeta, leafName, curPacket }: {
               ) : (
                 <div key={k}>• Paket {m.from + 1}-də «{leafName[m.specId]}» ixtisasının 1 yeri boş qalırdı (onu seçən yox idi), həmin paketdəki <b>{m.student.name}</b> ({m.student.score.toFixed(1)} bal) isə yersiz qalırdı.
                   {' '}Boş yer Paket {m.to + 1}-ə verildi, əvəzində Paket {m.to + 1}-dən «{leafName[m.otherSpecId!]}» ixtisasının 1 yeri Paket {m.from + 1}-ə keçdi{SRC_LABEL[m.src] ? ` (${SRC_LABEL[m.src].toLowerCase()})` : ''} — nəticədə hər iki paketdə yersiz qalan azaldı.</div>
+              ))}
+            </div>
+          )}
+          {chainMoves.length > 0 && (
+            <div style={{ marginTop: 6, fontSize: 11.5, color: `${O(P.ink, '#6a5a2e')}`, lineHeight: 1.6 }}>
+              <b>Real yerləşdirmə ilə yoxlama — limiti tutanın keçirilməsi:</b>
+              {chainMoves.map((m, k) => (
+                <div key={k}>• Paket {m.to + 1}-də <b>{m.student.name}</b> ({m.student.score.toFixed(1)} bal) «{leafName[m.specId]}» ixtisasını seçmişdi, amma {m.gender === 'F' ? 'qadın' : 'kişi'} limitini
+                  {' '}Paket {m.m + 1}-də bu ixtisasa yerləşən <b>{m.holder.name}</b> ({m.holder.score.toFixed(1)} bal) tuturdu — o isə siyahısında daha yuxarıda «{leafName[m.upSpecId]}» ixtisasını seçmişdi.
+                  {' '}«{leafName[m.upSpecId]}»in 1 yeri Paket {m.n + 1}-dən Paket {m.m + 1}-ə keçdi
+                  {m.emptySpecId ? `, əvəzində Paket ${m.m + 1}-in boş «${leafName[m.emptySpecId]}» yeri Paket ${m.n + 1}-ə` : ''}
+                  {m.m !== m.to ? `, limitin 1 vahidi Paket ${m.m + 1}-dən Paket ${m.to + 1}-ə` : ''}
+                  {m.jFrom != null ? `, «${leafName[m.specId]}»in boş yeri Paket ${m.jFrom + 1}-dən Paket ${m.to + 1}-ə` : ''}
+                  {SRC_LABEL[m.src] ? ` (${SRC_LABEL[m.src].toLowerCase()})` : ''} — {m.holder.name} «{leafName[m.upSpecId]}»ə keçdi, {m.student.name} yerləşdi.</div>
               ))}
             </div>
           )}
