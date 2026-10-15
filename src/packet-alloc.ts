@@ -1,6 +1,6 @@
 // Paket üsulu: ixtisas kvotalarının paketlərə bölgüsü (bax: Distribution.tsx)
 import { poolCounts, autoSplit, globalSourceSplitCached, canChoose } from './quota-pool'
-import { runPacketPlacement } from './placement'
+import { runPacketPlacement, runPlacement } from './placement'
 
 export interface PacketSpec {
   id: string; name: string; path: any[]; quota: number; origQuota: number; mülkiQuota?: number; liseyQuota?: number
@@ -90,6 +90,8 @@ export interface PacketAllocExplain {
   repairTimedOut: boolean
   /** cins limiti paketlərə bal sırası ilə bölündü (yuxarı paket əvvəl götürür) */
   capsByMerit?: boolean
+  /** ədalətli pay bölgüsündə `before` nəfər yersiz qalırdı — yerlər sadə bölgünün nəticəsinə görə təyin edildi */
+  simpleBased?: { before: number; after: number }
   /** yoxlamadan sonra seçdiyi ixtisasda paketində boş yer olduğu halda yersiz qalanlar */
   stillOut: { packet: number; specId: string; reason: 'rule' | 'source' | 'gender' | 'other'; src: string; student: { name: string; score: number } }[]
 }
@@ -592,6 +594,61 @@ export function allocatePacketSpecs(
       break
     }
     if (meritCaps(true)) explain.capsByMerit = true
+    // ── Sadə bölgüyə əsaslanan alternativ ──
+    // Yoxlamadan sonra da yersiz qalan varsa: hər paketə onun təhsilalanlarının sadə
+    // bölgüdə həmin ixtisasa tutduğu qədər yer (və cins limiti) verilir; sadə bölgüdə boş
+    // qalan yerlər əvvəlki bölgüdəki kimi paylanır. Paket daxilində yerləşdirmə də bal
+    // sırası ilə getdiyi üçün nəticə sadə bölgüyə yaxın olur. Yalnız yersiz qalanların
+    // sayını azaldırsa qəbul olunur.
+    const curOut = res.reduce((a, x) => a + x.unplaced.length, 0)
+    if (curOut > 0) {
+      const subUsers = allInstUsers.filter(u => rankOf.has(u.id))
+      const simple = runPlacement(subUsers, subs, tree, spActive, allInstUsers, preAssignLevel ?? null)
+      const B: Record<string, number[][]> = {}
+      for (const s0 of sources) B[s0] = leaves.map(() => Array(P).fill(0))
+      const G: Record<'F' | 'M', number[][]> = { F: leaves.map(() => Array(P).fill(0)), M: leaves.map(() => Array(P).fill(0)) }
+      pkUsers.forEach((us, i) => {
+        for (const u of us) {
+          const a = simple.assignments[u.id]
+          const j = a ? leafIdx.get(a.specId) : undefined
+          if (j == null) continue
+          B[srcOf(u)][j][i]++
+          const g = gKey(u)
+          if (g === 'F' || g === 'M') G[g][j][i]++
+        }
+      })
+      // sadə bölgüdə boş qalan yerlər — əvvəlki bölgüdə artıq yeri olan paketlərə
+      for (const s0 of sources) for (let j = 0; j < J; j++) {
+        let left = (slots[j][s0] || 0) - B[s0][j].reduce((a, b) => a + b, 0)
+        for (let i = 0; i < P && left > 0; i++) { const x = Math.min(left, Math.max(0, A[s0][j][i] - B[s0][j][i])); B[s0][j][i] += x; left -= x }
+        for (let i = 0; left > 0; i = (i + 1) % P) { B[s0][j][i]++; left-- }
+      }
+      const saveA: Record<string, number[][]> = {}
+      for (const s0 of sources) saveA[s0] = A[s0].map(r => [...r])
+      const saveCaps = capKeys.map(([g, j]) => [...capArr[g][j]!])
+      for (const s0 of sources) A[s0] = B[s0]
+      for (const [g, j] of capKeys) {
+        const caps = G[g][j].map(x => x)
+        let left = capOf(leaves[j].leaf, g)! - caps.reduce((a, b) => a + b, 0)
+        // qalan limit — ixtisasda boş yeri olan paketlərə
+        for (let i = 0; i < P && left > 0; i++) {
+          const seats = sources.reduce((a, s0) => a + B[s0][j][i], 0)
+          const x = Math.min(left, Math.max(0, seats - caps[i])); caps[i] += x; left -= x
+        }
+        capArr[g][j] = caps
+      }
+      const nr = Array.from({ length: P }, (_, i) => sim(i))
+      const newOut = nr.reduce((a, x) => a + x.unplaced.length, 0)
+      if (newOut < curOut) {
+        nr.forEach((r, i) => { res[i] = r })
+        explain.simpleBased = { before: curOut, after: newOut }
+        // əvvəlki yer/limit dəyişmələri artıq yekun bölgünü təsvir etmir
+        explain.moves = []; explain.capMoves = []; explain.chainMoves = []; explain.capsByMerit = false
+      } else {
+        for (const s0 of sources) A[s0] = saveA[s0]
+        capKeys.forEach(([g, j], q) => { capArr[g][j] = saveCaps[q] })
+      }
+    }
     // Yoxlamadan sonra da seçdiyi ixtisasda paketində boş yer olduğu halda yersiz qalanlar
     for (let i = 0; i < P; i++) {
       const sp = buildSpecs(i)

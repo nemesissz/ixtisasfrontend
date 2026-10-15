@@ -237,6 +237,14 @@ function PacketAllocWhy({ specId, explain, pkMeta, leafName, curPacket }: {
             Bölgü bütün ixtisaslar üçün <b>birlikdə</b> hesablanır ki, heç bir paketdə yer boş, digərində adam yersiz qalmasın — ona görə pay bəzən ədalətli paydan bir qədər fərqlənir.
             {' '}Namizəd — seçim göndərənlərdə bu ixtisası öz siyahısına salanlar, göndərməyənlərdə onu seçə bilənlər.
           </div>
+          {explain.simpleBased && (
+            <div style={{ fontSize: 12, color: `${O(P.navyDk, '#1d3a6b')}`, background: `${O(P.tint, '#eaf1fb')}`, border: `1px solid ${O(P.tint, '#c9d8ee')}`, borderRadius: 8, padding: '8px 10px', lineHeight: 1.6, marginBottom: 8 }}>
+              <b>Diqqət:</b> ədalətli pay bölgüsü ilə (yer dəyişmələrindən sonra da) {explain.simpleBased.before} nəfər boş yer olduğu halda yersiz qalırdı.
+              {' '}Ona görə bütün ixtisasların yerləri <b>sadə bölgünün nəticəsinə görə</b> təyin edildi: hər paketə onun təhsilalanlarının sadə bölgüdə bu ixtisasa
+              {' '}tutduğu qədər yer və cins limiti verildi, sadə bölgüdə boş qalan yerlər isə ədalətli paya yaxın paylandı.
+              {' '}Nəticədə yersiz qalan: {explain.simpleBased.after}. Aşağıdakı «Verilən» sütunu yekun yerləri göstərir.
+            </div>
+          )}
           {buckets.map(b => {
             const eTot = b.rows.reduce((a, r) => a + r.elig, 0)
             return (
