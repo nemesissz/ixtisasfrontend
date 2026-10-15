@@ -280,7 +280,8 @@ function PacketAllocWhy({ specId, explain, pkMeta, leafName, curPacket }: {
               <b>Real yerləşdirmə ilə yoxlama — cins limiti köçürmələri:</b>
               {capMoves.map((m, k) => (
                 <div key={k}>• Paket {m.to + 1}-də <b>{m.student.name}</b> ({m.student.score.toFixed(1)} bal) boş yer olduğu halda paketin {m.gender === 'F' ? 'qadın' : 'kişi'} limiti dolu olduğu üçün yersiz qalırdı —
-                  {' '}limitin 1 vahidi {m.from == null ? 'ehtiyatdan' : `onu işlətməyən Paket ${m.from + 1}-dən`} Paket {m.to + 1}-ə keçirildi.</div>
+                  {' '}limitin 1 vahidi {m.from == null ? 'ehtiyatdan' : m.displaced ? `Paket ${m.from + 1}-dən` : `onu işlətməyən Paket ${m.from + 1}-dən`} Paket {m.to + 1}-ə keçirildi.
+                  {m.displaced && <>{' '}Paket {m.from! + 1}-də bu limiti daha aşağı ballı <b>{m.displaced.name}</b> ({m.displaced.score.toFixed(1)} bal) tuturdu — sadə bölgüdə olduğu kimi limit yüksək bala verildi, {m.displaced.name} {m.displaced.specId ? <>növbəti seçiminə — «{leafName[m.displaced.specId]}» ixtisasına keçdi</> : 'yerləşmədi'}.</>}</div>
               ))}
             </div>
           )}

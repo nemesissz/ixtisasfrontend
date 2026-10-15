@@ -64,6 +64,8 @@ export interface PacketAllocMove {
 export interface PacketAllocCapMove {
   specId: string; gender: 'F' | 'M'; from: number | null; to: number
   student: { name: string; score: number }
+  /** `from` paketində limitdən kənarda qalan (daha aşağı ballı) — növbəti seçiminə keçdi */
+  displaced?: { name: string; score: number; specId: string | null }
 }
 /** Cins limitini tutan `holder` daha üstün seçdiyi ixtisasa keçirildi ki, `student` yerləşsin:
  *  `upSpecId`-in 1 yeri n → m, `emptySpecId`-in boş yeri m → n; m ≠ to olduqda limit m → to */
@@ -473,6 +475,41 @@ export function allocatePacketSpecs(
                 gr.undo()
               }
               A[src][j][k]++; A[src][j][i]--
+            }
+          }
+          // 4a) Limiti aşağı paketdə daha aşağı ballı eyni cinsli tutur — sadə bölgüdə limit
+          //     ona yox, daha yüksək ballıya düşərdi. Limitin 1 vahidi aşağı paketdən gəlir,
+          //     orada limitdən kənarda qalan öz növbəti seçiminə keçir (yersiz qalsa, qəbul olunmur).
+          if (phase === 2 && (g === 'F' || g === 'M')) for (const j of wants) {
+            const caps = capArr[g][j]
+            if (!caps || res[i].gPlaced(j, g) < caps[i]) continue
+            const jid = leaves[j].leaf.id
+            for (let k = i + 1; k < P; k++) {
+              if (caps[k] <= 0) continue
+              const hold = pkUsers[k].filter(y => res[k].r.assignments[y.id]?.specId === jid && gKey(y) === g)
+              if (hold.some(y => (y.score || 0) >= (u.score || 0))) continue
+              // u-ya j-də yer: öz paketində boş yer, başqa paketin boş yeri və ya k-nın yeri
+              let seatFrom: number | null = null
+              if (res[i].empty(src, j) <= 0) {
+                seatFrom = [k, ...others].find(x => x !== i && res[x].empty(src, j) > 0) ?? (A[src][j][k] > 0 ? k : null)
+                if (seatFrom == null) continue
+              }
+              if (Date.now() > deadline) { explain.repairTimedOut = true; break outer }
+              caps[k]--; caps[i]++
+              if (seatFrom != null) { A[src][j][seatFrom]--; A[src][j][i]++ }
+              const inv = [...new Set([i, k, ...(seatFrom != null ? [seatFrom] : [])])]
+              const nr = inv.map(x => sim(x))
+              if (nr.reduce((a, x) => a + x.unplaced.length, 0) < inv.reduce((a, x) => a + res[x].unplaced.length, 0)) {
+                const nk = nr[inv.indexOf(k)]
+                const moved = hold.find(y => nk.r.assignments[y.id]?.specId !== jid)
+                inv.forEach((x, q) => { res[x] = nr[q] })
+                explain.capMoves.push({ specId: jid, gender: g, from: k, to: i, student: { name: u.name, score: u.score || 0 },
+                  ...(moved ? { displaced: { name: moved.name, score: moved.score || 0, specId: nk.r.assignments[moved.id]?.specId ?? null } } : {}) })
+                if (seatFrom != null) explain.moves.push({ src, specId: jid, from: seatFrom, to: i, student: { name: u.name, score: u.score || 0 } })
+                continue outer
+              }
+              if (seatFrom != null) { A[src][j][seatFrom]++; A[src][j][i]-- }
+              caps[k]++; caps[i]--
             }
           }
           // 4) Cins limitini başqası tutur: j-yə yerləşən eyni cinsli y öz siyahısında daha
