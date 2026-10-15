@@ -68,6 +68,7 @@ function mapSelection(a: any) {
     studentCount: a.studentCount, choiceCount: a.choiceCount,
     tiebreaker: a.tiebreaker || [], viewMode: a.viewMode,
     sourceProportional: !!a.sourceProportional, preAssignLevel: a.preAssignLevel ?? null,
+    defaultOrder: (a.defaultOrder as string[] | null) ?? null,
     status: a.status, createdAt: utc(a.createdAt), publishedAt: utc(a.publishedAt),
     closedAt: utc(a.closedAt), archivedAt: utc(a.archivedAt),
   }
@@ -125,6 +126,7 @@ export const selectionDb = {
       name: merged.name, studentCount: merged.studentCount, choiceCount: merged.choiceCount,
       tiebreaker: merged.tiebreaker || [], viewMode: merged.viewMode,
       sourceProportional: !!merged.sourceProportional, preAssignLevel: merged.preAssignLevel ?? null,
+      defaultOrder: merged.defaultOrder ?? null, keepDefaultOrder: false,
     })
     return selectionDb.get(id)
   },

@@ -6,7 +6,7 @@ import { getStudentSession, clearStudentSession } from '../../api/auth'
 import { BASE_URL } from '../../api/http'
 import {
   FlatView, NestedView,
-  treeToNested, nestedToFlat, flatToNested,
+  treeToNested, nestedToFlat, flatToNested, applyDefaultOrder,
   type FlatRow, type GroupEntry,
 } from '../../components/SpecialtyViews'
 import { P, O } from '../../palette'
@@ -165,8 +165,9 @@ export default function SelectionPage() {
       if (branchName && selection?.preAssignLevel != null) {
         filteredTree = collapseLevel(filteredTree, selection.preAssignLevel)
       }
-      const initNested = treeToNested(filteredTree)
-      const initFlat   = nestedToFlat(initNested)
+      // Admin seçimdə ilkin sıra təyin edibsə, siyahı o sıra ilə açılır
+      const initFlat   = applyDefaultOrder(nestedToFlat(treeToNested(filteredTree)), selection?.defaultOrder)
+      const initNested = flatToNested(initFlat)
       const existing   = await submissionDb.getByUser(student.id, selId!)
 
       if (existing) {

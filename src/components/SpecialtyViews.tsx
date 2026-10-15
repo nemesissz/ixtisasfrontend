@@ -112,6 +112,16 @@ export function flatToNested(flat: FlatRow[]): GroupEntry[] {
   })
 }
 
+// Seçimdə admin tərəfindən təyin edilmiş ilkin sıranı tətbiq edir.
+// Sırada olmayan (sonradan əlavə edilmiş) ixtisaslar strukturdakı ardıcıllıqla sona düşür.
+export function applyDefaultOrder(flat: FlatRow[], order?: string[] | null): FlatRow[] {
+  if (!order?.length) return flat
+  const pos = new Map(order.map((id, i) => [id, i]))
+  const known   = flat.filter(r => pos.has(r.specId)).sort((a, b) => pos.get(a.specId)! - pos.get(b.specId)!)
+  const unknown = flat.filter(r => !pos.has(r.specId))
+  return [...known, ...unknown]
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // 📋  Siyahı Görünüşü
 // ══════════════════════════════════════════════════════════════════════════════

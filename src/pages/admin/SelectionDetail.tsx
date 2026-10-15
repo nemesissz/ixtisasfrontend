@@ -4,7 +4,7 @@ import { selectionDb, treeDb, institutionDb, userDb, submissionDb, resetAndAutoS
 import { AppDialog, useDialog } from '../../components/AppDialog'
 import { balanceReport } from '../../quota-pool'
 import InstIcon from '../../components/InstIcon'
-import { FlatView, NestedView, treeToNested, nestedToFlat } from '../../components/SpecialtyViews'
+import { FlatView, NestedView, treeToNested, nestedToFlat, flatToNested, applyDefaultOrder, type FlatRow } from '../../components/SpecialtyViews'
 import { P } from '../../palette'
 
 // ── Preview overlay ──────────────────────────────────────────────────────────
@@ -17,8 +17,8 @@ function PreviewOverlay({ sel, tree, onClose, onSaveView }: {
   const [view, setView] = useState<'list' | 'nested'>(savedView)
   const [saved, setSaved] = useState(false)
 
-  const nested = treeToNested(tree)
-  const flat   = nestedToFlat(nested)
+  const flat   = applyDefaultOrder(nestedToFlat(treeToNested(tree)), sel.defaultOrder)
+  const nested = flatToNested(flat)
 
   function handleSave() {
     onSaveView(view)
@@ -174,6 +174,38 @@ export default function SelectionDetail() {
 
   useEffect(() => { refresh() }, [refresh])
   usePoll(refresh)   // real-time: yeni göndərişlər/status avtomatik görünür
+
+  // ── İlkin sıra: təhsilalanın səhifəsi açılanda ixtisasların göstərildiyi sıra ──
+  const [orderOpen,  setOrderOpen]  = useState(false)
+  const [orderFlat,  setOrderFlat]  = useState<FlatRow[]>([])
+  const [orderDirty, setOrderDirty] = useState(false)
+  const [orderSaving, setOrderSaving] = useState(false)
+  const [orderSaved,  setOrderSaved]  = useState(false)
+  const savedOrderKey = JSON.stringify(sel?.defaultOrder ?? null)
+  useEffect(() => {
+    // Polling sel-i yeniləyir — admin sürüşdürərkən dəyişiklikləri silməmək üçün
+    if (!tree || orderDirty) return
+    setOrderFlat(applyDefaultOrder(nestedToFlat(treeToNested(tree)), sel?.defaultOrder))
+  }, [tree?.id, savedOrderKey, orderDirty])
+
+  function changeOrder(f: FlatRow[]) { setOrderFlat(f); setOrderDirty(true); setOrderSaved(false) }
+
+  async function saveOrder(order: string[] | null) {
+    if (!sel) return
+    setOrderSaving(true)
+    try {
+      await selectionDb.update(sel.id, { defaultOrder: order })
+      addLog('selection', 'info',
+        order ? `İlkin ixtisas sırası dəyişdirildi: "${sel.name}"` : `İlkin ixtisas sırası strukturdakı sıraya qaytarıldı: "${sel.name}"`,
+        `id: ${sel.id}`)
+      await refresh()
+      setOrderDirty(false)
+      setOrderSaved(true)
+      setTimeout(() => setOrderSaved(false), 2000)
+    } finally {
+      setOrderSaving(false)
+    }
+  }
 
   const instObj = insts.find((i: any) => i.id === sel?.institution)
   const instLabel = instObj
@@ -540,9 +572,75 @@ export default function SelectionDetail() {
             </div>
           </div>
 
+
         </div>
 
       </div>
+
+      {/* ── İlkin sıra ── */}
+      {tree && (() => {
+        const hasCustom   = !!sel.defaultOrder?.length
+        const orderLocked = sel.status === 'closed' || sel.status === 'archived'
+        const orderNested = flatToNested(orderFlat)
+        return (
+          <div className="card" style={{ marginTop: 16 }}>
+            <div className="card-head">
+              <div>
+                <div className="card-title">İlkin İxtisas Sırası</div>
+                <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
+                  {hasCustom ? 'Xüsusi sıra təyin edilib' : 'Strukturdakı sıra ilə göstərilir'}
+                </div>
+              </div>
+              <button className="btn btn-sm btn-outline" onClick={() => setOrderOpen(o => !o)}>
+                {orderOpen ? 'Gizlət ▲' : '↕ Sıranı düzəlt ▼'}
+              </button>
+            </div>
+            {orderOpen && (
+              <div className="card-body pad">
+                <div className="info-box" style={{ marginBottom: 12 }}>
+                  Təhsilalan seçim səhifəsini açanda ixtisaslar bu sıra ilə göstəriləcək.
+                  Sətirləri sağdakı <b>⠿</b> işarəsindən tutub sürüşdürərək sıranı dəyişin, sonra <b>Saxla</b> düyməsini basın.
+                  {sel.viewMode === 'nested' && ' Qrup görünüşündə qrupları və alt qrupları da sürüşdürmək olar.'}
+                  {' '}Artıq göndərilmiş seçimlərə təsir etmir.
+                </div>
+                {orderLocked && (
+                  <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 10 }}>
+                    Seçim bağlandığı üçün sıranı dəyişmək mümkün deyil.
+                  </div>
+                )}
+                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginBottom: 12, flexWrap: 'wrap' }}>
+                  {orderDirty && (
+                    <button className="btn btn-sm btn-outline" disabled={orderSaving}
+                      onClick={() => { setOrderDirty(false); setOrderSaved(false) }}>
+                      Dəyişiklikləri ləğv et
+                    </button>
+                  )}
+                  {hasCustom && !orderLocked && (
+                    <button className="btn btn-sm btn-outline" disabled={orderSaving}
+                      onClick={() => saveOrder(null)}>
+                      ↺ Strukturdakı sıraya qaytar
+                    </button>
+                  )}
+                  {!orderLocked && (
+                    <button className="btn btn-sm btn-primary"
+                      disabled={!orderDirty || orderSaving}
+                      style={{ opacity: !orderDirty || orderSaving ? 0.5 : 1 }}
+                      onClick={() => saveOrder(orderFlat.map(r => r.specId))}>
+                      {orderSaving ? 'Saxlanılır...' : orderSaved ? '✓ Saxlanıldı' : '✓ Saxla'}
+                    </button>
+                  )}
+                </div>
+                {sel.viewMode === 'nested'
+                  ? <NestedView nested={orderNested} submitted={orderLocked}
+                      onChange={orderLocked ? undefined : n => changeOrder(nestedToFlat(n))} />
+                  : <FlatView flat={orderFlat} submitted={orderLocked} levelNames={tree?.levelNames}
+                      onChange={orderLocked ? undefined : changeOrder} />
+                }
+              </div>
+            )}
+          </div>
+        )
+      })()}
     </>
   )
 }
