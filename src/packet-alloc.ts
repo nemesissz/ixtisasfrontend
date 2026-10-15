@@ -88,6 +88,10 @@ export interface PacketAllocExplain {
   moves: PacketAllocMove[]
   /** yoxlama vaxt limitinə çatıb dayandı */
   repairTimedOut: boolean
+  /** cins limiti paketlərə bal sırası ilə bölündü (yuxarı paket əvvəl götürür) */
+  capsByMerit?: boolean
+  /** yoxlamadan sonra seçdiyi ixtisasda paketində boş yer olduğu halda yersiz qalanlar */
+  stillOut: { packet: number; specId: string; reason: 'rule' | 'source' | 'gender' | 'other'; src: string; student: { name: string; score: number } }[]
 }
 export interface PacketAllocResult { specs: PacketSpec[][]; explain: PacketAllocExplain }
 
@@ -154,7 +158,7 @@ export function allocatePacketSpecs(
 ): PacketAllocResult {
   const P = pkUsers.length
   const spActive = !!(tree?.sourceProportional)
-  const explain: PacketAllocExplain = { sourceProportional: spActive, genderCaps: {}, capMoves: [], chainMoves: [], bySpec: {}, cap: {}, moves: [], repairTimedOut: false }
+  const explain: PacketAllocExplain = { sourceProportional: spActive, genderCaps: {}, capMoves: [], chainMoves: [], bySpec: {}, cap: {}, moves: [], repairTimedOut: false, stillOut: [] }
   const specs: PacketSpec[][] = Array.from({ length: P }, () => [])
   if (leaves.length === 0 || P === 0) return { specs, explain }
 
@@ -370,6 +374,27 @@ export function allocatePacketSpecs(
       return { unplaced, empty, gPlaced, r }
     }
     const res = Array.from({ length: P }, (_, i) => sim(i))
+    // Cins limitinin bal sırası ilə bölgüsü — sadə bölgüdəki kimi: yuxarı paket (daha
+    // yüksək ballılar) limitdən ehtiyacı qədər götürür, qalanı növbəti paketə keçir.
+    // Yersiz qalanların sayı artırsa (strict → azalmırsa) əvvəlki bölgü saxlanılır.
+    const capKeys: ['F' | 'M', number][] = []
+    for (const g of ['F', 'M'] as const) for (let j = 0; j < J; j++) if (capArr[g][j]) capKeys.push([g, j])
+    const meritCaps = (strict: boolean): boolean => {
+      if (!capKeys.length) return false
+      const save = capKeys.map(([g, j]) => [...capArr[g][j]!]), savePool = capKeys.map(([g, j]) => capPool[g][j])
+      const rem = capKeys.map(([g, j]) => capOf(leaves[j].leaf, g)!)
+      const nr: ReturnType<typeof sim>[] = []
+      for (let i = 0; i < P; i++) {
+        capKeys.forEach(([g, j], q) => { capArr[g][j]![i] = rem[q] })
+        const r = sim(i); nr.push(r)
+        if (i < P - 1) capKeys.forEach(([g, j], q) => { const u = Math.min(rem[q], r.gPlaced(j, g)); capArr[g][j]![i] = u; rem[q] -= u })
+      }
+      capKeys.forEach(([g, j]) => { capPool[g][j] = 0 })
+      const before = res.reduce((a, x) => a + x.unplaced.length, 0), after = nr.reduce((a, x) => a + x.unplaced.length, 0)
+      if (strict ? after < before : after <= before) { nr.forEach((r, i) => { res[i] = r }); return true }
+      capKeys.forEach(([g, j], q) => { capArr[g][j] = save[q]; capPool[g][j] = savePool[q] })
+      return false
+    }
     // i paketində j ixtisasına g cinsli üçün limit doludursa bir vahid gətirir
     // (ehtiyatdan, əvvəlcə `pref`, sonra onu işlətməyən digər paketlərdən).
     // Qaytarır: geri alma funksiyası və mənbə; null → limit tapılmadı.
@@ -565,6 +590,26 @@ export function allocatePacketSpecs(
         }
       }
       break
+    }
+    if (meritCaps(true)) explain.capsByMerit = true
+    // Yoxlamadan sonra da seçdiyi ixtisasda paketində boş yer olduğu halda yersiz qalanlar
+    for (let i = 0; i < P; i++) {
+      const sp = buildSpecs(i)
+      for (const u of res[i].unplaced) {
+        const src = srcOf(u), g = gKey(u)
+        for (const id of rankOf.get(u.id) || []) {
+          const j = leafIdx.get(id)
+          if (j == null) continue
+          const spec = sp.find(x => x.id === id)
+          if (!spec) continue
+          const taken = pkUsers[i].filter(y => res[i].r.assignments[y.id]?.specId === id).length
+          if (spec.quota - taken <= 0) continue
+          const reason = !info.get(u.id)!.set.includes(j) ? 'rule'
+            : res[i].empty(src, j) <= 0 ? 'source'
+            : (g === 'F' || g === 'M') && capArr[g][j] && res[i].gPlaced(j, g) >= capArr[g][j]![i] ? 'gender' : 'other'
+          explain.stillOut.push({ packet: i, specId: id, reason, src, student: { name: u.name, score: u.score || 0 } })
+        }
+      }
     }
     // Yekun yerlər izaha yazılır
     for (let j = 0; j < J; j++) for (const b of explain.bySpec[leaves[j].leaf.id].buckets)

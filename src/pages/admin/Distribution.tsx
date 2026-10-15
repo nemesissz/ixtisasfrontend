@@ -193,6 +193,7 @@ function PacketAllocWhy({ specId, explain, pkMeta, leafName, curPacket }: {
     .reduce((a, x) => a + (x.buckets.find(b => b.src === src)?.rows[i]?.given || 0), 0)
   const moves = explain.moves.filter(m => m.specId === specId || m.otherSpecId === specId)
   const capMoves = (explain.capMoves || []).filter(m => m.specId === specId)
+  const stillOut = (explain.stillOut || []).filter(m => m.specId === specId)
   const chainMoves = (explain.chainMoves || []).filter(m => m.specId === specId || m.upSpecId === specId || m.emptySpecId === specId)
   const gc = explain.genderCaps?.[specId]
   const range = (i: number) => {
@@ -272,7 +273,9 @@ function PacketAllocWhy({ specId, explain, pkMeta, leafName, curPacket }: {
               <b>{g === 'F' ? 'Qadın' : 'Kişi'} limiti — cəmi {gc[g]!.total}:</b>{' '}
               {gc[g]!.caps.map((c, i) => `Paket ${i + 1}: ${c}`).join(' · ')}
               {gc[g]!.caps.reduce((a, b) => a + b, 0) < gc[g]!.total ? ` · ehtiyatda ${gc[g]!.total - gc[g]!.caps.reduce((a, b) => a + b, 0)}` : ''}.
-              {' '}Limit bütün ixtisas üzrədir; paketlərə əvvəlcə bölgünün istifadə etdiyi qədər, qalanı həmin cinsdən namizəd sayına mütənasib bölünür.
+              {' '}{explain.capsByMerit
+                ? 'Limit bütün ixtisas üzrədir və sadə bölgüdəki kimi bal sırası ilə bölünür: yuxarı paket (daha yüksək ballılar) ehtiyacı qədər götürür, qalanı növbəti paketə keçir.'
+                : 'Limit bütün ixtisas üzrədir; paketlərə əvvəlcə bölgünün istifadə etdiyi qədər, qalanı həmin cinsdən namizəd sayına mütənasib bölünür.'}
             </div>
           ))}
           {capMoves.length > 0 && (
@@ -308,6 +311,18 @@ function PacketAllocWhy({ specId, explain, pkMeta, leafName, curPacket }: {
                   {m.m !== m.to ? `, limitin 1 vahidi Paket ${m.m + 1}-dən Paket ${m.to + 1}-ə` : ''}
                   {m.jFrom != null ? `, «${leafName[m.specId]}»in boş yeri Paket ${m.jFrom + 1}-dən Paket ${m.to + 1}-ə` : ''}
                   {SRC_LABEL[m.src] ? ` (${SRC_LABEL[m.src].toLowerCase()})` : ''} — {m.holder.name} «{leafName[m.upSpecId]}»ə keçdi, {m.student.name} yerləşdi.</div>
+              ))}
+            </div>
+          )}
+          {stillOut.length > 0 && (
+            <div style={{ marginTop: 6, fontSize: 11.5, color: '#cf1322', lineHeight: 1.6 }}>
+              <b>Boş yer olduğu halda yersiz qalanlar (düzəldilə bilmədi):</b>
+              {stillOut.map((m, k) => (
+                <div key={k}>• Paket {m.packet + 1}: <b>{m.student.name}</b> ({m.student.score.toFixed(1)} bal{m.src !== 'all' ? `, ${m.src === 'other' ? 'mənbəsiz' : m.src}` : ''}) —{' '}
+                  {m.reason === 'gender' ? 'paketin cins limiti doludur və heç bir dəyişmə yersiz qalanların sayını azaltmadı'
+                    : m.reason === 'source' ? 'boş yer başqa mənbəyə (mülki/lisey) aiddir'
+                    : m.reason === 'rule' ? 'bu ixtisasın şərtlərinə (qrup, sütun filtri, budaq) uyğun gəlmir'
+                    : 'yerləşdirmə qaydası onu bu yerə çatdırmadı'}.</div>
               ))}
             </div>
           )}
