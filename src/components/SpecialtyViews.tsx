@@ -12,6 +12,10 @@ const LAST_ITEM_OV = L('#dbe8f4', '#ffe8d8')
 const LAST_ITEM_BD = L('#c9dbeb', '#ffd5c2')
 const LAST_ITEM_FG = L('#1d3a5c', '#7a2a10')
 const LAST_SHADOW  = L('rgba(29,90,140,.45)', 'rgba(255,124,79,.5)')
+// Sürüşdürüb buraxdıqdan sonra qısa müddətli işarələmə — açıq rejimdə qızılı əvəzinə mavi
+const FLASH_BG = L('#e3ecf7', '#fffbe6')
+const FLASH_BD = L('#36659c', '#f5a623')
+const FLASH_GLOW = L('#36659c30', '#f5a62330')
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 export interface SpecEntry  { specId: string; specName: string; quota: number }
@@ -239,7 +243,7 @@ export function FlatView({ flat, onChange, submitted = false, levelNames }: {
                 display: 'grid', gridTemplateColumns: gridCols,
                 alignItems: 'stretch',
                 borderBottom: i < flat.length - 1 ? '1.5px solid #eef0f8' : 'none',
-                background: isFlash ? '#fffbe6' : isDrag ? `${P.tint3}` : '#fff',
+                background: isFlash ? FLASH_BG : isDrag ? `${P.tint3}` : '#fff',
                 opacity: 1,
                 position: 'relative',
                 zIndex: isDrag ? 2 : undefined,
@@ -251,7 +255,7 @@ export function FlatView({ flat, onChange, submitted = false, levelNames }: {
               {/* Haşiyə üst qatda çəkilir — xanaların fonu onu örtməsin, bütün sətir işarələnsin */}
               {(isFlash || isDrag || isOver) && <div style={{
                 position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 1,
-                boxShadow: isFlash ? 'inset 0 0 0 2px #f5a623'
+                boxShadow: isFlash ? `inset 0 0 0 2px ${FLASH_BD}`
                   : isDrag ? `inset 0 0 0 2px ${P.navy}`
                   : `inset 0 2px 0 ${P.navy}, inset 0 -2px 0 ${P.navy}`,
               }} />}
@@ -387,12 +391,12 @@ export function NestedView({ nested, onChange, submitted = false }: {
               onDragEnd={gEnd}
               style={{
                 width: 180, flexShrink: 0, display: 'flex', alignItems: 'stretch',
-                background: isFG ? '#fffbe6' : isOG ? '#e8eeff' : '#eef1ff',
-                border: `2px solid ${isFG ? '#f5a623' : isOG ? `${P.navy}` : `${P.line}`}`,
+                background: isFG ? FLASH_BG : isOG ? '#e8eeff' : '#eef1ff',
+                border: `2px solid ${isFG ? FLASH_BD : isOG ? `${P.navy}` : `${P.line}`}`,
                 borderRadius: 12, overflow: 'hidden',
                 cursor: interactive ? 'grab' : 'default',
                 opacity: 1,
-                boxShadow: isFG ? '0 0 0 3px #f5a62330' : isDG ? `0 8px 18px ${P.navy}80, 0 0 0 2px ${P.navy}` : isOG ? `0 0 0 3px ${P.navy}28` : 'none',
+                boxShadow: isFG ? `0 0 0 3px ${FLASH_GLOW}` : isDG ? `0 8px 18px ${P.navy}80, 0 0 0 2px ${P.navy}` : isOG ? `0 0 0 3px ${P.navy}28` : 'none',
                 userSelect: 'none',
                 transition: isFG ? 'background 1.8s ease, border-color 1.8s ease' : 'border-color .1s',
               }}
@@ -426,12 +430,12 @@ export function NestedView({ nested, onChange, submitted = false }: {
                       onDragEnd={sEnd}
                       style={{
                         width: 160, flexShrink: 0, display: 'flex', alignItems: 'stretch',
-                        background: isFS ? '#fffbe6' : isOS ? '#e8d8ff' : '#f4f0ff',
-                        border: `2px solid ${isFS ? '#f5a623' : isOS ? `${P.navyDk}` : `${O(P.tint, '#f3e9cf')}`}`,
+                        background: isFS ? FLASH_BG : isOS ? '#e8d8ff' : '#f4f0ff',
+                        border: `2px solid ${isFS ? FLASH_BD : isOS ? `${P.navyDk}` : `${O(P.tint, '#f3e9cf')}`}`,
                         borderRadius: 8, overflow: 'hidden',
                         cursor: interactive ? 'grab' : 'default',
                         opacity: 1,
-                        boxShadow: isFS ? '0 0 0 2px #f5a62330' : isDS ? `0 8px 18px ${P.navyDk}80, 0 0 0 2px ${P.navyDk}` : isOS ? `0 0 0 2px ${P.navyDk}28` : 'none',
+                        boxShadow: isFS ? `0 0 0 2px ${FLASH_GLOW}` : isDS ? `0 8px 18px ${P.navyDk}80, 0 0 0 2px ${P.navyDk}` : isOS ? `0 0 0 2px ${P.navyDk}28` : 'none',
                         userSelect: 'none',
                         transition: isFS ? 'background 1.8s ease, border-color 1.8s ease' : 'border-color .1s',
                       }}
@@ -461,12 +465,12 @@ export function NestedView({ nested, onChange, submitted = false }: {
                             onDragEnd={pEnd}
                             style={{
                               display: 'flex', alignItems: 'stretch',
-                              background: isFP ? '#fffbe6' : isOP ? LAST_ITEM_OV : LAST_ITEM_BG,
-                              border: `1.5px solid ${isFP ? '#f5a623' : isOP ? LAST_ACCENT : LAST_ITEM_BD}`,
+                              background: isFP ? FLASH_BG : isOP ? LAST_ITEM_OV : LAST_ITEM_BG,
+                              border: `1.5px solid ${isFP ? FLASH_BD : isOP ? LAST_ACCENT : LAST_ITEM_BD}`,
                               borderRadius: 6, overflow: 'hidden',
                               cursor: interactive ? 'grab' : 'default',
                               opacity: 1,
-                              boxShadow: isFP ? '0 0 0 2px #f5a62330' : isDP ? `0 8px 18px ${LAST_SHADOW}, 0 0 0 2px ${LAST_ACCENT}` : isOP ? `0 0 0 2px ${LAST_ACCENT}28` : 'none',
+                              boxShadow: isFP ? `0 0 0 2px ${FLASH_GLOW}` : isDP ? `0 8px 18px ${LAST_SHADOW}, 0 0 0 2px ${LAST_ACCENT}` : isOP ? `0 0 0 2px ${LAST_ACCENT}28` : 'none',
                               userSelect: 'none',
                               transition: isFP ? 'background 1.8s ease, border-color 1.8s ease' : 'border-color .1s',
                             }}
