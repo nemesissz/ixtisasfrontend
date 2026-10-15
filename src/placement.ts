@@ -297,11 +297,26 @@ export function rebalanceUnplaced(opts: {
   }
 }
 
+/**
+ * Paketin ixtisas yarpağı — paketə düşən cins limiti ilə (bax: PacketSpec).
+ * İxtisasın limiti bütün ixtisas üzrədir; paket öz payını tətbiq etməlidir,
+ * yoxsa paketlərin cəmi limiti keçirdi.
+ */
+export function packetLeaf(spec: { path: any[]; maxFemale?: number | null; maxMale?: number | null }) {
+  const leaf = spec.path?.[spec.path.length - 1]
+  if (!leaf || (spec.maxFemale === undefined && spec.maxMale === undefined)) return leaf
+  return {
+    ...leaf,
+    ...(spec.maxFemale !== undefined ? { maxFemale: spec.maxFemale } : {}),
+    ...(spec.maxMale !== undefined ? { maxMale: spec.maxMale } : {}),
+  }
+}
+
 // ── Paket-daxili yerləşdirmə (hər paket müstəqil işləyir) ────────────────────
 export function runPacketPlacement(
   packetStudents: any[],
   allSubs: any[],
-  packetSpecs: Array<{ id: string; quota: number; mülkiQuota?: number; liseyQuota?: number; path: any[] }>,
+  packetSpecs: Array<{ id: string; quota: number; mülkiQuota?: number; liseyQuota?: number; path: any[]; maxFemale?: number | null; maxMale?: number | null }>,
   sourceProportional = false
 ) {
   // Seçimə görə sürətli axtarış (əvvəl hər dəfə siyahı başdan-başa gəzilirdi)
@@ -312,7 +327,7 @@ export function runPacketPlacement(
   const leafById: Record<string, any> = {}
   for (const spec of packetSpecs) {
     pathMap[spec.id] = spec.path
-    leafById[spec.id] = spec.path?.[spec.path.length - 1]
+    leafById[spec.id] = packetLeaf(spec)
   }
 
   const placed: Record<string, number> = {}

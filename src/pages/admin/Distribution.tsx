@@ -6,9 +6,9 @@ import InstIcon from '../../components/InstIcon'
 import InstTabs from '../../components/InstTabs'
 import { can } from '../../permissions'
 import { poolCounts, autoSplit, globalSourceSplitCached } from '../../quota-pool'
-import { allocatePacketSpecs, splitPacketStudents } from '../../packet-alloc'
+import { allocatePacketSpecs, splitPacketStudents, type PacketAllocExplain } from '../../packet-alloc'
 import { UMUMI_KEY, isSumCrit } from '../../tiebreak'
-import { compareStudents, makeMeritCompare, pairTiebreaker, decidingCriterion, tieTrace, buildDefaultTiebreaker, setDefaultTiebreaker, getLeavesWithPath, genderAllowed, genderCapReached, rebalanceUnplaced, runPacketPlacement, runPlacement } from '../../placement'
+import { compareStudents, makeMeritCompare, pairTiebreaker, decidingCriterion, tieTrace, buildDefaultTiebreaker, setDefaultTiebreaker, getLeavesWithPath, genderAllowed, genderCapReached, rebalanceUnplaced, runPacketPlacement, runPlacement, packetLeaf } from '../../placement'
 import { ord } from '../../ordinal'
 import { P, O } from '../../palette'
 
@@ -173,6 +173,113 @@ function TieTraceView({ trace, winner }: { trace: TieStep[]; winner: string }) {
   )
 }
 
+// ── Paket üsulu: ixtisasın yerləri paketlərə niyə belə bölündü ─────────────────
+const SRC_LABEL: Record<string, string> = { all: '', mülki: 'Mülki yerlər', lisey: 'Lisey yerləri', other: 'Mənbəsiz yerlər' }
+const fmtPay = (x: number) => Number.isInteger(x) ? String(x) : x.toFixed(2)
+function PacketAllocWhy({ specId, explain, pkMeta, leafName, curPacket }: {
+  specId: string; explain: PacketAllocExplain
+  pkMeta: { num: number; minScore: number; maxScore: number }[]
+  leafName: Record<string, string>
+  /** cari paket (vurğulanır); null → hamısı bərabər */
+  curPacket: number | null
+}) {
+  const [open, setOpen] = useState(true)
+  const sp = explain.bySpec[specId]
+  if (!sp) return null
+  const buckets = sp.buckets.filter(b => b.slots > 0)
+  const P_ = buckets[0]?.rows.length ?? 0
+  // paketin mənbə üzrə bütün ixtisaslardan aldığı yer (paket dolubmu?)
+  const pkTotal = (src: string, i: number) => Object.values(explain.bySpec)
+    .reduce((a, x) => a + (x.buckets.find(b => b.src === src)?.rows[i]?.given || 0), 0)
+  const moves = explain.moves.filter(m => m.specId === specId || m.otherSpecId === specId)
+  const range = (i: number) => {
+    const m = pkMeta.find(x => x.num === i + 1)
+    return m && m.maxScore > 0 ? `${m.minScore.toFixed(0)}–${m.maxScore.toFixed(0)}` : '—'
+  }
+  const why = (src: string, i: number) => {
+    const b = buckets.find(x => x.src === src)!, r = b.rows[i]
+    const cap = explain.cap[src]?.[i] || { sub: 0, ns: 0 }
+    const parts: string[] = []
+    const d = r.flow - r.target
+    if (r.elig === 0 && r.given === 0) parts.push('Bu paketdə bu ixtisasa namizəd yoxdur — yer verilmədi.')
+    else if (Math.abs(d) < 1) parts.push(Number.isInteger(r.target) ? 'Ədalətli paya tam uyğundur.' : `Ədalətli paya uyğundur (${fmtPay(r.target)} → ${r.flow}, kəsr yuvarlaqlaşdırıldı).`)
+    else if (d < 0) {
+      const full = pkTotal(src, i) >= cap.sub + cap.ns
+      parts.push(`Ədalətli paydan ${fmtPay(-d)} az. ` + (full
+        ? `Paketin ${cap.sub + cap.ns} nəfərinin hamısına yer ayrılıb; buradakı namizədlərin bir hissəsi digər ixtisasların yerlərini doldurmalı idi — o yerləri başqa paketdə dolduran olmazdı və boş qalardı. Qalan pay digər paketlərə keçdi.`
+        : 'Buradakı namizədlər digər ixtisasların yerlərinə lazım idi (o yerləri başqa paketdə dolduran olmazdı) və ya cins limiti buna imkan vermədi.'))
+    } else parts.push(`Ədalətli paydan ${fmtPay(d)} çox: digər paketlərdə bu yerləri dolduracaq namizəd çatmırdı (və ya onlar başqa ixtisaslara lazım idi), ona görə yer bu paketə keçdi.`)
+    if (r.elig > r.eligSub) parts.push(`${r.elig - r.eligSub} namizəd seçim göndərməyib — onlar yalnız ehtiyat kimi sayılır.`)
+    if (r.overflow > 0) parts.push(`⚠ ${r.overflow} yer heç bir paketdə doldurula bilmir (bütün paketlərdə namizəd çatmır) — boş qalacaq; ədalətli paydan ən çox geridə qalan bu paketə yazıldı.`)
+    const moved = r.given - r.flow - r.overflow
+    if (moved !== 0) parts.push(`Yoxlamadan sonra ${moved > 0 ? '+' : ''}${moved} (aşağıya bax).`)
+    return parts.join(' ')
+  }
+  const th: React.CSSProperties = { padding: '6px 8px', fontWeight: 700, fontSize: 10.5, color: '#8892b0', textTransform: 'uppercase', letterSpacing: .4, textAlign: 'center', whiteSpace: 'nowrap' }
+  const td: React.CSSProperties = { padding: '7px 8px', fontSize: 12.5, textAlign: 'center', verticalAlign: 'top' }
+  return (
+    <div style={{ margin: '4px 0 12px', border: `1px solid ${O(P.tint, '#f1ead4')}`, borderRadius: 12, background: `${P.tint2}`, overflow: 'hidden' }}>
+      <button onClick={() => setOpen(o => !o)}
+        style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', border: 'none', background: 'transparent', cursor: 'pointer', textAlign: 'left' }}>
+        <span style={{ fontSize: 13, fontWeight: 800, color: `${P.ink}`, flex: 1 }}>📦 Bu ixtisasın {sp.quota} yeri paketlərə niyə belə bölündü?</span>
+        <span style={{ fontSize: 12, color: '#8a909c' }}>{open ? 'Gizlət ▲' : 'Göstər ▼'}</span>
+      </button>
+      {open && (
+        <div style={{ padding: '0 14px 12px' }}>
+          <div style={{ fontSize: 12, color: `${O(P.ink, '#6a5a2e')}`, lineHeight: 1.6, marginBottom: 8 }}>
+            Hər paketə öz təhsilalanlarının sayı qədər yer düşür. İxtisasın yerləri paketlərə <b>namizəd sayına mütənasib</b> bölünür:
+            {' '}<b>ədalətli pay = yer × paketdəki namizəd ÷ bütün paketlərdəki namizəd</b>.
+            Yer yalnız onu dolduracaq namizədi olan paketə verilir və bütün məhdudiyyətlər (qrup, sütun filtrləri, cins, budaq, mənbə) qorunur.
+            Bölgü bütün ixtisaslar üçün <b>birlikdə</b> hesablanır ki, heç bir paketdə yer boş, digərində adam yersiz qalmasın — ona görə pay bəzən ədalətli paydan bir qədər fərqlənir.
+            {' '}Namizəd — seçim göndərənlərdə bu ixtisası öz siyahısına salanlar, göndərməyənlərdə onu seçə bilənlər.
+          </div>
+          {buckets.map(b => {
+            const eTot = b.rows.reduce((a, r) => a + r.elig, 0)
+            return (
+              <div key={b.src} style={{ marginBottom: 8 }}>
+                {SRC_LABEL[b.src] && <div style={{ fontSize: 11.5, fontWeight: 800, color: `${P.navyDk}`, margin: '6px 0 4px' }}>{SRC_LABEL[b.src]}: {b.slots} yer · {eTot} namizəd</div>}
+                {!SRC_LABEL[b.src] && <div style={{ fontSize: 11.5, fontWeight: 800, color: `${P.navyDk}`, margin: '6px 0 4px' }}>{b.slots} yer · bütün paketlərdə {eTot} namizəd</div>}
+                <div style={{ background: '#fff', borderRadius: 8, border: '1px solid #eef0f5', overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead><tr style={{ background: '#f7f8fc' }}>
+                      <th style={th}>Paket</th><th style={th}>Bal</th><th style={th}>Namizəd</th><th style={th}>Ədalətli pay</th><th style={th}>Verilən</th><th style={{ ...th, textAlign: 'left' }}>Səbəb</th>
+                    </tr></thead>
+                    <tbody>
+                      {Array.from({ length: P_ }, (_, i) => {
+                        const r = b.rows[i], cur = curPacket === i + 1
+                        return (
+                          <tr key={i} style={{ borderTop: '1px solid #f1f2f7', background: cur ? `${P.tint2}` : undefined }}>
+                            <td style={{ ...td, fontWeight: 800, color: `${P.navy}` }}>{i + 1}{cur ? ' ◀' : ''}</td>
+                            <td style={{ ...td, color: '#8a909c', whiteSpace: 'nowrap' }}>{range(i)}</td>
+                            <td style={td}>{r.elig}</td>
+                            <td style={{ ...td, color: '#5a6070' }}>{eTot ? `${b.slots}×${r.elig}÷${eTot} = ${fmtPay(Math.round(r.target * 100) / 100)}` : '—'}</td>
+                            <td style={{ ...td, fontWeight: 900, fontSize: 14, color: r.given === Math.round(r.target) ? '#237804' : `${P.navy}` }}>{r.given}</td>
+                            <td style={{ ...td, textAlign: 'left', fontSize: 11.5, color: '#5a6070', lineHeight: 1.5, minWidth: 220 }}>{why(b.src, i)}</td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )
+          })}
+          {moves.length > 0 && (
+            <div style={{ marginTop: 6, fontSize: 11.5, color: `${O(P.ink, '#6a5a2e')}`, lineHeight: 1.6 }}>
+              <b>Real yerləşdirmə ilə yoxlama — yer dəyişmələri:</b>
+              {moves.map((m, k) => (
+                <div key={k}>• Paket {m.from + 1}-də «{leafName[m.specId]}» ixtisasının 1 yeri boş qalırdı (onu seçən yox idi), həmin paketdəki <b>{m.student.name}</b> ({m.student.score.toFixed(1)} bal) isə yersiz qalırdı.
+                  {' '}Boş yer Paket {m.to + 1}-ə verildi, əvəzində Paket {m.to + 1}-dən «{leafName[m.otherSpecId]}» ixtisasının 1 yeri Paket {m.from + 1}-ə keçdi{SRC_LABEL[m.src] ? ` (${SRC_LABEL[m.src].toLowerCase()})` : ''} — nəticədə hər iki paketdə yersiz qalan azaldı.</div>
+              ))}
+            </div>
+          )}
+          {explain.repairTimedOut && <div style={{ marginTop: 6, fontSize: 11.5, color: '#cf1322' }}>⚠ Yoxlama vaxt limitinə çatıb dayandı — bəzi dəyişmələr sınanmamış ola bilər.</div>}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── İzahlı (hekayə) simulyasiya — Sadə və Paket üsulu üçün ──────────────────────
 function StorySim({ students, packets, subs, tree, poolUsers, preAssignLevel, finalAssignments, onClose }: {
   students?: any[]; packets?: any[]; subs: any[]; tree: any
@@ -204,7 +311,7 @@ function StorySim({ students, packets, subs, tree, poolUsers, preAssignLevel, fi
     leaves.forEach(({ leaf, path }) => { pathMap[leaf.id] = path; leafName[leaf.id] = leaf.name; leafPath[leaf.id] = path.slice(0, -1).map((n: any) => n.name).join(' › ') })
     // Paketlər: verilmişsə onlar, yoxsa hamısı bir "paket" (sadə üsul)
     const pkts = (packets && packets.length)
-      ? packets.map((p: any) => ({ num: p.num, students: p.students || [], specs: (p.specs || []).map((s: any) => ({ id: s.id, quota: s.quota, mülkiQuota: s.mülkiQuota, liseyQuota: s.liseyQuota })) }))
+      ? packets.map((p: any) => ({ num: p.num, students: p.students || [], specs: (p.specs || []).map((s: any) => ({ id: s.id, quota: s.quota, mülkiQuota: s.mülkiQuota, liseyQuota: s.liseyQuota, path: s.path, maxFemale: s.maxFemale, maxMale: s.maxMale })) }))
       : [{ num: 1, students: students || [], specs: leaves.map(({ leaf }) => ({ id: leaf.id, quota: leaf.quota || 0 })) }]
 
     const leafById: Record<string, any> = {}
@@ -215,6 +322,9 @@ function StorySim({ students, packets, subs, tree, poolUsers, preAssignLevel, fi
     const rebalanced: { name: string; score: number; fromSpec: string | null; toSpec: string; packetNum: number }[] = []
     for (const pk of pkts) {
       const quota: Record<string, number> = {}; pk.specs.forEach((s: any) => { quota[s.id] = s.quota })
+      // Paketə düşən cins limiti (real yerləşdirmə ilə eyni — bax: packetLeaf)
+      const pkLeaf: Record<string, any> = { ...leafById }
+      pk.specs.forEach((s: any) => { if (s.path) pkLeaf[s.id] = packetLeaf(s) })
       const withSub = pk.students.filter((u: any) => (subs.find((s: any) => s.userId === u.id)?.ranking || []).length)
       // Yerləşdirmə mühərriki ilə EYNİ sıra (bal, bərabərdirsə prioritet meyarları)
       const meritCmp = makeMeritCompare(subs, pathMap, sid => quota[sid] !== undefined)
@@ -288,7 +398,7 @@ function StorySim({ students, packets, subs, tree, poolUsers, preAssignLevel, fi
         const tieRivals: { id: string; rival: string; score: number; trace?: TieStep[]; subject?: string; rivalSubjScore?: number; mySubjScore?: number }[] = []
         const sc = u.score || 0, g = u.gender
         for (const sid of ranking) {
-          const leaf = leafById[sid]
+          const leaf = pkLeaf[sid]
           if (!genderAllowed(leaf, g)) { attempts.push({ id: sid, full: true, blocked: 'gender' }); continue }
           if (av[sid] > 0 && !genderCapReached(leaf, g, femP[sid] || 0, malP[sid] || 0)) {
             av[sid]--; placed = sid
@@ -335,7 +445,7 @@ function StorySim({ students, packets, subs, tree, poolUsers, preAssignLevel, fi
           if (a) assignments[u.id] = a
         }
       } else {
-        rebalanceUnplaced({ users: pk.students, subs, leafById, quotas: quota, pathMap, placed: placedMap, femP, malP, assignments })
+        rebalanceUnplaced({ users: pk.students, subs, leafById: pkLeaf, quotas: quota, pathMap, placed: placedMap, femP, malP, assignments })
       }
       // Hər addıma yekun (tarazlamadan sonrakı) vəziyyəti yaz
       for (let i = stepStart; i < steps.length; i++) {
@@ -353,7 +463,8 @@ function StorySim({ students, packets, subs, tree, poolUsers, preAssignLevel, fi
     // ona görə "təhsilalan sayı" addım sayından ayrıca hesablanır.
     const studentCount = new Set(steps.map(s => s.u.id)).size
     const staged = steps.some(s => s.stage)
-    return { steps, leafName, leafPath, pkMeta, multiPacket: pkts.length > 1, rebalanced, greedyPlaced, finalPlaced, studentCount, staged }
+    const allocExplain: PacketAllocExplain | null = (packets && packets.length && packets[0]?.allocExplain) || null
+    return { steps, leafName, leafPath, pkMeta, multiPacket: pkts.length > 1, rebalanced, greedyPlaced, finalPlaced, studentCount, staged, allocExplain }
   }, [students, packets, subs, tree, poolUsers, preAssignLevel, finalAssignments])
 
   const total = data.steps.length
@@ -633,6 +744,11 @@ function StorySim({ students, packets, subs, tree, poolUsers, preAssignLevel, fi
                 </div>
               )}
               <div style={{ fontSize: 13, marginTop: 6 }}>Addım-addım izləmək üçün “Növbəti addım”, ardıcıl izləmək üçün “Avtomatik” istifadə edin.</div>
+              {data.allocExplain && (
+                <div style={{ fontSize: 12, color: '#8a909c', marginTop: 10, lineHeight: 1.6 }}>
+                  📦 İxtisasın yerlərinin paketlərə niyə belə bölündüyünü görmək üçün soldakı ixtisasın üzərinə klikləyin.
+                </div>
+              )}
             </div>
           )}
 
@@ -818,6 +934,7 @@ function StorySim({ students, packets, subs, tree, poolUsers, preAssignLevel, fi
 
               {/* Siyahı */}
               <div style={{ overflowY: 'auto', padding: '10px 16px 16px' }}>
+                {data.allocExplain && <PacketAllocWhy specId={selLeaf} explain={data.allocExplain} pkMeta={data.pkMeta} leafName={data.leafName} curPacket={showAll ? null : curPk} />}
                 {list.length === 0 ? (
                   <div style={{ padding: 40, textAlign: 'center', color: '#8892b0', fontSize: 14 }}>Bu addıma qədər bu ixtisasa heç kim yerləşməyib.</div>
                 ) : list.map((it, i) => (
@@ -1041,7 +1158,9 @@ export default function Distribution() {
     // Yerlər HƏR MƏNBƏ ÜZRƏ AYRICA paylanır: paketə düşən mülki yer = paketdəki
     // mülki təhsilalan sayı, lisey yer = lisey sayı. Hər ixtisas üzrə paketlərin
     // cəmi sadə üsulun bölgüsünə dəqiq bərabərdir.
-    const perPacketSpecs = allocatePacketSpecs(leaves, allInstUsers, pkUsers, tree, sel?.preAssignLevel ?? null)
+    // Bütün paketlər birlikdə hesablanır, real yerləşdirmə ilə yoxlanılır; hər
+    // paketin ixtisas payının izahı izahlı simulyasiyada göstərilir.
+    const { specs: perPacketSpecs, explain } = allocatePacketSpecs(leaves, allInstUsers, pkUsers, tree, sel?.preAssignLevel ?? null, sels)
 
     const result = []
     for (let i = 0; i < P; i++) {
@@ -1055,6 +1174,9 @@ export default function Distribution() {
         maxScore:   studs.length ? Math.max(...studs.map((s: any) => s.score || 0)) : 0,
         specs:      perPacketSpecs[i],
         totalQuota: perPacketSpecs[i].reduce((s, x) => s + x.quota, 0),
+        // paketin 0-dan başlayan sırası bölgüdə (izah sətirləri bununla tapılır)
+        allocIndex: i,
+        allocExplain: explain,
       })
     }
     return result
